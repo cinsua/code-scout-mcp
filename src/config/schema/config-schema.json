@@ -1,0 +1,535 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://code-scout.dev/config-schema.json",
+  "title": "Code-Scout Configuration Schema",
+  "description": "JSON Schema for Code-Scout MCP server configuration",
+  "type": "object",
+  "required": [
+    "version",
+    "indexing",
+    "search",
+    "database",
+    "watching",
+    "languages",
+    "logging",
+    "security"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Configuration version for migration support",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "profile": {
+      "type": "string",
+      "description": "Profile name for environment-specific configurations",
+      "enum": ["development", "production", "cicd"]
+    },
+    "indexing": {
+      "type": "object",
+      "description": "Indexing configuration for code analysis",
+      "required": [
+        "maxFileSize",
+        "maxWorkers",
+        "batchSize",
+        "debounceMs",
+        "batchWindowMs",
+        "followSymlinks",
+        "maxDepth",
+        "incremental"
+      ],
+      "properties": {
+        "maxFileSize": {
+          "type": "integer",
+          "description": "Maximum file size in bytes to process",
+          "minimum": 1024,
+          "maximum": 1073741824,
+          "default": 10485760
+        },
+        "maxWorkers": {
+          "type": "integer",
+          "description": "Maximum number of worker threads for parallel processing",
+          "minimum": 1,
+          "maximum": 64,
+          "default": 4
+        },
+        "batchSize": {
+          "type": "integer",
+          "description": "Batch size for processing files",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 100
+        },
+        "debounceMs": {
+          "type": "integer",
+          "description": "Debounce time in milliseconds for file changes",
+          "minimum": 0,
+          "maximum": 10000,
+          "default": 300
+        },
+        "batchWindowMs": {
+          "type": "integer",
+          "description": "Batch window time in milliseconds",
+          "minimum": 100,
+          "maximum": 60000,
+          "default": 1000
+        },
+        "followSymlinks": {
+          "type": "boolean",
+          "description": "Whether to follow symbolic links",
+          "default": false
+        },
+        "maxDepth": {
+          "type": "integer",
+          "description": "Maximum depth for directory traversal",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 10
+        },
+        "incremental": {
+          "type": "boolean",
+          "description": "Enable incremental indexing",
+          "default": true
+        }
+      }
+    },
+    "search": {
+      "type": "object",
+      "description": "Search/querying configuration",
+      "required": [
+        "defaultLimit",
+        "maxLimit",
+        "scoringWeights",
+        "fuzzySearch",
+        "fuzzyThreshold",
+        "enableRegex",
+        "timeoutMs"
+      ],
+      "properties": {
+        "defaultLimit": {
+          "type": "integer",
+          "description": "Default number of results to return",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 20
+        },
+        "maxLimit": {
+          "type": "integer",
+          "description": "Maximum number of results to return",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 100
+        },
+        "scoringWeights": {
+          "type": "object",
+          "description": "Scoring weights for different content types",
+          "required": [
+            "filename",
+            "path",
+            "definitions",
+            "imports",
+            "documentation",
+            "content"
+          ],
+          "properties": {
+            "filename": {
+              "type": "number",
+              "description": "Weight for filename matches",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 5.0
+            },
+            "path": {
+              "type": "number",
+              "description": "Weight for path matches",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 3.0
+            },
+            "definitions": {
+              "type": "number",
+              "description": "Weight for definition matches",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 3.0
+            },
+            "imports": {
+              "type": "number",
+              "description": "Weight for import matches",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 2.0
+            },
+            "documentation": {
+              "type": "number",
+              "description": "Weight for documentation matches",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 1.0
+            },
+            "content": {
+              "type": "number",
+              "description": "Weight for code content matches",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 1.0
+            }
+          }
+        },
+        "fuzzySearch": {
+          "type": "boolean",
+          "description": "Enable fuzzy search",
+          "default": true
+        },
+        "fuzzyThreshold": {
+          "type": "number",
+          "description": "Fuzzy search threshold (0-1)",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.6
+        },
+        "enableRegex": {
+          "type": "boolean",
+          "description": "Enable regex search",
+          "default": true
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "description": "Search timeout in milliseconds",
+          "minimum": 1000,
+          "maximum": 300000,
+          "default": 30000
+        }
+      }
+    },
+    "database": {
+      "type": "object",
+      "description": "Database configuration for storage",
+      "required": [
+        "path",
+        "maxConnections",
+        "connectionTimeout",
+        "type",
+        "enableWAL",
+        "vacuumIntervalHours"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Path to the database file",
+          "minLength": 1,
+          "default": "./.code-scout/database.db"
+        },
+        "maxConnections": {
+          "type": "integer",
+          "description": "Maximum number of connections",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 10
+        },
+        "connectionTimeout": {
+          "type": "integer",
+          "description": "Connection timeout in milliseconds",
+          "minimum": 1000,
+          "maximum": 300000,
+          "default": 30000
+        },
+        "type": {
+          "type": "string",
+          "description": "Database type",
+          "enum": ["sqlite", "postgresql", "mysql"],
+          "default": "sqlite"
+        },
+        "enableWAL": {
+          "type": "boolean",
+          "description": "Enable WAL mode for SQLite",
+          "default": true
+        },
+        "vacuumIntervalHours": {
+          "type": "integer",
+          "description": "Vacuum interval in hours",
+          "minimum": 1,
+          "maximum": 168,
+          "default": 24
+        },
+        "connectionString": {
+          "type": "string",
+          "description": "Connection string for non-SQLite databases",
+          "minLength": 1
+        }
+      }
+    },
+    "watching": {
+      "type": "object",
+      "description": "File watching configuration",
+      "required": [
+        "enabled",
+        "ignorePatterns",
+        "includePatterns",
+        "recursive",
+        "debounceMs"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable file watching",
+          "default": true
+        },
+        "ignorePatterns": {
+          "type": "array",
+          "description": "Patterns to ignore when watching",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": [
+            "node_modules",
+            ".git",
+            "dist",
+            "build",
+            "__pycache__",
+            "*.pyc"
+          ]
+        },
+        "includePatterns": {
+          "type": "array",
+          "description": "Patterns to include when watching",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": ["**/*.{js,jsx,ts,tsx,py,json,md}"]
+        },
+        "pollingInterval": {
+          "type": "integer",
+          "description": "Polling interval in milliseconds (0 = use OS events)",
+          "minimum": 0,
+          "maximum": 10000,
+          "default": 0
+        },
+        "recursive": {
+          "type": "boolean",
+          "description": "Enable watching for subdirectories",
+          "default": true
+        },
+        "debounceMs": {
+          "type": "integer",
+          "description": "Debounce time for file events",
+          "minimum": 100,
+          "maximum": 5000,
+          "default": 300
+        }
+      }
+    },
+    "languages": {
+      "type": "object",
+      "description": "Language-specific configurations",
+      "required": ["typescript", "javascript", "python"],
+      "properties": {
+        "typescript": {
+          "$ref": "#/definitions/languageConfig"
+        },
+        "javascript": {
+          "$ref": "#/definitions/languageConfig"
+        },
+        "python": {
+          "$ref": "#/definitions/languageConfig"
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/languageConfig"
+      }
+    },
+    "logging": {
+      "type": "object",
+      "description": "Logging configuration",
+      "required": ["level", "format", "file", "console", "structured"],
+      "properties": {
+        "level": {
+          "type": "string",
+          "description": "Log level",
+          "enum": ["error", "warn", "info", "debug", "trace"],
+          "default": "info"
+        },
+        "format": {
+          "type": "string",
+          "description": "Log format",
+          "enum": ["json", "text"],
+          "default": "json"
+        },
+        "file": {
+          "type": "object",
+          "description": "File logging configuration",
+          "required": ["enabled"],
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable file logging",
+              "default": true
+            },
+            "path": {
+              "type": "string",
+              "description": "Log file path",
+              "minLength": 1,
+              "default": "./.code-scout/logs/app.log"
+            },
+            "maxSize": {
+              "type": "string",
+              "description": "Maximum file size",
+              "pattern": "^\\d+[KMGT]?B$",
+              "default": "10MB"
+            },
+            "maxFiles": {
+              "type": "integer",
+              "description": "Maximum number of log files",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 5
+            }
+          }
+        },
+        "console": {
+          "type": "object",
+          "description": "Console logging configuration",
+          "required": ["enabled"],
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable console logging",
+              "default": true
+            },
+            "colorize": {
+              "type": "boolean",
+              "description": "Colorize console output",
+              "default": true
+            }
+          }
+        },
+        "structured": {
+          "type": "boolean",
+          "description": "Enable structured logging",
+          "default": false
+        }
+      }
+    },
+    "security": {
+      "type": "object",
+      "description": "Security configuration",
+      "required": [
+        "allowedExtensions",
+        "blockedPatterns",
+        "maxPathLength",
+        "enableSandbox"
+      ],
+      "properties": {
+        "allowedExtensions": {
+          "type": "array",
+          "description": "Allowed file extensions",
+          "items": {
+            "type": "string",
+            "pattern": "^\\.[a-zA-Z0-9]+$"
+          },
+          "default": [
+            ".js",
+            ".jsx",
+            ".ts",
+            ".tsx",
+            ".py",
+            ".json",
+            ".md",
+            ".txt",
+            ".yml",
+            ".yaml"
+          ]
+        },
+        "blockedPatterns": {
+          "type": "array",
+          "description": "Blocked file patterns",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": [
+            "*.exe",
+            "*.dll",
+            "*.so",
+            "*.dylib",
+            "*.bin",
+            "*.obj",
+            "*.o"
+          ]
+        },
+        "maxPathLength": {
+          "type": "integer",
+          "description": "Maximum file path length",
+          "minimum": 100,
+          "maximum": 4096,
+          "default": 1024
+        },
+        "enableSandbox": {
+          "type": "boolean",
+          "description": "Enable sandboxing",
+          "default": false
+        },
+        "sandbox": {
+          "type": "object",
+          "description": "Sandbox configuration",
+          "required": ["timeoutMs", "memoryLimitMB", "allowNetworkAccess"],
+          "properties": {
+            "timeoutMs": {
+              "type": "integer",
+              "description": "Sandbox timeout in milliseconds",
+              "minimum": 1000,
+              "maximum": 300000,
+              "default": 30000
+            },
+            "memoryLimitMB": {
+              "type": "integer",
+              "description": "Memory limit in MB",
+              "minimum": 64,
+              "maximum": 8192,
+              "default": 512
+            },
+            "allowNetworkAccess": {
+              "type": "boolean",
+              "description": "Allow network access in sandbox",
+              "default": false
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "languageConfig": {
+      "type": "object",
+      "description": "Language-specific configuration",
+      "required": ["extensions", "parser", "enabled"],
+      "properties": {
+        "extensions": {
+          "type": "array",
+          "description": "File extensions for this language",
+          "items": {
+            "type": "string",
+            "pattern": "^\\.[a-zA-Z0-9]+$"
+          },
+          "minItems": 1
+        },
+        "parser": {
+          "type": "string",
+          "description": "Parser name to use",
+          "minLength": 1
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable this language",
+          "default": true
+        },
+        "config": {
+          "type": "object",
+          "description": "Language-specific configuration"
+        }
+      }
+    }
+  }
+}

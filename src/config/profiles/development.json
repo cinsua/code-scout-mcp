@@ -1,0 +1,140 @@
+{
+  "version": "1.0.0",
+  "profile": "development",
+  "indexing": {
+    "maxFileSize": 52428800,
+    "maxWorkers": 2,
+    "batchSize": 50,
+    "debounceMs": 500,
+    "batchWindowMs": 2000,
+    "followSymlinks": true,
+    "maxDepth": 10,
+    "incremental": true
+  },
+  "search": {
+    "defaultLimit": 50,
+    "maxLimit": 200,
+    "fuzzySearch": true,
+    "fuzzyThreshold": 0.6,
+    "enableRegex": true,
+    "timeoutMs": 10000,
+    "scoringWeights": {
+      "filename": 4.0,
+      "path": 2.5,
+      "definitions": 3.5,
+      "imports": 2.0,
+      "documentation": 1.5,
+      "content": 2.0
+    }
+  },
+  "database": {
+    "path": "./.code-scout/dev-database.db",
+    "type": "sqlite",
+    "maxConnections": 5,
+    "connectionTimeout": 10000,
+    "enableWAL": true,
+    "vacuumIntervalHours": 24
+  },
+  "watching": {
+    "enabled": true,
+    "ignorePatterns": [
+      "node_modules",
+      ".git",
+      "dist",
+      "build",
+      "__pycache__",
+      "*.pyc",
+      ".code-scout",
+      "*.log",
+      "coverage",
+      ".nyc_output"
+    ],
+    "includePatterns": [
+      "**/*.ts",
+      "**/*.tsx",
+      "**/*.js",
+      "**/*.jsx",
+      "**/*.py",
+      "**/*.json",
+      "**/*.md"
+    ],
+    "pollingInterval": 0,
+    "recursive": true,
+    "debounceMs": 500
+  },
+  "languages": {
+    "typescript": {
+      "extensions": [".ts", ".tsx", ".js", ".jsx"],
+      "parser": "TypeScriptParser",
+      "enabled": true,
+      "config": {
+        "strict": false,
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true
+      }
+    },
+    "javascript": {
+      "extensions": [".js", ".jsx"],
+      "parser": "JavaScriptParser",
+      "enabled": true,
+      "config": {
+        "esversion": 2022,
+        "sourceType": "module"
+      }
+    },
+    "python": {
+      "extensions": [".py"],
+      "parser": "PythonParser",
+      "enabled": true,
+      "config": {
+        "version": 3,
+        "parseDocstrings": true
+      }
+    }
+  },
+  "logging": {
+    "level": "debug",
+    "format": "text",
+    "file": {
+      "enabled": true,
+      "path": "./.code-scout/logs/dev.log",
+      "maxSize": "50MB",
+      "maxFiles": 5
+    },
+    "console": {
+      "enabled": true,
+      "colorize": true
+    },
+    "structured": false
+  },
+  "security": {
+    "allowedExtensions": [
+      ".ts",
+      ".tsx",
+      ".js",
+      ".jsx",
+      ".py",
+      ".json",
+      ".md",
+      ".txt",
+      ".yml",
+      ".yaml"
+    ],
+    "blockedPatterns": [
+      "**/*.pem",
+      "**/*.key",
+      "**/*.p12",
+      "**/.env*",
+      "**/secrets/**",
+      "**/private/**",
+      "**/.ssh/**"
+    ],
+    "maxPathLength": 1024,
+    "enableSandbox": false,
+    "sandbox": {
+      "timeoutMs": 30000,
+      "memoryLimitMB": 512,
+      "allowNetworkAccess": true
+    }
+  }
+}

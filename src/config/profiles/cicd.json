@@ -1,0 +1,137 @@
+{
+  "version": "1.0.0",
+  "profile": "cicd",
+  "indexing": {
+    "maxFileSize": 5242880,
+    "maxWorkers": 2,
+    "batchSize": 200,
+    "debounceMs": 100,
+    "batchWindowMs": 500,
+    "followSymlinks": false,
+    "maxDepth": 6,
+    "incremental": false
+  },
+  "search": {
+    "defaultLimit": 10,
+    "maxLimit": 50,
+    "fuzzySearch": false,
+    "fuzzyThreshold": 0.9,
+    "enableRegex": false,
+    "timeoutMs": 3000,
+    "scoringWeights": {
+      "filename": 6.0,
+      "path": 4.0,
+      "definitions": 5.0,
+      "imports": 3.0,
+      "documentation": 2.0,
+      "content": 1.0
+    }
+  },
+  "database": {
+    "path": "./.code-scout/ci-database.db",
+    "type": "sqlite",
+    "maxConnections": 3,
+    "connectionTimeout": 5000,
+    "enableWAL": false,
+    "vacuumIntervalHours": 1
+  },
+  "watching": {
+    "enabled": false,
+    "ignorePatterns": [
+      "node_modules",
+      ".git",
+      "dist",
+      "build",
+      "__pycache__",
+      "*.pyc",
+      ".code-scout",
+      "*.log",
+      "coverage",
+      ".nyc_output",
+      "tmp",
+      "temp",
+      ".pytest_cache",
+      ".mypy_cache",
+      ".tox"
+    ],
+    "includePatterns": [
+      "src/**/*.{ts,tsx,js,jsx,py}",
+      "lib/**/*.{ts,tsx,js,jsx,py}"
+    ],
+    "pollingInterval": 0,
+    "recursive": true,
+    "debounceMs": 100
+  },
+  "languages": {
+    "typescript": {
+      "extensions": [".ts", ".tsx"],
+      "parser": "TypeScriptParser",
+      "enabled": true,
+      "config": {
+        "strict": true,
+        "experimentalDecorators": false,
+        "emitDecoratorMetadata": false
+      }
+    },
+    "javascript": {
+      "extensions": [".js", ".jsx"],
+      "parser": "JavaScriptParser",
+      "enabled": true,
+      "config": {
+        "esversion": 2022,
+        "sourceType": "module"
+      }
+    },
+    "python": {
+      "extensions": [".py"],
+      "parser": "PythonParser",
+      "enabled": true,
+      "config": {
+        "version": 3,
+        "parseDocstrings": false
+      }
+    }
+  },
+  "logging": {
+    "level": "warn",
+    "format": "json",
+    "file": {
+      "enabled": true,
+      "path": "./.code-scout/logs/ci.log",
+      "maxSize": "10MB",
+      "maxFiles": 3
+    },
+    "console": {
+      "enabled": true,
+      "colorize": false
+    },
+    "structured": true
+  },
+  "security": {
+    "allowedExtensions": [".ts", ".tsx", ".js", ".jsx", ".py"],
+    "blockedPatterns": [
+      "**/*.pem",
+      "**/*.key",
+      "**/*.p12",
+      "**/.env*",
+      "**/secrets/**",
+      "**/private/**",
+      "**/.ssh/**",
+      "**/config/**",
+      "**/*.conf",
+      "**/*.cfg",
+      "**/test/**",
+      "**/tests/**",
+      "**/__tests__/**",
+      "**/*.test.*",
+      "**/*.spec.*"
+    ],
+    "maxPathLength": 256,
+    "enableSandbox": true,
+    "sandbox": {
+      "timeoutMs": 5000,
+      "memoryLimitMB": 128,
+      "allowNetworkAccess": false
+    }
+  }
+}

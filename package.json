@@ -44,6 +44,8 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
     "better-sqlite3": "^11.4.0",
     "chokidar": "^3.5.0",
     "tree-sitter": "^0.21.1",
@@ -52,6 +54,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@types/ajv": "^0.0.5",
     "@types/jest": "^30.0.0",
     "@types/node": "^18.0.0",
     "@typescript-eslint/eslint-plugin": "^8.30.1",
