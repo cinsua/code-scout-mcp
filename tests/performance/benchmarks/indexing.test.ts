@@ -1,5 +1,6 @@
 // Sample performance test for benchmarking
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
+import { performance } from 'perf_hooks';
 import { createTestRepository, createTestCodebase } from '../../fixtures';
 
 describe('Performance Benchmarks', () => {
@@ -125,7 +126,7 @@ export class ApiService {
       const largeContent =
         'export const functions = [' +
         Array.from({ length: 1000 }, (_, i) => `() => { return ${i}; }`).join(
-          ', '
+          ', ',
         ) +
         '];';
 

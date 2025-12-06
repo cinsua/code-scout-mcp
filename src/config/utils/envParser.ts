@@ -673,7 +673,6 @@ export function envVarToConfigPath(
  */
 
 export function setNestedProperty(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   obj: any,
   path: string,
   value: unknown,

@@ -462,7 +462,7 @@ export class EnvironmentConfiguration extends ConfigurationSource {
   /**
    * Set nested value in configuration object
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   private setNestedValue(obj: any, path: string, value: unknown): void {
     const keys = path.split('.');
     let current = obj;

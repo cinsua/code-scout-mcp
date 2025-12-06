@@ -446,7 +446,7 @@ export class Configuration extends EventEmitter {
   /**
    * Deep merge two objects
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   private deepMerge<T extends Record<string, any>>(
     target: T,
     source: Partial<T>,
@@ -460,10 +460,8 @@ export class Configuration extends EventEmitter {
       }
 
       if (this.shouldDeepMerge(result[key], sourceValue)) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         result[key] = this.deepMerge(result[key], sourceValue as any);
       } else {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         result[key] = sourceValue as any;
       }
     }

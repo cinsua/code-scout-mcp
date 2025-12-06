@@ -246,7 +246,7 @@ export class ConfigurationManager extends EventEmitter {
   /**
    * Deep merge two objects
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   private deepMerge(target: any, source: any): any {
     const result = { ...target };
 
@@ -507,7 +507,7 @@ export class ConfigurationManager extends EventEmitter {
   /**
    * Set nested value in object
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   private setNestedValue(obj: any, path: string, value: unknown): void {
     const keys = path.split('.');
     let current = obj;

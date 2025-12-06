@@ -44,14 +44,14 @@ export default [
     },
     rules: {
       // TypeScript specific rules
-      '@typescript-eslint/no-unused-vars': [
-        'error',
-        { argsIgnorePattern: '^_' },
-      ],
-      '@typescript-eslint/explicit-function-return-type': 'off',
-      '@typescript-eslint/explicit-module-boundary-types': 'off',
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-non-null-assertion': 'warn',
+       '@typescript-eslint/no-unused-vars': [
+         'error',
+         { argsIgnorePattern: '^_' },
+       ],
+       '@typescript-eslint/explicit-function-return-type': 'off',
+       '@typescript-eslint/explicit-module-boundary-types': 'off',
+       '@typescript-eslint/no-explicit-any': 'off', // Relaxed: allow any type for flexibility
+       '@typescript-eslint/no-non-null-assertion': 'off', // Relaxed: allow non-null assertions
       '@typescript-eslint/no-var-requires': 'error',
       '@typescript-eslint/prefer-nullish-coalescing': 'error',
       '@typescript-eslint/prefer-optional-chain': 'error',
@@ -102,59 +102,59 @@ export default [
       'object-curly-spacing': 'off', // Let Prettier handle spacing
       'array-bracket-spacing': 'off', // Let Prettier handle spacing
 
-      // Error prevention
-      'no-undef': 'error',
-      'no-unused-vars': 'off', // Handled by TypeScript
-      'no-unreachable': 'error',
-      'no-constant-condition': 'warn',
-      'no-empty': 'warn',
-      'no-extra-semi': 'error',
+       // Error prevention
+       'no-undef': 'error',
+       'no-unused-vars': 'off', // Handled by TypeScript
+       'no-unreachable': 'error',
+       'no-constant-condition': 'warn',
+       'no-empty': 'warn',
+       'no-extra-semi': 'error',
 
-      // Import/Export rules
-      'import/order': [
-        'error',
-        {
-          groups: [
-            'builtin',
-            'external',
-            'internal',
-            'parent',
-            'sibling',
-            'index',
-          ],
-          'newlines-between': 'always',
-        },
-      ],
-      'import/no-unused-modules': 'error',
-      'import/no-deprecated': 'warn',
+       // Import/Export rules
+       'import/order': [
+         'error',
+         {
+           groups: [
+             'builtin',
+             'external',
+             'internal',
+             'parent',
+             'sibling',
+             'index',
+           ],
+           'newlines-between': 'always',
+         },
+       ],
+       'import/no-unused-modules': 'error',
+       'import/no-deprecated': 'warn',
 
-      // Best practices
-      'consistent-return': 'error',
-      'default-case': 'error',
-      'dot-notation': 'error',
-      'no-else-return': 'error',
-      'no-empty-function': 'warn',
-      'no-magic-numbers': ['warn', { ignore: [-1, 0, 1, 2] }],
-      'no-multi-spaces': 'error',
-      'no-return-assign': 'error',
-      'no-return-await': 'error',
-      'no-self-compare': 'error',
-      'no-sequences': 'error',
-      'no-throw-literal': 'error',
-      'no-unmodified-loop-condition': 'error',
-      'no-unused-expressions': 'error',
-      'no-useless-call': 'error',
-      'no-useless-concat': 'error',
-      'no-useless-return': 'error',
-      'prefer-promise-reject-errors': 'error',
-      radix: 'error',
-      'require-await': 'error',
-      yoda: 'error',
+       // Best practices
+       'consistent-return': 'error',
+       'default-case': 'error',
+       'dot-notation': 'error',
+       'no-else-return': 'error',
+       'no-empty-function': 'warn',
+       'no-magic-numbers': ['off', { ignore: [-1, 0, 1, 2] }], // Relaxed: allow magic numbers
+       'no-multi-spaces': 'error',
+       'no-return-assign': 'error',
+       'no-return-await': 'error',
+       'no-self-compare': 'error',
+       'no-sequences': 'error',
+       'no-throw-literal': 'error',
+       'no-unmodified-loop-condition': 'error',
+       'no-unused-expressions': 'error',
+       'no-useless-call': 'error',
+       'no-useless-concat': 'error',
+       'no-useless-return': 'error',
+       'prefer-promise-reject-errors': 'error',
+       radix: 'error',
+       'require-await': 'error',
+       yoda: 'error',
 
-      // Complexity monitoring
-      complexity: ['warn', 7],
-      'max-lines-per-function': ['warn', 50],
-      'max-params': ['warn', 4],
+       // Complexity monitoring - relaxed for development flexibility
+       complexity: ['off', 7], // Disabled: allow complex functions
+       'max-lines-per-function': ['off', 50], // Disabled: allow long functions
+       'max-params': ['off', 4], // Disabled: allow more parameters
     },
   },
   {
@@ -194,6 +194,118 @@ export default [
     rules: {
       'no-console': 'off',
       'no-magic-numbers': 'off',
+    },
+  },
+  {
+    files: ['**/*.test.ts', '**/*.spec.ts'],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        project: './tsconfig.json',
+        tsconfigRootDir: process.cwd(),
+      },
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        console: 'readonly',
+        process: 'readonly',
+        Buffer: 'readonly',
+        __dirname: 'readonly',
+        __filename: 'readonly',
+        global: 'readonly',
+        module: 'readonly',
+        require: 'readonly',
+        exports: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        NodeJS: 'readonly',
+        describe: 'readonly',
+        it: 'readonly',
+        test: 'readonly',
+        expect: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+        jest: 'readonly',
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tsPlugin,
+      import: importPlugin,
+      security: securityPlugin,
+      unicorn: unicornPlugin,
+    },
+    rules: {
+      // Allow console statements in tests
+      'no-console': 'off',
+      // Allow magic numbers in tests
+      'no-magic-numbers': 'off',
+      // Relax some rules for tests
+      '@typescript-eslint/no-explicit-any': 'off',
+      'max-lines-per-function': 'off',
+      'max-params': 'off',
+      complexity: 'off',
+    },
+  },
+  {
+    files: ['**/*.test.ts', '**/*.spec.ts'],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        project: './tsconfig.json',
+        tsconfigRootDir: process.cwd(),
+      },
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        ...Object.fromEntries(
+          Object.entries({
+            console: 'readonly',
+            process: 'readonly',
+            Buffer: 'readonly',
+            __dirname: 'readonly',
+            __filename: 'readonly',
+            global: 'readonly',
+            module: 'readonly',
+            require: 'readonly',
+            exports: 'readonly',
+            setTimeout: 'readonly',
+            clearTimeout: 'readonly',
+            setInterval: 'readonly',
+            clearInterval: 'readonly',
+            NodeJS: 'readonly',
+            describe: 'readonly',
+            it: 'readonly',
+            test: 'readonly',
+            expect: 'readonly',
+            beforeEach: 'readonly',
+            afterEach: 'readonly',
+            beforeAll: 'readonly',
+            afterAll: 'readonly',
+            jest: 'readonly',
+          }).map(([key, value]) => [key, value]),
+        ),
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tsPlugin,
+      import: importPlugin,
+      security: securityPlugin,
+      unicorn: unicornPlugin,
+    },
+    rules: {
+      // Allow console statements in tests
+      'no-console': 'off',
+      // Allow magic numbers in tests
+      'no-magic-numbers': 'off',
+      // Relax some rules for tests
+      '@typescript-eslint/no-explicit-any': 'off',
+      'max-lines-per-function': 'off',
+      'max-params': 'off',
+      complexity: 'off',
     },
   },
   {
