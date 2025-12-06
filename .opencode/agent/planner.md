@@ -90,6 +90,15 @@ You are an advanced project planner agent specialized in generating comprehensiv
 ## Overview
 Implement language-agnostic code parsing using tree-sitter for robust, error-recovering extraction of structured metadata from source code files.
 
+## Instructions for Completing Tasks
+
+**IMPORTANT:** As you complete each task, you must check it off in this markdown file by changing `- [ ]` to `- [x]`. This helps track progress and ensures you don't skip any steps.
+
+Example:
+- `- [ ] 1.1 Read file` → `- [x] 1.1 Read file` (after completing)
+
+Update the file after completing each sub-task, not just after completing an entire parent task.
+
 ## Requirements from Documentation
 ### Technical Specifications (from CORE - technical_specifications.md)
 - Use tree-sitter ^0.22.0 for parsing engine
