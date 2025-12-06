@@ -5,12 +5,84 @@
  * checking logical consistency, dependencies, and business rules.
  */
 
-import {
+import type {
   PartialAppConfig,
   ValidationResult,
   ValidationError,
   ValidationWarning,
+  DatabaseConfig,
+  IndexingConfig,
+  SearchConfig,
+  SecurityConfig,
+  WatchingConfig,
+  LanguageConfig,
 } from '../types/ConfigTypes';
+
+/**
+ * Maximum recommended database connections
+ */
+const MAX_RECOMMENDED_CONNECTIONS = 100;
+
+/**
+ * Minimum timeout in milliseconds
+ */
+const MIN_TIMEOUT_MS = 1000;
+
+/**
+ * Maximum recommended file size for indexing
+ */
+const MAX_RECOMMENDED_FILE_SIZE = 5000;
+
+/**
+ * Maximum recommended directory traversal depth
+ */
+const MAX_RECOMMENDED_DEPTH = 20;
+
+/**
+ * Maximum recommended database file size
+ */
+const MAX_RECOMMENDED_DB_SIZE = 4096;
+
+/**
+ * Maximum recommended workers
+ */
+const MAX_RECOMMENDED_WORKERS = 64;
+
+/**
+ * Minimum recommended polling interval in milliseconds
+ */
+const MIN_POLLING_INTERVAL_MS = 100;
+
+/**
+ * Maximum recommended debounce timing in milliseconds
+ */
+const MAX_DEBOUNCE_MS = 2000;
+
+/**
+ * Multiplier for search limit vs indexing batch size
+ */
+const SEARCH_LIMIT_MULTIPLIER = 10;
+
+/**
+ * Number of bytes in a kilobyte
+ */
+const BYTES_PER_KB = 1024;
+
+/**
+ * Number of kilobytes in a megabyte
+ */
+const KB_PER_MB = 1024;
+
+/**
+ * Number of megabytes for recommended index file size
+ */
+const RECOMMENDED_INDEX_MB = 100;
+
+/**
+ * Maximum recommended file size for indexing (100MB)
+ */
+const MAX_RECOMMENDED_INDEX_FILE_SIZE =
+  RECOMMENDED_INDEX_MB * BYTES_PER_KB * KB_PER_MB;
 
 /**
  * Semantic validation options
@@ -136,7 +208,7 @@ export class SemanticValidator {
    * @param name - Rule name to remove
    */
   removeRule(name: string): void {
-    this.rules = this.rules.filter((rule) => rule.name !== name);
+    this.rules = this.rules.filter(rule => rule.name !== name);
   }
 
   /**
@@ -152,75 +224,190 @@ export class SemanticValidator {
    * Initialize built-in validation rules
    */
   private initializeRules(): void {
-    // Database validation rules
+    this.addDatabaseRules();
+    this.addIndexingRules();
+    this.addSearchRules();
+    this.addWatchingRules();
+    this.addSecurityRules();
+    this.addLanguageRules();
+    this.addLoggingRules();
+    this.addDependencyRules();
+  }
+
+  /**
+   * Add database-related validation rules
+   */
+  private addDatabaseRules(): void {
     if (this.options.checkDependencies) {
       this.addRule({
         name: 'database-consistency',
         description: 'Validate database configuration consistency',
         severity: 'error',
-        validate: (config) => this.validateDatabaseConsistency(config),
+        validate: config => this.validateDatabaseConsistency(config),
       });
     }
+  }
 
-    // Indexing validation rules
+  /**
+   * Add indexing-related validation rules
+   */
+  private addIndexingRules(): void {
     if (this.options.checkPerformance) {
       this.addRule({
         name: 'indexing-performance',
         description: 'Validate indexing configuration for performance',
         severity: 'warning',
-        validate: (config) => this.validateIndexingPerformance(config),
+        validate: config => this.validateIndexingPerformance(config),
       });
     }
+  }
 
-    // Search validation rules
+  /**
+   * Add search-related validation rules
+   */
+  private addSearchRules(): void {
     this.addRule({
       name: 'search-logic',
       description: 'Validate search configuration logic',
       severity: 'error',
-      validate: (config) => this.validateSearchLogic(config),
+      validate: config => this.validateSearchLogic(config),
     });
+  }
 
-    // File watching validation rules
+  /**
+   * Add file watching validation rules
+   */
+  private addWatchingRules(): void {
     this.addRule({
       name: 'watching-configuration',
       description: 'Validate file watching configuration',
       severity: 'warning',
-      validate: (config) => this.validateWatchingConfiguration(config),
+      validate: config => this.validateWatchingConfiguration(config),
     });
+  }
 
-    // Security validation rules
+  /**
+   * Add security validation rules
+   */
+  private addSecurityRules(): void {
     if (this.options.checkSecurity) {
       this.addRule({
         name: 'security-configuration',
         description: 'Validate security configuration',
         severity: 'error',
-        validate: (config) => this.validateSecurityConfiguration(config),
+        validate: config => this.validateSecurityConfiguration(config),
       });
     }
+  }
 
-    // Language configuration validation
+  /**
+   * Add language configuration validation rules
+   */
+  private addLanguageRules(): void {
     this.addRule({
       name: 'language-configuration',
       description: 'Validate language configuration',
       severity: 'error',
-      validate: (config) => this.validateLanguageConfiguration(config),
+      validate: config => this.validateLanguageConfiguration(config),
     });
+  }
 
-    // Logging validation rules
+  /**
+   * Add logging validation rules
+   */
+  private addLoggingRules(): void {
     this.addRule({
       name: 'logging-configuration',
       description: 'Validate logging configuration',
       severity: 'warning',
-      validate: (config) => this.validateLoggingConfiguration(config),
+      validate: config => this.validateLoggingConfiguration(config),
     });
+  }
 
-    // Cross-section dependencies
+  /**
+   * Add cross-section dependency validation rules
+   */
+  private addDependencyRules(): void {
     if (this.options.checkDependencies) {
       this.addRule({
         name: 'cross-section-dependencies',
         description: 'Validate dependencies between configuration sections',
         severity: 'error',
-        validate: (config) => this.validateCrossSectionDependencies(config),
+        validate: config => this.validateCrossSectionDependencies(config),
+      });
+    }
+  }
+
+  /**
+   * Validate database type consistency
+   */
+  private validateDatabaseTypeConsistency(
+    database: unknown,
+    errors: ValidationError[],
+    warnings: ValidationWarning[],
+  ): void {
+    const db = database as Partial<DatabaseConfig>;
+    if (db.type === 'sqlite' && db.connectionString) {
+      warnings.push({
+        path: 'database.connectionString',
+        message: 'connectionString is ignored for SQLite databases',
+        code: 'IGNORED_SETTING',
+      });
+    }
+
+    if (db.type !== 'sqlite' && !db.connectionString) {
+      errors.push({
+        path: 'database.connectionString',
+        message: `connectionString is required for ${db.type} databases`,
+        code: 'MISSING_CONNECTION_STRING',
+        suggestion: 'Provide a valid connection string for the database',
+      });
+    }
+  }
+
+  /**
+   * Validate database connection limits
+   */
+  private validateConnectionLimits(
+    database: unknown,
+    errors: ValidationError[],
+    warnings: ValidationWarning[],
+  ): void {
+    const db = database as Partial<DatabaseConfig>;
+    if (db.maxConnections && db.maxConnections < 1) {
+      errors.push({
+        path: 'database.maxConnections',
+        message: 'maxConnections must be at least 1',
+        code: 'INVALID_CONNECTION_LIMIT',
+        suggestion: 'Set maxConnections to a positive integer',
+      });
+    }
+
+    if (db.maxConnections && db.maxConnections > MAX_RECOMMENDED_CONNECTIONS) {
+      warnings.push({
+        path: 'database.maxConnections',
+        message: 'High maxConnections may impact performance',
+        code: 'HIGH_CONNECTION_LIMIT',
+        suggestion:
+          'Consider reducing maxConnections or implementing connection pooling',
+      });
+    }
+  }
+
+  /**
+   * Validate database connection timeout
+   */
+  private validateConnectionTimeout(
+    database: unknown,
+    warnings: ValidationWarning[],
+  ): void {
+    const db = database as Partial<DatabaseConfig>;
+    if (db.connectionTimeout && db.connectionTimeout < MIN_TIMEOUT_MS) {
+      warnings.push({
+        path: 'database.connectionTimeout',
+        message: 'Very low connection timeout may cause frequent failures',
+        code: 'LOW_TIMEOUT',
+        suggestion: 'Consider increasing connectionTimeout to at least 1000ms',
       });
     }
   }
@@ -229,7 +416,7 @@ export class SemanticValidator {
    * Validate database configuration consistency
    */
   private validateDatabaseConsistency(
-    config: PartialAppConfig
+    config: PartialAppConfig,
   ): ValidationResult {
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];
@@ -240,53 +427,9 @@ export class SemanticValidator {
 
     const { database } = config;
 
-    // Check database type consistency
-    if (database.type === 'sqlite' && database.connectionString) {
-      warnings.push({
-        path: 'database.connectionString',
-        message: 'connectionString is ignored for SQLite databases',
-        code: 'IGNORED_SETTING',
-      });
-    }
-
-    if (database.type !== 'sqlite' && !database.connectionString) {
-      errors.push({
-        path: 'database.connectionString',
-        message: `connectionString is required for ${database.type} databases`,
-        code: 'MISSING_CONNECTION_STRING',
-        suggestion: 'Provide a valid connection string for the database',
-      });
-    }
-
-    // Validate connection limits
-    if (database.maxConnections && database.maxConnections < 1) {
-      errors.push({
-        path: 'database.maxConnections',
-        message: 'maxConnections must be at least 1',
-        code: 'INVALID_CONNECTION_LIMIT',
-        suggestion: 'Set maxConnections to a positive integer',
-      });
-    }
-
-    if (database.maxConnections && database.maxConnections > 100) {
-      warnings.push({
-        path: 'database.maxConnections',
-        message: 'High maxConnections may impact performance',
-        code: 'HIGH_CONNECTION_LIMIT',
-        suggestion:
-          'Consider reducing maxConnections or implementing connection pooling',
-      });
-    }
-
-    // Validate timeout
-    if (database.connectionTimeout && database.connectionTimeout < 1000) {
-      warnings.push({
-        path: 'database.connectionTimeout',
-        message: 'Very low connection timeout may cause frequent failures',
-        code: 'LOW_TIMEOUT',
-        suggestion: 'Consider increasing connectionTimeout to at least 1000ms',
-      });
-    }
+    this.validateDatabaseTypeConsistency(database, errors, warnings);
+    this.validateConnectionLimits(database, errors, warnings);
+    this.validateConnectionTimeout(database, warnings);
 
     return {
       valid: errors.length === 0,
@@ -297,10 +440,87 @@ export class SemanticValidator {
   }
 
   /**
+   * Validate worker to batch size ratio
+   */
+  private validateWorkerBatchRatio(
+    indexing: unknown,
+    warnings: ValidationWarning[],
+  ): void {
+    const idx = indexing as Partial<IndexingConfig>;
+    if (idx.maxWorkers && idx.batchSize) {
+      if (idx.maxWorkers > idx.batchSize) {
+        warnings.push({
+          path: 'indexing.maxWorkers',
+          message: 'maxWorkers greater than batchSize may be inefficient',
+          code: 'INEFFICIENT_WORKER_RATIO',
+          suggestion: 'Consider increasing batchSize or reducing maxWorkers',
+        });
+      }
+    }
+  }
+
+  /**
+   * Validate file size limits
+   */
+  private validateFileSizeLimits(
+    indexing: IndexingConfig,
+    warnings: ValidationWarning[],
+  ): void {
+    if (
+      indexing.maxFileSize &&
+      indexing.maxFileSize > MAX_RECOMMENDED_INDEX_FILE_SIZE
+    ) {
+      warnings.push({
+        path: 'indexing.maxFileSize',
+        message: 'Large maxFileSize may impact indexing performance',
+        code: 'LARGE_FILE_SIZE',
+        suggestion: 'Consider reducing maxFileSize or implementing streaming',
+      });
+    }
+  }
+
+  /**
+   * Validate debounce timing
+   */
+  private validateDebounceTiming(
+    indexing: IndexingConfig,
+    warnings: ValidationWarning[],
+  ): void {
+    if (
+      indexing.debounceMs &&
+      indexing.debounceMs > MAX_RECOMMENDED_FILE_SIZE
+    ) {
+      warnings.push({
+        path: 'indexing.debounceMs',
+        message: 'High debounce delay may slow down indexing updates',
+        code: 'HIGH_DEBOUNCE',
+        suggestion: 'Consider reducing debounceMs for more responsive indexing',
+      });
+    }
+  }
+
+  /**
+   * Validate depth limits
+   */
+  private validateDepthLimits(
+    indexing: IndexingConfig,
+    warnings: ValidationWarning[],
+  ): void {
+    if (indexing.maxDepth && indexing.maxDepth > MAX_RECOMMENDED_DEPTH) {
+      warnings.push({
+        path: 'indexing.maxDepth',
+        message: 'Very deep directory traversal may be slow',
+        code: 'DEEP_TRAVERSAL',
+        suggestion: 'Consider reducing maxDepth or using ignore patterns',
+      });
+    }
+  }
+
+  /**
    * Validate indexing configuration for performance
    */
   private validateIndexingPerformance(
-    config: PartialAppConfig
+    config: PartialAppConfig,
   ): ValidationResult {
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];
@@ -311,48 +531,10 @@ export class SemanticValidator {
 
     const { indexing } = config;
 
-    // Check worker vs batch size ratio
-    if (indexing.maxWorkers && indexing.batchSize) {
-      if (indexing.maxWorkers > indexing.batchSize) {
-        warnings.push({
-          path: 'indexing.maxWorkers',
-          message: 'maxWorkers greater than batchSize may be inefficient',
-          code: 'INEFFICIENT_WORKER_RATIO',
-          suggestion: 'Consider increasing batchSize or reducing maxWorkers',
-        });
-      }
-    }
-
-    // Check file size limits
-    if (indexing.maxFileSize && indexing.maxFileSize > 100 * 1024 * 1024) {
-      // 100MB
-      warnings.push({
-        path: 'indexing.maxFileSize',
-        message: 'Large maxFileSize may impact indexing performance',
-        code: 'LARGE_FILE_SIZE',
-        suggestion: 'Consider reducing maxFileSize or implementing streaming',
-      });
-    }
-
-    // Check debounce timing
-    if (indexing.debounceMs && indexing.debounceMs > 5000) {
-      warnings.push({
-        path: 'indexing.debounceMs',
-        message: 'High debounce delay may slow down indexing updates',
-        code: 'HIGH_DEBOUNCE',
-        suggestion: 'Consider reducing debounceMs for more responsive indexing',
-      });
-    }
-
-    // Check depth limits
-    if (indexing.maxDepth && indexing.maxDepth > 20) {
-      warnings.push({
-        path: 'indexing.maxDepth',
-        message: 'Very deep directory traversal may be slow',
-        code: 'DEEP_TRAVERSAL',
-        suggestion: 'Consider reducing maxDepth or using ignore patterns',
-      });
-    }
+    this.validateWorkerBatchRatio(indexing, warnings);
+    this.validateFileSizeLimits(indexing, warnings);
+    this.validateDebounceTiming(indexing, warnings);
+    this.validateDepthLimits(indexing, warnings);
 
     return {
       valid: errors.length === 0,
@@ -360,6 +542,95 @@ export class SemanticValidator {
       warnings,
       config,
     };
+  }
+
+  /**
+   * Validate search limits consistency
+   */
+  private validateSearchLimits(
+    search: SearchConfig,
+    errors: ValidationError[],
+  ): void {
+    if (search.defaultLimit && search.maxLimit) {
+      if (search.defaultLimit > search.maxLimit) {
+        errors.push({
+          path: 'search.defaultLimit',
+          message: 'defaultLimit cannot be greater than maxLimit',
+          code: 'INVALID_LIMIT_RANGE',
+          suggestion: 'Set defaultLimit <= maxLimit',
+        });
+      }
+    }
+  }
+
+  /**
+   * Validate fuzzy threshold range
+   */
+  private validateFuzzyThreshold(
+    search: SearchConfig,
+    errors: ValidationError[],
+  ): void {
+    if (search.fuzzyThreshold < 0 || search.fuzzyThreshold > 1) {
+      errors.push({
+        path: 'search.fuzzyThreshold',
+        message: 'fuzzyThreshold must be between 0 and 1',
+        code: 'INVALID_FUZZY_THRESHOLD',
+        suggestion: 'Set fuzzyThreshold to a value between 0 and 1',
+      });
+    }
+  }
+
+  /**
+   * Validate scoring weights
+   */
+  private validateScoringWeights(
+    search: SearchConfig,
+    errors: ValidationError[],
+    warnings: ValidationWarning[],
+  ): void {
+    const weights = Object.values(search.scoringWeights) as number[];
+    const totalWeight = weights.reduce(
+      (sum: number, weight: number) => sum + weight,
+      0,
+    );
+
+    if (totalWeight === 0) {
+      errors.push({
+        path: 'search.scoringWeights',
+        message: 'At least one scoring weight must be greater than 0',
+        code: 'ZERO_SCORING_WEIGHTS',
+        suggestion: 'Set at least one scoring weight to a positive value',
+      });
+    }
+
+    // Check for negative weights
+    for (const [key, weight] of Object.entries(weights)) {
+      if (weight < 0) {
+        warnings.push({
+          path: `search.scoringWeights.${key}`,
+          message: `Negative scoring weight for ${key}`,
+          code: 'NEGATIVE_WEIGHT',
+          suggestion: 'Consider using positive weights for better results',
+        });
+      }
+    }
+  }
+
+  /**
+   * Validate search timeout
+   */
+  private validateSearchTimeout(
+    search: SearchConfig,
+    warnings: ValidationWarning[],
+  ): void {
+    if (search.timeoutMs && search.timeoutMs < MIN_TIMEOUT_MS) {
+      warnings.push({
+        path: 'search.timeoutMs',
+        message: 'Very low search timeout may cause premature failures',
+        code: 'LOW_SEARCH_TIMEOUT',
+        suggestion: 'Consider increasing timeoutMs to at least 1000ms',
+      });
+    }
   }
 
   /**
@@ -375,69 +646,10 @@ export class SemanticValidator {
 
     const { search } = config;
 
-    // Check limit consistency
-    if (search.defaultLimit && search.maxLimit) {
-      if (search.defaultLimit > search.maxLimit) {
-        errors.push({
-          path: 'search.defaultLimit',
-          message: 'defaultLimit cannot be greater than maxLimit',
-          code: 'INVALID_LIMIT_RANGE',
-          suggestion: 'Set defaultLimit <= maxLimit',
-        });
-      }
-    }
-
-    // Check fuzzy threshold
-    if (search.fuzzyThreshold !== undefined) {
-      if (search.fuzzyThreshold < 0 || search.fuzzyThreshold > 1) {
-        errors.push({
-          path: 'search.fuzzyThreshold',
-          message: 'fuzzyThreshold must be between 0 and 1',
-          code: 'INVALID_FUZZY_THRESHOLD',
-          suggestion: 'Set fuzzyThreshold to a value between 0 and 1',
-        });
-      }
-    }
-
-    // Check scoring weights
-    if (search.scoringWeights) {
-      const weights = search.scoringWeights;
-      const totalWeight = Object.values(weights).reduce(
-        (sum, weight) => sum + weight,
-        0
-      );
-
-      if (totalWeight === 0) {
-        errors.push({
-          path: 'search.scoringWeights',
-          message: 'At least one scoring weight must be greater than 0',
-          code: 'ZERO_SCORING_WEIGHTS',
-          suggestion: 'Set at least one scoring weight to a positive value',
-        });
-      }
-
-      // Check for negative weights
-      for (const [key, weight] of Object.entries(weights)) {
-        if (weight < 0) {
-          warnings.push({
-            path: `search.scoringWeights.${key}`,
-            message: `Negative scoring weight for ${key}`,
-            code: 'NEGATIVE_WEIGHT',
-            suggestion: 'Consider using positive weights for better results',
-          });
-        }
-      }
-    }
-
-    // Check timeout
-    if (search.timeoutMs && search.timeoutMs < 1000) {
-      warnings.push({
-        path: 'search.timeoutMs',
-        message: 'Very low search timeout may cause premature failures',
-        code: 'LOW_SEARCH_TIMEOUT',
-        suggestion: 'Consider increasing timeoutMs to at least 1000ms',
-      });
-    }
+    this.validateSearchLimits(search, errors);
+    this.validateFuzzyThreshold(search, errors);
+    this.validateScoringWeights(search, errors, warnings);
+    this.validateSearchTimeout(search, warnings);
 
     return {
       valid: errors.length === 0,
@@ -451,7 +663,7 @@ export class SemanticValidator {
    * Validate file watching configuration
    */
   private validateWatchingConfiguration(
-    config: PartialAppConfig
+    config: PartialAppConfig,
   ): ValidationResult {
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];
@@ -462,42 +674,8 @@ export class SemanticValidator {
 
     const { watching } = config;
 
-    // Check ignore patterns
-    if (watching.ignorePatterns && watching.includePatterns) {
-      const conflicts = watching.ignorePatterns.filter((pattern) =>
-        watching.includePatterns!.includes(pattern)
-      );
-
-      if (conflicts.length > 0) {
-        warnings.push({
-          path: 'watching.ignorePatterns',
-          message: `Patterns in both ignore and include: ${conflicts.join(', ')}`,
-          code: 'CONFLICTING_PATTERNS',
-          suggestion:
-            'Remove conflicting patterns from ignore or include lists',
-        });
-      }
-    }
-
-    // Check polling interval
-    if (watching.pollingInterval && watching.pollingInterval < 100) {
-      warnings.push({
-        path: 'watching.pollingInterval',
-        message: 'Very low polling interval may impact performance',
-        code: 'HIGH_POLLING_FREQUENCY',
-        suggestion: 'Consider increasing pollingInterval to reduce CPU usage',
-      });
-    }
-
-    // Check debounce timing
-    if (watching.debounceMs && watching.debounceMs > 2000) {
-      warnings.push({
-        path: 'watching.debounceMs',
-        message: 'High debounce delay may slow down file change detection',
-        code: 'HIGH_WATCH_DEBOUNCE',
-        suggestion: 'Consider reducing debounceMs for more responsive watching',
-      });
-    }
+    this.validateWatchingPatterns(watching, warnings);
+    this.validateWatchingTiming(watching, warnings);
 
     return {
       valid: errors.length === 0,
@@ -508,10 +686,171 @@ export class SemanticValidator {
   }
 
   /**
+   * Validate watching patterns for conflicts
+   */
+  private validateWatchingPatterns(
+    watching: WatchingConfig,
+    warnings: ValidationWarning[],
+  ): void {
+    const conflicts = watching.ignorePatterns.filter((pattern: string) =>
+      watching.includePatterns.includes(pattern),
+    );
+
+    if (conflicts.length > 0) {
+      warnings.push({
+        path: 'watching.ignorePatterns',
+        message: `Patterns in both ignore and include: ${conflicts.join(', ')}`,
+        code: 'CONFLICTING_PATTERNS',
+        suggestion: 'Remove conflicting patterns from ignore or include lists',
+      });
+    }
+  }
+
+  /**
+   * Validate watching timing configurations
+   */
+  private validateWatchingTiming(
+    watching: WatchingConfig,
+    warnings: ValidationWarning[],
+  ): void {
+    // Check polling interval
+    if (
+      watching.pollingInterval &&
+      watching.pollingInterval < MIN_POLLING_INTERVAL_MS
+    ) {
+      warnings.push({
+        path: 'watching.pollingInterval',
+        message: 'Very low polling interval may impact performance',
+        code: 'HIGH_POLLING_FREQUENCY',
+        suggestion: 'Consider increasing pollingInterval to reduce CPU usage',
+      });
+    }
+
+    // Check debounce timing
+    if (watching.debounceMs && watching.debounceMs > MAX_DEBOUNCE_MS) {
+      warnings.push({
+        path: 'watching.debounceMs',
+        message: 'High debounce delay may slow down file change detection',
+        code: 'HIGH_WATCH_DEBOUNCE',
+        suggestion: 'Consider reducing debounceMs for more responsive watching',
+      });
+    }
+  }
+
+  /**
+   * Validate extensions and patterns
+   */
+  private validateExtensionsAndPatterns(
+    security: SecurityConfig,
+    warnings: ValidationWarning[],
+  ): void {
+    if (security.allowedExtensions.length === 0) {
+      warnings.push({
+        path: 'security.allowedExtensions',
+        message:
+          'No allowed extensions specified - all files will be processed',
+        code: 'NO_ALLOWED_EXTENSIONS',
+        suggestion: 'Specify allowed extensions for better security',
+      });
+    }
+
+    if (security.blockedPatterns.length === 0) {
+      warnings.push({
+        path: 'security.blockedPatterns',
+        message:
+          'No blocked patterns specified - potentially unsafe files may be processed',
+        code: 'NO_BLOCKED_PATTERNS',
+        suggestion: 'Add blocked patterns for sensitive files',
+      });
+    }
+  }
+
+  /**
+   * Validate path length limits
+   */
+  private validatePathLength(
+    security: SecurityConfig,
+    warnings: ValidationWarning[],
+  ): void {
+    if (security.maxPathLength > MAX_RECOMMENDED_DB_SIZE) {
+      warnings.push({
+        path: 'security.maxPathLength',
+        message: 'Very high maxPathLength may allow path traversal attacks',
+        code: 'HIGH_PATH_LENGTH',
+        suggestion: 'Consider reducing maxPathLength to a reasonable value',
+      });
+    }
+  }
+
+  /**
+   * Validate sandbox configuration
+   */
+  private validateSandboxConfiguration(
+    security: SecurityConfig,
+    errors: ValidationError[],
+    warnings: ValidationWarning[],
+  ): void {
+    if (security.enableSandbox && !security.sandbox) {
+      errors.push({
+        path: 'security.sandbox',
+        message: 'Sandbox is enabled but no sandbox configuration provided',
+        code: 'MISSING_SANDBOX_CONFIG',
+        suggestion: 'Provide sandbox configuration or disable sandbox',
+      });
+      return;
+    }
+
+    if (!security.sandbox) {
+      return;
+    }
+
+    this.validateSandboxTimeout(security.sandbox, warnings);
+    this.validateSandboxMemoryLimit(security.sandbox, warnings);
+  }
+
+  /**
+   * Validate sandbox timeout configuration
+   */
+  private validateSandboxTimeout(
+    sandbox: NonNullable<SecurityConfig['sandbox']>,
+    warnings: ValidationWarning[],
+  ): void {
+    if (sandbox.timeoutMs && sandbox.timeoutMs < MIN_TIMEOUT_MS) {
+      warnings.push({
+        path: 'security.sandbox.timeoutMs',
+        message:
+          'Very low sandbox timeout may cause legitimate operations to fail',
+        code: 'LOW_SANDBOX_TIMEOUT',
+        suggestion: 'Consider increasing sandbox timeoutMs',
+      });
+    }
+  }
+
+  /**
+   * Validate sandbox memory limit configuration
+   */
+  private validateSandboxMemoryLimit(
+    sandbox: NonNullable<SecurityConfig['sandbox']>,
+    warnings: ValidationWarning[],
+  ): void {
+    if (
+      sandbox.memoryLimitMB &&
+      sandbox.memoryLimitMB < MAX_RECOMMENDED_WORKERS
+    ) {
+      warnings.push({
+        path: 'security.sandbox.memoryLimitMB',
+        message: 'Very low memory limit may cause operations to fail',
+        code: 'LOW_MEMORY_LIMIT',
+        suggestion: 'Consider increasing memoryLimitMB',
+      });
+    }
+  }
+
+  /**
    * Validate security configuration
    */
   private validateSecurityConfiguration(
-    config: PartialAppConfig
+    config: PartialAppConfig,
   ): ValidationResult {
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];
@@ -522,71 +861,9 @@ export class SemanticValidator {
 
     const { security } = config;
 
-    // Check allowed extensions
-    if (security.allowedExtensions && security.allowedExtensions.length === 0) {
-      warnings.push({
-        path: 'security.allowedExtensions',
-        message:
-          'No allowed extensions specified - all files will be processed',
-        code: 'NO_ALLOWED_EXTENSIONS',
-        suggestion: 'Specify allowed extensions for better security',
-      });
-    }
-
-    // Check blocked patterns
-    if (security.blockedPatterns && security.blockedPatterns.length === 0) {
-      warnings.push({
-        path: 'security.blockedPatterns',
-        message:
-          'No blocked patterns specified - potentially unsafe files may be processed',
-        code: 'NO_BLOCKED_PATTERNS',
-        suggestion: 'Add blocked patterns for sensitive files',
-      });
-    }
-
-    // Check path length
-    if (security.maxPathLength && security.maxPathLength > 4096) {
-      warnings.push({
-        path: 'security.maxPathLength',
-        message: 'Very high maxPathLength may allow path traversal attacks',
-        code: 'HIGH_PATH_LENGTH',
-        suggestion: 'Consider reducing maxPathLength to a reasonable value',
-      });
-    }
-
-    // Check sandbox configuration
-    if (security.enableSandbox && !security.sandbox) {
-      errors.push({
-        path: 'security.sandbox',
-        message: 'Sandbox is enabled but no sandbox configuration provided',
-        code: 'MISSING_SANDBOX_CONFIG',
-        suggestion: 'Provide sandbox configuration or disable sandbox',
-      });
-    }
-
-    if (security.sandbox) {
-      if (security.sandbox.timeoutMs && security.sandbox.timeoutMs < 1000) {
-        warnings.push({
-          path: 'security.sandbox.timeoutMs',
-          message:
-            'Very low sandbox timeout may cause legitimate operations to fail',
-          code: 'LOW_SANDBOX_TIMEOUT',
-          suggestion: 'Consider increasing sandbox timeoutMs',
-        });
-      }
-
-      if (
-        security.sandbox.memoryLimitMB &&
-        security.sandbox.memoryLimitMB < 64
-      ) {
-        warnings.push({
-          path: 'security.sandbox.memoryLimitMB',
-          message: 'Very low memory limit may cause operations to fail',
-          code: 'LOW_MEMORY_LIMIT',
-          suggestion: 'Consider increasing memoryLimitMB',
-        });
-      }
-    }
+    this.validateExtensionsAndPatterns(security, warnings);
+    this.validatePathLength(security, warnings);
+    this.validateSandboxConfiguration(security, errors, warnings);
 
     return {
       valid: errors.length === 0,
@@ -600,7 +877,7 @@ export class SemanticValidator {
    * Validate language configuration
    */
   private validateLanguageConfiguration(
-    config: PartialAppConfig
+    config: PartialAppConfig,
   ): ValidationResult {
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];
@@ -613,45 +890,11 @@ export class SemanticValidator {
 
     // Check each language configuration
     for (const [langName, langConfig] of Object.entries(languages)) {
-      if (!langConfig.extensions || langConfig.extensions.length === 0) {
-        errors.push({
-          path: `languages.${langName}.extensions`,
-          message: `No file extensions specified for ${langName}`,
-          code: 'NO_EXTENSIONS',
-          suggestion: `Add at least one file extension for ${langName}`,
-        });
-      }
-
-      if (!langConfig.parser) {
-        errors.push({
-          path: `languages.${langName}.parser`,
-          message: `No parser specified for ${langName}`,
-          code: 'NO_PARSER',
-          suggestion: `Specify a parser for ${langName}`,
-        });
-      }
-
-      // Check for duplicate extensions
-      const allExtensions: string[] = [];
-      for (const [name, config] of Object.entries(languages)) {
-        if (config.extensions) {
-          allExtensions.push(...config.extensions);
-        }
-      }
-
-      const duplicates = allExtensions.filter(
-        (ext, index) => allExtensions.indexOf(ext) !== index
-      );
-      if (duplicates.length > 0) {
-        warnings.push({
-          path: 'languages',
-          message: `Duplicate file extensions: ${[...new Set(duplicates)].join(', ')}`,
-          code: 'DUPLICATE_EXTENSIONS',
-          suggestion:
-            'Remove duplicate extensions from language configurations',
-        });
-      }
+      this.validateLanguageConfig(langName, langConfig, errors);
     }
+
+    // Check for duplicate extensions across all languages
+    this.validateDuplicateExtensions(languages, warnings);
 
     return {
       valid: errors.length === 0,
@@ -662,10 +905,62 @@ export class SemanticValidator {
   }
 
   /**
+   * Validate individual language configuration
+   */
+  private validateLanguageConfig(
+    langName: string,
+    langConfig: LanguageConfig,
+    errors: ValidationError[],
+  ): void {
+    if (langConfig.extensions.length === 0) {
+      errors.push({
+        path: `languages.${langName}.extensions`,
+        message: `No file extensions specified for ${langName}`,
+        code: 'NO_EXTENSIONS',
+        suggestion: `Add at least one file extension for ${langName}`,
+      });
+    }
+
+    if (!langConfig.parser) {
+      errors.push({
+        path: `languages.${langName}.parser`,
+        message: `No parser specified for ${langName}`,
+        code: 'NO_PARSER',
+        suggestion: `Specify a parser for ${langName}`,
+      });
+    }
+  }
+
+  /**
+   * Validate for duplicate extensions across languages
+   */
+  private validateDuplicateExtensions(
+    languages: Record<string, LanguageConfig>,
+    warnings: ValidationWarning[],
+  ): void {
+    const allExtensions: string[] = [];
+    for (const config of Object.values(languages)) {
+      allExtensions.push(...config.extensions);
+    }
+
+    const duplicates = allExtensions.filter(
+      (ext, index) => allExtensions.indexOf(ext) !== index,
+    );
+    if (duplicates.length > 0) {
+      warnings.push({
+        path: 'languages',
+        message: `Duplicate file extensions: ${[...new Set(duplicates)].join(', ')}`,
+        code: 'DUPLICATE_EXTENSIONS',
+        suggestion: 'Remove duplicate extensions from language configurations',
+      });
+    }
+  }
+
+  /**
    * Validate logging configuration
    */
   private validateLoggingConfiguration(
-    config: PartialAppConfig
+    config: PartialAppConfig,
   ): ValidationResult {
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];
@@ -677,7 +972,7 @@ export class SemanticValidator {
     const { logging } = config;
 
     // Check file logging configuration
-    if (logging.file?.enabled && !logging.file?.path) {
+    if (logging.file.enabled && !logging.file.path) {
       warnings.push({
         path: 'logging.file.path',
         message: 'File logging enabled but no path specified',
@@ -705,15 +1000,12 @@ export class SemanticValidator {
   }
 
   /**
-   * Validate cross-section dependencies
+   * Validate that watching and indexing are properly configured together
    */
-  private validateCrossSectionDependencies(
-    config: PartialAppConfig
-  ): ValidationResult {
-    const errors: ValidationError[] = [];
-    const warnings: ValidationWarning[] = [];
-
-    // Check if watching is enabled but indexing is disabled
+  private validateWatchingIndexingDependency(
+    config: PartialAppConfig,
+    warnings: ValidationWarning[],
+  ): void {
     if (config.watching?.enabled && !config.indexing) {
       warnings.push({
         path: 'watching.enabled',
@@ -722,14 +1014,21 @@ export class SemanticValidator {
         suggestion: 'Configure indexing or disable file watching',
       });
     }
+  }
 
-    // Check database path vs file watching
+  /**
+   * Validate database path conflicts with file watching
+   */
+  private validateDatabaseWatchingConflict(
+    config: PartialAppConfig,
+    warnings: ValidationWarning[],
+  ): void {
     if (config.database?.path && config.watching?.enabled) {
       const dbPath = config.database.path;
-      const ignorePatterns = config.watching.ignorePatterns || [];
+      const ignorePatterns = config.watching.ignorePatterns;
 
       const shouldIgnoreDb = ignorePatterns.some(
-        (pattern) => dbPath.includes(pattern) || pattern.includes('database')
+        pattern => dbPath.includes(pattern) || pattern.includes('database'),
       );
 
       if (!shouldIgnoreDb) {
@@ -741,10 +1040,20 @@ export class SemanticValidator {
         });
       }
     }
+  }
 
-    // Check search limits vs indexing batch size
+  /**
+   * Validate search limits align with indexing batch size
+   */
+  private validateSearchIndexingLimits(
+    config: PartialAppConfig,
+    warnings: ValidationWarning[],
+  ): void {
     if (config.search?.maxLimit && config.indexing?.batchSize) {
-      if (config.search.maxLimit > config.indexing.batchSize * 10) {
+      if (
+        config.search.maxLimit >
+        config.indexing.batchSize * SEARCH_LIMIT_MULTIPLIER
+      ) {
         warnings.push({
           path: 'search.maxLimit',
           message: 'Search limit much higher than indexing batch size',
@@ -754,6 +1063,20 @@ export class SemanticValidator {
         });
       }
     }
+  }
+
+  /**
+   * Validate cross-section dependencies
+   */
+  private validateCrossSectionDependencies(
+    config: PartialAppConfig,
+  ): ValidationResult {
+    const errors: ValidationError[] = [];
+    const warnings: ValidationWarning[] = [];
+
+    this.validateWatchingIndexingDependency(config, warnings);
+    this.validateDatabaseWatchingConflict(config, warnings);
+    this.validateSearchIndexingLimits(config, warnings);
 
     return {
       valid: errors.length === 0,
@@ -771,7 +1094,7 @@ export class SemanticValidator {
  * @returns SemanticValidator instance
  */
 export function createSemanticValidator(
-  options?: SemanticValidatorOptions
+  options?: SemanticValidatorOptions,
 ): SemanticValidator {
   return new SemanticValidator(options);
 }

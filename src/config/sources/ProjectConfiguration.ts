@@ -15,6 +15,26 @@ import { ConfigurationError } from '../errors/ConfigurationError';
 import { ConfigurationSource } from './ConfigurationSource';
 
 /**
+ * File permissions for project configuration files (owner read/write, group/world read)
+ */
+const PROJECT_CONFIG_PERMISSIONS = 0o644;
+
+/**
+ * Mask for all file permissions
+ */
+const ALL_PERMISSIONS_MASK = 0o777;
+
+/**
+ * World read permission bit
+ */
+const WORLD_READ_PERMISSION = 0o004;
+
+/**
+ * Base for octal number conversion
+ */
+const OCTAL_BASE = 8;
+
+/**
  * Project configuration source loading from .code-scout/config.json
  */
 export class ProjectConfiguration extends ConfigurationSource {
@@ -44,7 +64,10 @@ export class ProjectConfiguration extends ConfigurationSource {
     await this.validateAvailability();
 
     const content = await fs.readFile(this.configPath, 'utf-8');
-    const config = this.safeJsonParse(content, 'project configuration file');
+    const config = this.safeJsonParse(
+      content,
+      'project configuration file',
+    ) as PartialAppConfig;
 
     return this.createPartialConfig(config);
   }
@@ -161,7 +184,7 @@ export class ProjectConfiguration extends ConfigurationSource {
       await fs.writeFile(this.configPath, content, 'utf-8');
 
       // Set appropriate permissions
-      await fs.chmod(this.configPath, 0o644);
+      await fs.chmod(this.configPath, PROJECT_CONFIG_PERMISSIONS);
     } catch (error) {
       throw ConfigurationError.fileAccess(
         `Failed to save project configuration: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -178,7 +201,7 @@ export class ProjectConfiguration extends ConfigurationSource {
     try {
       await fs.unlink(this.configPath);
     } catch (error) {
-      if ((error as any)?.code !== 'ENOENT') {
+      if ((error as { code?: string }).code !== 'ENOENT') {
         throw ConfigurationError.fileAccess(
           `Failed to remove project configuration: ${error instanceof Error ? error.message : 'Unknown error'}`,
           this.configPath,
@@ -203,7 +226,7 @@ export class ProjectConfiguration extends ConfigurationSource {
         exists: true,
         size: stats.size,
         modified: stats.mtime,
-        permissions: (stats.mode & 0o777).toString(8),
+        permissions: (stats.mode & ALL_PERMISSIONS_MASK).toString(OCTAL_BASE),
       };
     } catch {
       return { exists: false };
@@ -223,7 +246,7 @@ export class ProjectConfiguration extends ConfigurationSource {
 
       // For project config, we allow group read but not world read
       const mode = parseInt(stats.permissions ?? '0', 8);
-      const hasWorldRead = (mode & 0o004) !== 0;
+      const hasWorldRead = (mode & WORLD_READ_PERMISSION) !== 0;
 
       return !hasWorldRead;
     } catch {
@@ -236,7 +259,7 @@ export class ProjectConfiguration extends ConfigurationSource {
    */
   async fixPermissions(): Promise<void> {
     try {
-      await fs.chmod(this.configPath, 0o644);
+      await fs.chmod(this.configPath, PROJECT_CONFIG_PERMISSIONS);
     } catch (error) {
       throw ConfigurationError.fileAccess(
         `Failed to fix permissions on project configuration: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -257,7 +280,7 @@ export class ProjectConfiguration extends ConfigurationSource {
     try {
       const content = await fs.readFile(this.configPath, 'utf-8');
       await fs.writeFile(finalBackupPath, content, 'utf-8');
-      await fs.chmod(finalBackupPath, 0o644);
+      await fs.chmod(finalBackupPath, PROJECT_CONFIG_PERMISSIONS);
       return finalBackupPath;
     } catch (error) {
       throw ConfigurationError.fileAccess(
@@ -274,7 +297,9 @@ export class ProjectConfiguration extends ConfigurationSource {
   async restoreFromBackup(backupPath: string): Promise<void> {
     try {
       const content = await fs.readFile(backupPath, 'utf-8');
-      await this.saveConfig(this.safeJsonParse(content, 'backup file'));
+      await this.saveConfig(
+        this.safeJsonParse(content, 'backup file') as PartialAppConfig,
+      );
     } catch (error) {
       throw ConfigurationError.fileAccess(
         `Failed to restore from backup: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -305,34 +330,84 @@ export class ProjectConfiguration extends ConfigurationSource {
   }
 
   /**
+   * Detect Node.js project type from package.json
+   */
+  private async detectNodeProjectType(files: string[]): Promise<string | null> {
+    if (!files.includes('package.json')) {
+      return null;
+    }
+
+    try {
+      const packageJson = await fs.readFile(
+        path.join(this.projectRoot, 'package.json'),
+        'utf-8',
+      );
+      const pkg = JSON.parse(packageJson);
+      return pkg.type === 'module' ? 'esm-node' : 'cjs-node';
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Detect Python project
+   */
+  private detectPythonProject(files: string[]): string | null {
+    if (
+      files.includes('pyproject.toml') ||
+      files.includes('requirements.txt')
+    ) {
+      return 'python';
+    }
+    return null;
+  }
+
+  /**
+   * Detect Rust project
+   */
+  private detectRustProject(files: string[]): string | null {
+    if (files.includes('Cargo.toml')) {
+      return 'rust';
+    }
+    return null;
+  }
+
+  /**
+   * Detect Java project
+   */
+  private detectJavaProject(files: string[]): string | null {
+    if (files.includes('pom.xml') || files.includes('build.gradle')) {
+      return 'java';
+    }
+    return null;
+  }
+
+  /**
    * Detect project type based on files in project root
    */
   async detectProjectType(): Promise<string> {
     try {
       const files = await fs.readdir(this.projectRoot);
 
-      if (files.includes('package.json')) {
-        const packageJson = await fs.readFile(
-          path.join(this.projectRoot, 'package.json'),
-          'utf-8',
-        );
-        const pkg = JSON.parse(packageJson);
-        return pkg.type === 'module' ? 'esm-node' : 'cjs-node';
+      // Try different project type detectors
+      const nodeType = await this.detectNodeProjectType(files);
+      if (nodeType) {
+        return nodeType;
       }
 
-      if (
-        files.includes('pyproject.toml') ||
-        files.includes('requirements.txt')
-      ) {
-        return 'python';
+      const pythonType = this.detectPythonProject(files);
+      if (pythonType) {
+        return pythonType;
       }
 
-      if (files.includes('Cargo.toml')) {
-        return 'rust';
+      const rustType = this.detectRustProject(files);
+      if (rustType) {
+        return rustType;
       }
 
-      if (files.includes('pom.xml') || files.includes('build.gradle')) {
-        return 'java';
+      const javaType = this.detectJavaProject(files);
+      if (javaType) {
+        return javaType;
       }
 
       return 'unknown';

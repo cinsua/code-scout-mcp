@@ -81,7 +81,7 @@ export abstract class ConfigurationSource implements IConfigurationSource {
   /**
    * Safely parse JSON with error handling
    */
-  protected safeJsonParse(json: string, context: string): any {
+  protected safeJsonParse(json: string, context: string): unknown {
     try {
       return JSON.parse(json);
     } catch (error) {

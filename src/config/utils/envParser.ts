@@ -356,6 +356,51 @@ export const ENV_MAPPINGS: EnvironmentVariableMapping[] = [
  * @param mappings - Custom environment variable mappings
  * @returns EnvParseResult
  */
+/**
+ * Context for processing environment variable mappings
+ */
+interface MappingContext {
+  config: PartialAppConfig;
+  processedVars: string[];
+  errors: string[];
+}
+
+/**
+ * Process a single environment variable mapping
+ */
+function processMapping(
+  mapping: EnvironmentVariableMapping,
+  env: Record<string, string | undefined>,
+  context: MappingContext,
+): void {
+  const envValue = env[mapping.envVar];
+
+  if (envValue === undefined) {
+    if (mapping.required) {
+      context.errors.push(
+        `Required environment variable '${mapping.envVar}' is not set`,
+      );
+    }
+    return;
+  }
+
+  try {
+    const convertedValue = convertType(envValue, mapping.type, {
+      strict: true,
+      trimStrings: true,
+    });
+
+    // Set the value in the configuration object using dot notation
+    setNestedProperty(context.config, mapping.configPath, convertedValue);
+    context.processedVars.push(mapping.envVar);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    context.errors.push(
+      `Failed to convert '${mapping.envVar}' to ${mapping.type}: ${errorMessage}`,
+    );
+  }
+}
+
 export function parseEnvironmentVariables(
   env: Record<string, string | undefined> = process.env,
   mappings: EnvironmentVariableMapping[] = ENV_MAPPINGS,
@@ -365,34 +410,10 @@ export function parseEnvironmentVariables(
   const warnings: string[] = [];
   const errors: string[] = [];
 
+  const context: MappingContext = { config, processedVars, errors };
+
   for (const mapping of mappings) {
-    const envValue = env[mapping.envVar];
-
-    if (envValue === undefined) {
-      if (mapping.required) {
-        errors.push(
-          `Required environment variable '${mapping.envVar}' is not set`,
-        );
-      }
-      continue;
-    }
-
-    try {
-      const convertedValue = convertType(envValue, mapping.type, {
-        strict: true,
-        trimStrings: true,
-      });
-
-      // Set the value in the configuration object using dot notation
-      setNestedProperty(config, mapping.configPath, convertedValue);
-      processedVars.push(mapping.envVar);
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      errors.push(
-        `Failed to convert '${mapping.envVar}' to ${mapping.type}: ${errorMessage}`,
-      );
-    }
+    processMapping(mapping, env, context);
   }
 
   return {
@@ -420,29 +441,15 @@ export function parseEnvironmentVariablesAuto(
   const errors: string[] = [];
 
   for (const [envVar, envValue] of Object.entries(env)) {
-    if (!envVar.startsWith(prefix + ENV_SEPARATOR)) {
+    if (!shouldProcessEnvVar(envVar, envValue, prefix)) {
       continue;
     }
 
-    if (envValue === undefined) {
-      continue;
-    }
-
-    try {
-      // Convert environment variable name to config path
-      const configPath = envVarToConfigPath(envVar, prefix);
-
-      // Try to infer type and convert
-      const convertedValue = inferAndConvertType(envValue);
-
-      // Set the value in the configuration object
-      setNestedProperty(config, configPath, convertedValue);
-      processedVars.push(envVar);
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      errors.push(`Failed to parse '${envVar}': ${errorMessage}`);
-    }
+    processSingleEnvVar(envVar, envValue as string, {
+      config,
+      processedVars,
+      errors,
+    });
   }
 
   return {
@@ -451,6 +458,66 @@ export function parseEnvironmentVariablesAuto(
     warnings,
     errors,
   };
+}
+
+/**
+ * Check if an environment variable should be processed
+ */
+function shouldProcessEnvVar(
+  envVar: string,
+  envValue: string | undefined,
+  prefix: string,
+): boolean {
+  return envVar.startsWith(prefix + ENV_SEPARATOR) && envValue !== undefined;
+}
+
+/**
+ * Process a single environment variable
+ */
+function processSingleEnvVar(
+  envVar: string,
+  envValue: string,
+  context: {
+    config: PartialAppConfig;
+    processedVars: string[];
+    errors: string[];
+  },
+): void {
+  try {
+    // Convert environment variable name to config path
+    const configPath = envVarToConfigPath(envVar, ENV_PREFIX);
+
+    // Try to infer type and convert
+    const convertedValue = inferAndConvertType(envValue);
+
+    // Set the value in the configuration object
+    setNestedProperty(context.config, configPath, convertedValue);
+    context.processedVars.push(envVar);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    context.errors.push(`Failed to parse '${envVar}': ${errorMessage}`);
+  }
+}
+
+/**
+ * Convert string to boolean with various accepted values
+ */
+function stringToBoolean(value: string, strict: boolean): boolean {
+  const lowerValue = value.toLowerCase();
+  const trueValues = ['true', '1', 'yes', 'on', 'enabled'];
+  const falseValues = ['false', '0', 'no', 'off', 'disabled'];
+
+  if (trueValues.includes(lowerValue)) {
+    return true;
+  } else if (falseValues.includes(lowerValue)) {
+    return false;
+  } else if (strict) {
+    throw new ConfigurationError(
+      `Cannot convert '${value}' to boolean`,
+      'TYPE_CONVERSION_ERROR',
+    );
+  }
+  return Boolean(value);
 }
 
 /**
@@ -473,12 +540,10 @@ export function convertType(
     processedValue = processedValue.trim();
   }
 
-  switch (type) {
-    case 'string':
-      return processedValue;
-
-    case 'number': {
-      const numValue = Number(processedValue);
+  const converters: Record<string, (val: string) => unknown> = {
+    string: val => val,
+    number: val => {
+      const numValue = Number(val);
       if (strict && isNaN(numValue)) {
         throw new ConfigurationError(
           `Cannot convert '${value}' to number`,
@@ -486,39 +551,29 @@ export function convertType(
         );
       }
       return numValue;
-    }
-
-    case 'boolean': {
-      const lowerValue = processedValue.toLowerCase();
-      if (['true', '1', 'yes', 'on', 'enabled'].includes(lowerValue)) {
-        return true;
-      } else if (['false', '0', 'no', 'off', 'disabled'].includes(lowerValue)) {
-        return false;
-      } else if (strict) {
-        throw new ConfigurationError(
-          `Cannot convert '${value}' to boolean`,
-          'TYPE_CONVERSION_ERROR',
-        );
-      }
-      return Boolean(processedValue);
-    }
-
-    case 'json':
+    },
+    boolean: val => stringToBoolean(val, strict),
+    json: val => {
       try {
-        return JSON.parse(processedValue);
+        return JSON.parse(val);
       } catch (error) {
         throw new ConfigurationError(
           `Invalid JSON in '${value}': ${error instanceof Error ? error.message : String(error)}`,
           'JSON_PARSE_ERROR',
         );
       }
+    },
+  };
 
-    default:
-      throw new ConfigurationError(
-        `Unsupported type: ${type}`,
-        'UNSUPPORTED_TYPE',
-      );
+  const converter = converters[type];
+  if (!converter) {
+    throw new ConfigurationError(
+      `Unsupported type: ${type}`,
+      'UNSUPPORTED_TYPE',
+    );
   }
+
+  return converter(processedValue);
 }
 
 /**
@@ -527,31 +582,62 @@ export function convertType(
  * @param value - String value to convert
  * @returns Converted value
  */
-export function inferAndConvertType(value: string): unknown {
-  const trimmed = value.trim();
-
-  // Try JSON first (for objects and arrays)
+/**
+ * Try to parse value as JSON
+ */
+function tryParseJson(value: string): unknown | null {
   if (
-    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-    (trimmed.startsWith('[') && trimmed.endsWith(']'))
+    (value.startsWith('{') && value.endsWith('}')) ||
+    (value.startsWith('[') && value.endsWith(']'))
   ) {
     try {
-      return JSON.parse(trimmed);
+      return JSON.parse(value);
     } catch {
-      // Not valid JSON, continue with other types
+      // Not valid JSON
     }
   }
+  return null;
+}
 
-  // Try boolean
-  const lowerValue = trimmed.toLowerCase();
+/**
+ * Try to parse value as boolean
+ */
+function tryParseBoolean(value: string): boolean | null {
+  const lowerValue = value.toLowerCase();
   if (['true', 'false'].includes(lowerValue)) {
     return lowerValue === 'true';
   }
+  return null;
+}
 
-  // Try number
-  const numValue = Number(trimmed);
+/**
+ * Try to parse value as number
+ */
+function tryParseNumber(value: string): number | null {
+  const numValue = Number(value);
   if (!isNaN(numValue) && isFinite(numValue)) {
     return numValue;
+  }
+  return null;
+}
+
+export function inferAndConvertType(value: string): unknown {
+  const trimmed = value.trim();
+
+  // Try different type conversions in order of specificity
+  const jsonResult = tryParseJson(trimmed);
+  if (jsonResult !== null) {
+    return jsonResult;
+  }
+
+  const boolResult = tryParseBoolean(trimmed);
+  if (boolResult !== null) {
+    return boolResult;
+  }
+
+  const numResult = tryParseNumber(trimmed);
+  if (numResult !== null) {
+    return numResult;
   }
 
   // Default to string
@@ -585,7 +671,9 @@ export function envVarToConfigPath(
  * @param path - Property path (dot notation)
  * @param value - Value to set
  */
+
 export function setNestedProperty(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   obj: any,
   path: string,
   value: unknown,
@@ -618,99 +706,202 @@ export function setNestedProperty(
 }
 
 /**
+ * Get nested value from object using path array
+ */
+function getNestedValue<T>(obj: T, path: string[]): unknown {
+  return path.reduce<unknown>((current, key) => {
+    if (current && typeof current === 'object') {
+      return (current as Record<string, unknown>)[key];
+    }
+    return undefined;
+  }, obj);
+}
+
+/**
+ * Validate that a numeric value is positive
+ */
+function validatePositiveNumber(
+  value: number | undefined,
+  fieldName: string,
+): string | null {
+  if (value !== undefined && value <= 0) {
+    return `${fieldName} must be greater than 0`;
+  }
+  return null;
+}
+
+/**
+ * Validate that a value is within a range
+ */
+function validateRange(
+  value: number | undefined,
+  min: number,
+  max: number,
+  fieldName: string,
+): string | null {
+  if (value !== undefined && (value < min || value > max)) {
+    return `${fieldName} must be between ${min} and ${max}`;
+  }
+  return null;
+}
+
+/**
+ * Validate that a value is an array
+ */
+function validateArray(value: unknown, fieldName: string): string | null {
+  if (value !== undefined && !Array.isArray(value)) {
+    return `${fieldName} must be an array`;
+  }
+  return null;
+}
+
+/**
+ * Validate that a value is in an allowed set
+ */
+function validateEnum<T extends string>(
+  value: T | undefined,
+  allowedValues: readonly T[],
+  fieldName: string,
+): string | null {
+  if (value !== undefined && !allowedValues.includes(value)) {
+    return `${fieldName} must be one of: ${allowedValues.join(', ')}`;
+  }
+  return null;
+}
+
+/**
+ * Validate positive numeric values in configuration
+ */
+function validatePositiveNumbers(config: PartialAppConfig): string[] {
+  const errors: string[] = [];
+
+  // Define fields to validate with their paths and display names
+  const positiveNumberFields = [
+    { path: ['database', 'maxConnections'], name: 'Database maxConnections' },
+    {
+      path: ['database', 'connectionTimeout'],
+      name: 'Database connectionTimeout',
+    },
+    { path: ['indexing', 'maxFileSize'], name: 'Indexing maxFileSize' },
+    { path: ['indexing', 'maxWorkers'], name: 'Indexing maxWorkers' },
+    { path: ['indexing', 'batchSize'], name: 'Indexing batchSize' },
+    { path: ['search', 'defaultLimit'], name: 'Search defaultLimit' },
+    { path: ['search', 'maxLimit'], name: 'Search maxLimit' },
+  ];
+
+  // Validate each field
+  for (const field of positiveNumberFields) {
+    const value = getNestedValue(config, field.path);
+    if (value !== undefined) {
+      const error = validatePositiveNumber(
+        value as number | undefined,
+        field.name,
+      );
+      if (error) {
+        errors.push(error);
+      }
+    }
+  }
+
+  return errors;
+}
+
+/**
+ * Validate range values in configuration
+ */
+function validateRanges(config: PartialAppConfig): string[] {
+  const errors: string[] = [];
+
+  const rangeError = validateRange(
+    config.search?.fuzzyThreshold,
+    0,
+    1,
+    'Search fuzzyThreshold',
+  );
+  if (rangeError) {
+    errors.push(rangeError);
+  }
+
+  return errors;
+}
+
+/**
+ * Validate array values in configuration
+ */
+function validateArrays(config: PartialAppConfig): string[] {
+  const errors: string[] = [];
+  const validations = [
+    {
+      value: config.watching?.ignorePatterns,
+      field: 'Watching ignorePatterns',
+    },
+    {
+      value: config.watching?.includePatterns,
+      field: 'Watching includePatterns',
+    },
+  ];
+
+  for (const { value, field } of validations) {
+    const error = validateArray(value, field);
+    if (error) {
+      errors.push(error);
+    }
+  }
+
+  return errors;
+}
+
+/**
+ * Validate enum values in configuration
+ */
+function validateEnums(config: PartialAppConfig): string[] {
+  const errors: string[] = [];
+  const validations = [
+    {
+      value: config.database?.type,
+      allowed: ['sqlite', 'postgresql', 'mysql'] as const,
+      field: 'Database type',
+    },
+    {
+      value: config.logging?.level,
+      allowed: ['error', 'warn', 'info', 'debug', 'trace'] as const,
+      field: 'Log level',
+    },
+    {
+      value: config.logging?.format,
+      allowed: ['json', 'text'] as const,
+      field: 'Log format',
+    },
+    {
+      value: config.profile,
+      allowed: ['development', 'production', 'cicd'] as const,
+      field: 'Profile',
+    },
+  ];
+
+  for (const { value, allowed, field } of validations) {
+    const error = validateEnum(value, allowed, field);
+    if (error) {
+      errors.push(error);
+    }
+  }
+
+  return errors;
+}
+
+/**
  * Validate environment variable values
  *
  * @param config - Parsed configuration
  * @returns Array of validation errors
  */
 export function validateEnvironmentValues(config: PartialAppConfig): string[] {
-  const errors: string[] = [];
-
-  // Validate numeric values
-  if (config.database?.maxConnections && config.database.maxConnections <= 0) {
-    errors.push('Database maxConnections must be greater than 0');
-  }
-
-  if (
-    config.database?.connectionTimeout &&
-    config.database.connectionTimeout <= 0
-  ) {
-    errors.push('Database connectionTimeout must be greater than 0');
-  }
-
-  if (config.indexing?.maxFileSize && config.indexing.maxFileSize <= 0) {
-    errors.push('Indexing maxFileSize must be greater than 0');
-  }
-
-  if (config.indexing?.maxWorkers && config.indexing.maxWorkers <= 0) {
-    errors.push('Indexing maxWorkers must be greater than 0');
-  }
-
-  if (config.indexing?.batchSize && config.indexing.batchSize <= 0) {
-    errors.push('Indexing batchSize must be greater than 0');
-  }
-
-  if (config.search?.defaultLimit && config.search.defaultLimit <= 0) {
-    errors.push('Search defaultLimit must be greater than 0');
-  }
-
-  if (config.search?.maxLimit && config.search.maxLimit <= 0) {
-    errors.push('Search maxLimit must be greater than 0');
-  }
-
-  // Validate ranges
-  if (
-    config.search?.fuzzyThreshold &&
-    (config.search.fuzzyThreshold < 0 || config.search.fuzzyThreshold > 1)
-  ) {
-    errors.push('Search fuzzyThreshold must be between 0 and 1');
-  }
-
-  // Validate arrays
-  if (
-    config.watching?.ignorePatterns &&
-    !Array.isArray(config.watching.ignorePatterns)
-  ) {
-    errors.push('Watching ignorePatterns must be an array');
-  }
-
-  if (
-    config.watching?.includePatterns &&
-    !Array.isArray(config.watching.includePatterns)
-  ) {
-    errors.push('Watching includePatterns must be an array');
-  }
-
-  // Validate enum values
-  if (
-    config.database?.type &&
-    !['sqlite', 'postgresql', 'mysql'].includes(config.database.type)
-  ) {
-    errors.push('Database type must be one of: sqlite, postgresql, mysql');
-  }
-
-  if (
-    config.logging?.level &&
-    !['error', 'warn', 'info', 'debug', 'trace'].includes(config.logging.level)
-  ) {
-    errors.push('Log level must be one of: error, warn, info, debug, trace');
-  }
-
-  if (
-    config.logging?.format &&
-    !['json', 'text'].includes(config.logging.format)
-  ) {
-    errors.push('Log format must be one of: json, text');
-  }
-
-  if (
-    config.profile &&
-    !['development', 'production', 'cicd'].includes(config.profile)
-  ) {
-    errors.push('Profile must be one of: development, production, cicd');
-  }
-
-  return errors;
+  return [
+    ...validatePositiveNumbers(config),
+    ...validateRanges(config),
+    ...validateArrays(config),
+    ...validateEnums(config),
+  ];
 }
 
 /**

@@ -14,6 +14,31 @@ import { ConfigurationError } from '../errors/ConfigurationError';
 import { ConfigurationSource } from './ConfigurationSource';
 
 /**
+ * Priority level for environment configuration
+ */
+const ENVIRONMENT_PRIORITY = 3;
+
+/**
+ * Maximum number of database connections
+ */
+const MAX_ENV_CONNECTIONS = 100;
+
+/**
+ * Minimum timeout in milliseconds
+ */
+const MIN_ENV_TIMEOUT_MS = 1000;
+
+/**
+ * Maximum timeout in milliseconds
+ */
+const MAX_ENV_TIMEOUT_MS = 300000;
+
+/**
+ * Maximum number of workers
+ */
+const MAX_ENV_WORKERS = 64;
+
+/**
  * Environment variable mappings for configuration
  */
 const ENV_MAPPINGS: EnvironmentVariableMapping[] = [
@@ -295,7 +320,7 @@ const ENV_MAPPINGS: EnvironmentVariableMapping[] = [
  * Environment configuration source loading from CODE_SCOUT_* variables
  */
 export class EnvironmentConfiguration extends ConfigurationSource {
-  public readonly priority = 3; // Fourth priority
+  public readonly priority = ENVIRONMENT_PRIORITY; // Fourth priority
   public readonly name = 'environment';
 
   /**
@@ -375,6 +400,38 @@ export class EnvironmentConfiguration extends ConfigurationSource {
   }
 
   /**
+   * Validate number range for environment variables
+   */
+  private validateNumberRange(num: number, envVar: string): void {
+    const validators = [
+      {
+        condition: envVar.includes('CONNECTIONS'),
+        min: 1,
+        max: MAX_ENV_CONNECTIONS,
+        message: `Connection count must be between 1 and ${MAX_ENV_CONNECTIONS}`,
+      },
+      {
+        condition: envVar.includes('TIMEOUT'),
+        min: MIN_ENV_TIMEOUT_MS,
+        max: MAX_ENV_TIMEOUT_MS,
+        message: `Timeout must be between ${MIN_ENV_TIMEOUT_MS}ms and ${MAX_ENV_TIMEOUT_MS}ms`,
+      },
+      {
+        condition: envVar.includes('WORKERS'),
+        min: 1,
+        max: MAX_ENV_WORKERS,
+        message: `Worker count must be between 1 and ${MAX_ENV_WORKERS}`,
+      },
+    ];
+
+    for (const validator of validators) {
+      if (validator.condition && (num < validator.min || num > validator.max)) {
+        throw new Error(validator.message);
+      }
+    }
+  }
+
+  /**
    * Parse number value from string
    */
   private parseNumber(value: string, envVar: string): number {
@@ -384,18 +441,7 @@ export class EnvironmentConfiguration extends ConfigurationSource {
       throw new Error(`Cannot parse '${value}' as number`);
     }
 
-    // Validate ranges for specific variables
-    if (envVar.includes('CONNECTIONS') && (num < 1 || num > 100)) {
-      throw new Error('Connection count must be between 1 and 100');
-    }
-
-    if (envVar.includes('TIMEOUT') && (num < 1000 || num > 300000)) {
-      throw new Error('Timeout must be between 1000ms and 300000ms');
-    }
-
-    if (envVar.includes('WORKERS') && (num < 1 || num > 64)) {
-      throw new Error('Worker count must be between 1 and 64');
-    }
+    this.validateNumberRange(num, envVar);
 
     return num;
   }
@@ -416,6 +462,7 @@ export class EnvironmentConfiguration extends ConfigurationSource {
   /**
    * Set nested value in configuration object
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private setNestedValue(obj: any, path: string, value: unknown): void {
     const keys = path.split('.');
     let current = obj;
@@ -503,7 +550,10 @@ export class EnvironmentConfiguration extends ConfigurationSource {
       example: string;
     }
   > {
-    const docs: Record<string, any> = {};
+    const docs: Record<
+      string,
+      { description: string; type: string; example: string }
+    > = {};
 
     for (const mapping of ENV_MAPPINGS) {
       docs[mapping.envVar] = {

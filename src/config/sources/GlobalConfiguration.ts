@@ -15,6 +15,31 @@ import { ConfigurationError } from '../errors/ConfigurationError';
 import { ConfigurationSource } from './ConfigurationSource';
 
 /**
+ * File permissions for configuration files (owner read/write only)
+ */
+const CONFIG_FILE_PERMISSIONS = 0o600;
+
+/**
+ * Mask for all file permissions
+ */
+const ALL_PERMISSIONS_MASK = 0o777;
+
+/**
+ * Group read permission bit
+ */
+const GROUP_READ_PERMISSION = 0o040;
+
+/**
+ * World read permission bit
+ */
+const WORLD_READ_PERMISSION = 0o004;
+
+/**
+ * Base for octal number conversion
+ */
+const OCTAL_BASE = 8;
+
+/**
  * Global configuration source loading from user's home directory
  */
 export class GlobalConfiguration extends ConfigurationSource {
@@ -38,7 +63,10 @@ export class GlobalConfiguration extends ConfigurationSource {
     await this.validateAvailability();
 
     const content = await fs.readFile(this.configPath, 'utf-8');
-    const config = this.safeJsonParse(content, 'global configuration file');
+    const config = this.safeJsonParse(
+      content,
+      'global configuration file',
+    ) as PartialAppConfig;
 
     return this.createPartialConfig(config);
   }
@@ -103,7 +131,7 @@ export class GlobalConfiguration extends ConfigurationSource {
       await fs.writeFile(this.configPath, content, 'utf-8');
 
       // Set restrictive permissions (owner read/write only)
-      await fs.chmod(this.configPath, 0o600);
+      await fs.chmod(this.configPath, CONFIG_FILE_PERMISSIONS);
     } catch (error) {
       throw ConfigurationError.fileAccess(
         `Failed to save global configuration: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -120,7 +148,7 @@ export class GlobalConfiguration extends ConfigurationSource {
     try {
       await fs.unlink(this.configPath);
     } catch (error) {
-      if ((error as any)?.code !== 'ENOENT') {
+      if ((error as { code?: string }).code !== 'ENOENT') {
         throw ConfigurationError.fileAccess(
           `Failed to remove global configuration: ${error instanceof Error ? error.message : 'Unknown error'}`,
           this.configPath,
@@ -145,7 +173,7 @@ export class GlobalConfiguration extends ConfigurationSource {
         exists: true,
         size: stats.size,
         modified: stats.mtime,
-        permissions: (stats.mode & 0o777).toString(8),
+        permissions: (stats.mode & ALL_PERMISSIONS_MASK).toString(OCTAL_BASE),
       };
     } catch {
       return { exists: false };
@@ -165,8 +193,8 @@ export class GlobalConfiguration extends ConfigurationSource {
 
       // Check that file is not world-readable or group-readable
       const mode = parseInt(stats.permissions ?? '0', 8);
-      const hasGroupRead = (mode & 0o040) !== 0;
-      const hasWorldRead = (mode & 0o004) !== 0;
+      const hasGroupRead = (mode & GROUP_READ_PERMISSION) !== 0;
+      const hasWorldRead = (mode & WORLD_READ_PERMISSION) !== 0;
 
       return !hasGroupRead && !hasWorldRead;
     } catch {
@@ -179,7 +207,7 @@ export class GlobalConfiguration extends ConfigurationSource {
    */
   async fixPermissions(): Promise<void> {
     try {
-      await fs.chmod(this.configPath, 0o600);
+      await fs.chmod(this.configPath, CONFIG_FILE_PERMISSIONS);
     } catch (error) {
       throw ConfigurationError.fileAccess(
         `Failed to fix permissions on global configuration: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -200,7 +228,7 @@ export class GlobalConfiguration extends ConfigurationSource {
     try {
       const content = await fs.readFile(this.configPath, 'utf-8');
       await fs.writeFile(finalBackupPath, content, 'utf-8');
-      await fs.chmod(finalBackupPath, 0o600);
+      await fs.chmod(finalBackupPath, CONFIG_FILE_PERMISSIONS);
       return finalBackupPath;
     } catch (error) {
       throw ConfigurationError.fileAccess(
@@ -217,7 +245,9 @@ export class GlobalConfiguration extends ConfigurationSource {
   async restoreFromBackup(backupPath: string): Promise<void> {
     try {
       const content = await fs.readFile(backupPath, 'utf-8');
-      await this.saveConfig(this.safeJsonParse(content, 'backup file'));
+      await this.saveConfig(
+        this.safeJsonParse(content, 'backup file') as PartialAppConfig,
+      );
     } catch (error) {
       throw ConfigurationError.fileAccess(
         `Failed to restore from backup: ${error instanceof Error ? error.message : 'Unknown error'}`,

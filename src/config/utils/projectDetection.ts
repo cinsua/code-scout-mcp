@@ -72,40 +72,63 @@ export interface ProjectDetectionResult {
  * @param markers - List of markers to look for (defaults to PROJECT_MARKERS)
  * @returns Promise<ProjectDetectionResult>
  */
+/**
+ * Check for project markers in a directory
+ */
+async function checkMarkersInDirectory(
+  dirPath: string,
+  markers: string[],
+): Promise<string[]> {
+  const foundMarkers: string[] = [];
+
+  for (const marker of markers) {
+    const markerPath = path.join(dirPath, marker);
+    try {
+      const stats = await fs.stat(markerPath);
+      if (stats.isFile() || stats.isDirectory()) {
+        foundMarkers.push(marker);
+      }
+    } catch {
+      // Marker doesn't exist, continue searching
+    }
+  }
+
+  return foundMarkers;
+}
+
+/**
+ * Create project detection result for a directory
+ */
+async function createProjectResult(
+  rootPath: string,
+  foundMarkers: string[],
+  isValid: boolean,
+): Promise<ProjectDetectionResult> {
+  const configDir = path.join(rootPath, '.code-scout');
+  const configFile = await findConfigFile(rootPath);
+
+  return {
+    rootPath,
+    foundMarkers,
+    isValid,
+    configDir,
+    configFile,
+  };
+}
+
 export async function detectProjectRoot(
   startPath: string = process.cwd(),
-  markers: string[] = PROJECT_MARKERS
+  markers: string[] = PROJECT_MARKERS,
 ): Promise<ProjectDetectionResult> {
   let currentPath = path.resolve(startPath);
-  const foundMarkers: string[] = [];
 
   // Search upwards until we find markers or reach filesystem root
   while (currentPath !== path.dirname(currentPath)) {
-    // Check for markers in current directory
-    for (const marker of markers) {
-      const markerPath = path.join(currentPath, marker);
-      try {
-        const stats = await fs.stat(markerPath);
-        if (stats.isFile() || stats.isDirectory()) {
-          foundMarkers.push(marker);
-        }
-      } catch {
-        // Marker doesn't exist, continue searching
-      }
-    }
+    const foundMarkers = await checkMarkersInDirectory(currentPath, markers);
 
     // If we found markers, this is our project root
     if (foundMarkers.length > 0) {
-      const configDir = path.join(currentPath, '.code-scout');
-      const configFile = await findConfigFile(currentPath);
-
-      return {
-        rootPath: currentPath,
-        foundMarkers,
-        isValid: true,
-        configDir,
-        configFile,
-      };
+      return createProjectResult(currentPath, foundMarkers, true);
     }
 
     // Move up to parent directory
@@ -114,16 +137,7 @@ export async function detectProjectRoot(
 
   // If we reached here, we didn't find any project markers
   // Return the current directory as fallback
-  const configDir = path.join(currentPath, '.code-scout');
-  const configFile = await findConfigFile(currentPath);
-
-  return {
-    rootPath: currentPath,
-    foundMarkers,
-    isValid: false,
-    configDir,
-    configFile,
-  };
+  return createProjectResult(currentPath, [], false);
 }
 
 /**
@@ -135,7 +149,7 @@ export async function detectProjectRoot(
  */
 export async function findConfigFile(
   dirPath: string,
-  configFiles: string[] = CONFIG_FILES
+  configFiles: string[] = CONFIG_FILES,
 ): Promise<string | undefined> {
   // First check .code-scout/config.json
   const codeScoutDir = path.join(dirPath, '.code-scout');
@@ -175,7 +189,7 @@ export async function findConfigFile(
  */
 export async function isValidProjectRoot(
   dirPath: string,
-  markers: string[] = PROJECT_MARKERS
+  markers: string[] = PROJECT_MARKERS,
 ): Promise<boolean> {
   const result = await detectProjectRoot(dirPath, markers);
   return result.isValid && result.rootPath === path.resolve(dirPath);
@@ -203,7 +217,7 @@ export function getPossibleConfigPaths(projectRoot: string): string[] {
  * @returns Promise<string | undefined>
  */
 export async function findNearestConfigFile(
-  startPath: string = process.cwd()
+  startPath: string = process.cwd(),
 ): Promise<string | undefined> {
   let currentPath = path.resolve(startPath);
 
@@ -245,7 +259,7 @@ export async function ensureConfigDir(projectRoot: string): Promise<string> {
  */
 export function isPathInProject(
   filePath: string,
-  projectRoot: string
+  projectRoot: string,
 ): boolean {
   const resolvedFilePath = path.resolve(filePath);
   const resolvedProjectRoot = path.resolve(projectRoot);
@@ -262,7 +276,7 @@ export function isPathInProject(
  */
 export function getRelativePathFromProject(
   filePath: string,
-  projectRoot: string
+  projectRoot: string,
 ): string {
   return path.relative(path.resolve(projectRoot), path.resolve(filePath));
 }

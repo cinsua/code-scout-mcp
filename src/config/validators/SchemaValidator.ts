@@ -5,7 +5,7 @@
  * using the AJV library for high-performance validation.
  */
 
-import type { ErrorObject, ValidateFunction } from 'ajv';
+import type { ErrorObject, ValidateFunction, KeywordDefinition } from 'ajv';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 
@@ -76,7 +76,18 @@ export class SchemaValidator {
   private options: Required<SchemaValidatorOptions>;
 
   constructor(options: SchemaValidatorOptions = {}) {
-    this.options = {
+    this.options = this.processOptions(options);
+    this.ajv = this.createAjvInstance();
+    this.validateFunction = this.compileValidationFunction();
+  }
+
+  /**
+   * Process and normalize validator options
+   */
+  private processOptions(
+    options: SchemaValidatorOptions,
+  ): Required<SchemaValidatorOptions> {
+    return {
       allowAdditionalProperties: options.allowAdditionalProperties ?? false,
       removeAdditional: options.removeAdditional ?? false,
       coerceTypes: options.coerceTypes ?? false,
@@ -84,9 +95,13 @@ export class SchemaValidator {
       allErrors: options.allErrors ?? true,
       strict: options.strict ?? true,
     };
+  }
 
-    // Initialize AJV with options
-    this.ajv = new Ajv({
+  /**
+   * Create and configure AJV instance
+   */
+  private createAjvInstance(): Ajv {
+    const ajv = new Ajv({
       allErrors: this.options.allErrors,
       coerceTypes: this.options.coerceTypes,
       removeAdditional: this.options.removeAdditional,
@@ -96,11 +111,15 @@ export class SchemaValidator {
       verbose: true,
     });
 
-    // Add format validation
-    addFormats(this.ajv);
+    addFormats(ajv);
+    return ajv;
+  }
 
-    // Compile the validation function
-    this.validateFunction = this.ajv.compile(configSchema);
+  /**
+   * Compile the validation function
+   */
+  private compileValidationFunction(): ValidateFunction {
+    return this.ajv.compile(configSchema);
   }
 
   /**
@@ -195,7 +214,8 @@ export class SchemaValidator {
         );
 
         if (sectionResult.valid) {
-          (validSections as any)[sectionName] = sectionValue;
+          (validSections as Record<string, unknown>)[sectionName] =
+            sectionValue;
         } else {
           sectionErrors.push(...sectionResult.errors);
         }
@@ -241,7 +261,7 @@ export class SchemaValidator {
   }
 
   /**
-   * Format AJV error message for better readability
+   * Format an AJV error into a user-friendly message
    *
    * @param error - AJV error object
    * @returns Formatted error message
@@ -252,40 +272,30 @@ export class SchemaValidator {
     // Get the property name from the path
     const propertyName = instancePath.split('/').pop() ?? 'property';
 
-    switch (keyword) {
-      case 'type':
-        return `${propertyName} must be of type ${params.type}`;
+    const messageMap: Record<
+      string,
+      (prop: string, params: Record<string, unknown>) => string
+    > = {
+      type: (prop, p) => `${prop} must be of type ${p.type}`,
+      required: (_, p) => `Missing required property: ${p.missingProperty}`,
+      minimum: (prop, p) => `${prop} must be >= ${p.limit}`,
+      maximum: (prop, p) => `${prop} must be <= ${p.limit}`,
+      minLength: (prop, p) =>
+        `${prop} must be at least ${p.limit} characters long`,
+      maxLength: (prop, p) =>
+        `${prop} must be at most ${p.limit} characters long`,
+      pattern: prop => `${prop} does not match required pattern`,
+      enum: (prop, p) =>
+        `${prop} must be one of: ${(p.allowedValues as string[]).join(', ')}`,
+      format: (prop, p) => `${prop} must be a valid ${p.format}`,
+      additionalProperties: (_, p) =>
+        `Additional property not allowed: ${p.additionalProperty}`,
+    };
 
-      case 'required':
-        return `Missing required property: ${params.missingProperty}`;
-
-      case 'minimum':
-        return `${propertyName} must be >= ${params.limit}`;
-
-      case 'maximum':
-        return `${propertyName} must be <= ${params.limit}`;
-
-      case 'minLength':
-        return `${propertyName} must be at least ${params.limit} characters long`;
-
-      case 'maxLength':
-        return `${propertyName} must be at most ${params.limit} characters long`;
-
-      case 'pattern':
-        return `${propertyName} does not match required pattern`;
-
-      case 'enum':
-        return `${propertyName} must be one of: ${params.allowedValues?.join(', ')}`;
-
-      case 'format':
-        return `${propertyName} must be a valid ${params.format}`;
-
-      case 'additionalProperties':
-        return `Additional property not allowed: ${params.additionalProperty}`;
-
-      default:
-        return message ?? `Validation error at ${instancePath}`;
-    }
+    const messageFn = messageMap[keyword];
+    return messageFn
+      ? messageFn(propertyName, params)
+      : (message ?? `Validation error at ${instancePath}`);
   }
 
   /**
@@ -297,34 +307,24 @@ export class SchemaValidator {
   private getErrorCode(error: ErrorObject): string {
     const { keyword } = error;
 
-    switch (keyword) {
-      case 'type':
-        return 'INVALID_TYPE';
-      case 'required':
-        return 'MISSING_REQUIRED';
-      case 'minimum':
-        return 'VALUE_TOO_SMALL';
-      case 'maximum':
-        return 'VALUE_TOO_LARGE';
-      case 'minLength':
-        return 'STRING_TOO_SHORT';
-      case 'maxLength':
-        return 'STRING_TOO_LONG';
-      case 'pattern':
-        return 'PATTERN_MISMATCH';
-      case 'enum':
-        return 'INVALID_ENUM_VALUE';
-      case 'format':
-        return 'INVALID_FORMAT';
-      case 'additionalProperties':
-        return 'ADDITIONAL_PROPERTY';
-      default:
-        return 'VALIDATION_ERROR';
-    }
+    const errorCodeMap: Record<string, string> = {
+      type: 'INVALID_TYPE',
+      required: 'MISSING_REQUIRED',
+      minimum: 'VALUE_TOO_SMALL',
+      maximum: 'VALUE_TOO_LARGE',
+      minLength: 'STRING_TOO_SHORT',
+      maxLength: 'STRING_TOO_LONG',
+      pattern: 'PATTERN_MISMATCH',
+      enum: 'INVALID_ENUM_VALUE',
+      format: 'INVALID_FORMAT',
+      additionalProperties: 'ADDITIONAL_PROPERTY',
+    };
+
+    return errorCodeMap[keyword] ?? 'VALIDATION_ERROR';
   }
 
   /**
-   * Get suggestion for fixing the error
+   * Generate a suggestion for fixing a validation error
    *
    * @param error - AJV error object
    * @returns Suggestion string or undefined
@@ -332,40 +332,28 @@ export class SchemaValidator {
   private getSuggestion(error: ErrorObject): string | undefined {
     const { keyword, params } = error;
 
-    switch (keyword) {
-      case 'type':
-        return `Change the value to a ${params.type}`;
+    const suggestionMap: Record<
+      string,
+      (params: Record<string, unknown>) => string
+    > = {
+      type: p => `Change the value to a ${p.type}`,
+      required: p => `Add the missing property: ${p.missingProperty}`,
+      minimum: p => `Increase the value to at least ${p.limit as number}`,
+      maximum: p => `Decrease the value to at most ${p.limit as number}`,
+      minLength: p =>
+        `Add at least ${(p.limit as number) - (typeof p.data === 'string' ? p.data.length : 0)} more characters`,
+      maxLength: p =>
+        `Remove at least ${(typeof p.data === 'string' ? p.data.length : 0) - (p.limit as number)} characters`,
+      pattern: () => `Ensure the value matches the required pattern`,
+      enum: p =>
+        `Use one of the allowed values: ${(p.allowedValues as string[]).join(', ')}`,
+      format: p => `Provide a valid ${p.format} format`,
+      additionalProperties: () =>
+        `Remove the additional property or add it to the schema`,
+    };
 
-      case 'required':
-        return `Add the missing property: ${params.missingProperty}`;
-
-      case 'minimum':
-        return `Increase the value to at least ${params.limit}`;
-
-      case 'maximum':
-        return `Decrease the value to at most ${params.limit}`;
-
-      case 'minLength':
-        return `Add at least ${params.limit - (params.data?.length ?? 0)} more characters`;
-
-      case 'maxLength':
-        return `Remove at least ${(params.data?.length ?? 0) - params.limit} characters`;
-
-      case 'pattern':
-        return `Ensure the value matches the required pattern`;
-
-      case 'enum':
-        return `Use one of the allowed values: ${params.allowedValues?.join(', ')}`;
-
-      case 'format':
-        return `Provide a valid ${params.format} format`;
-
-      case 'additionalProperties':
-        return `Remove the additional property or add it to the schema`;
-
-      default:
-        return undefined;
-    }
+    const suggestionFn = suggestionMap[keyword];
+    return suggestionFn ? suggestionFn(params) : undefined;
   }
 
   /**
@@ -415,43 +403,60 @@ export class SchemaValidator {
   private performSemanticChecks(config: PartialAppConfig): ValidationWarning[] {
     const warnings: ValidationWarning[] = [];
 
-    // Check for logical inconsistencies
-    if (config.search) {
-      if (config.search.defaultLimit && config.search.maxLimit) {
-        if (config.search.defaultLimit > config.search.maxLimit) {
-          warnings.push({
-            path: 'search.defaultLimit',
-            message: 'defaultLimit should not be greater than maxLimit',
-            code: 'ILLOGICAL_LIMITS',
-          });
-        }
-      }
-    }
+    warnings.push(...this.checkSearchLimits(config));
+    warnings.push(...this.checkIndexingPerformance(config));
+    warnings.push(...this.checkDatabaseSettings(config));
 
-    if (config.indexing) {
-      if (config.indexing.maxWorkers && config.indexing.batchSize) {
-        if (config.indexing.maxWorkers > config.indexing.batchSize) {
-          warnings.push({
-            path: 'indexing.maxWorkers',
-            message:
-              'maxWorkers should not be greater than batchSize for optimal performance',
-            code: 'PERFORMANCE_WARNING',
-          });
-        }
-      }
-    }
+    return warnings;
+  }
 
-    if (config.database) {
-      if (
-        config.database.type === 'sqlite' &&
-        config.database.connectionString
-      ) {
+  private checkSearchLimits(config: PartialAppConfig): ValidationWarning[] {
+    const warnings: ValidationWarning[] = [];
+    const search = config.search;
+
+    if (search?.defaultLimit && search.maxLimit) {
+      if (search.defaultLimit > search.maxLimit) {
         warnings.push({
-          path: 'database.connectionString',
-          message: 'connectionString is ignored for SQLite database type',
-          code: 'IGNORED_SETTING',
+          path: 'search.defaultLimit',
+          message: 'defaultLimit should not be greater than maxLimit',
+          code: 'ILLOGICAL_LIMITS',
         });
       }
+    }
+
+    return warnings;
+  }
+
+  private checkIndexingPerformance(
+    config: PartialAppConfig,
+  ): ValidationWarning[] {
+    const warnings: ValidationWarning[] = [];
+    const indexing = config.indexing;
+
+    if (indexing?.maxWorkers && indexing.batchSize) {
+      if (indexing.maxWorkers > indexing.batchSize) {
+        warnings.push({
+          path: 'indexing.maxWorkers',
+          message:
+            'maxWorkers should not be greater than batchSize for optimal performance',
+          code: 'PERFORMANCE_WARNING',
+        });
+      }
+    }
+
+    return warnings;
+  }
+
+  private checkDatabaseSettings(config: PartialAppConfig): ValidationWarning[] {
+    const warnings: ValidationWarning[] = [];
+    const database = config.database;
+
+    if (database?.type === 'sqlite' && database.connectionString) {
+      warnings.push({
+        path: 'database.connectionString',
+        message: 'connectionString is ignored for SQLite database type',
+        code: 'IGNORED_SETTING',
+      });
     }
 
     return warnings;
@@ -462,7 +467,7 @@ export class SchemaValidator {
    *
    * @returns JSON schema object
    */
-  getSchema(): any {
+  getSchema(): Record<string, unknown> {
     return configSchema;
   }
 
@@ -482,7 +487,7 @@ export class SchemaValidator {
    * @param keyword - Keyword name
    * @param definition - Keyword definition
    */
-  addKeyword(keyword: string, definition: any): void {
+  addKeyword(keyword: string, definition: KeywordDefinition): void {
     this.ajv.addKeyword(keyword, definition);
   }
 }

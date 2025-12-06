@@ -22,7 +22,7 @@
     "pretest": "npm run lint && npm run typecheck",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint --fix src/**/*.ts",
-    "test-lint": "eslint --fix",
+    "lint:all": "eslint --fix",
     "format": "prettier --write src/**/*.ts",
     "format:check": "prettier --check src/**/*.ts",
     "typecheck": "tsc --noEmit",

@@ -12,10 +12,25 @@ import * as path from 'path';
 import type {
   PartialAppConfig,
   ConfigurationMigration,
+  LoggingConfig,
+  WatchingConfig,
+  DatabaseConfig,
+  ValidationResult,
+  ScoringWeights,
 } from '../types/ConfigTypes';
 
 /**
- * Migration result
+ * Default filename scoring weight
+ */
+const DEFAULT_FILENAME_WEIGHT = 5.0;
+
+/**
+ * Default path scoring weight
+ */
+const DEFAULT_PATH_WEIGHT = 3.0;
+
+/**
+ * Configuration migration definitions
  */
 export interface MigrationResult {
   /**
@@ -104,6 +119,50 @@ export class MigrationManager {
    * @param targetVersion - Target version (defaults to current)
    * @returns Promise<MigrationResult>
    */
+  /**
+   * Handle the case when no migration is needed
+   */
+  private handleNoMigrationNeeded(
+    result: MigrationResult,
+    config: PartialAppConfig,
+    fromVersion: string,
+  ): MigrationResult {
+    return this.createNoMigrationNeededResult(result, config, fromVersion);
+  }
+
+  /**
+   * Execute the migration process
+   */
+  private async executeMigration(
+    config: PartialAppConfig,
+    fromVersion: string,
+    toVersion: string,
+    result: MigrationResult,
+  ): Promise<MigrationResult> {
+    // Create backup if requested
+    if (this.options.createBackup) {
+      await this.createBackup(config, fromVersion);
+    }
+
+    // Apply migrations
+    const migrationResult = this.performMigrations(
+      config,
+      fromVersion,
+      toVersion,
+      result,
+    );
+    if (!migrationResult.success) {
+      return migrationResult.result;
+    }
+
+    // Validate and finalize
+    if (!migrationResult.config) {
+      result.errors.push('Migration failed: no config returned');
+      return result;
+    }
+    return this.finalizeMigration(migrationResult.config, toVersion, result);
+  }
+
   async migrate(
     config: PartialAppConfig,
     targetVersion?: string,
@@ -121,78 +180,110 @@ export class MigrationManager {
     };
 
     try {
-      // If already at target version, no migration needed
-      if (this.compareVersions(fromVersion, toVersion) >= 0) {
-        result.success = true;
-        result.config = config;
-        result.warnings.push(
-          `Configuration is already at version ${fromVersion} or newer`,
-        );
-        return result;
+      // Check if migration is needed
+      if (!this.isMigrationNeeded(fromVersion, toVersion)) {
+        return this.handleNoMigrationNeeded(result, config, fromVersion);
       }
 
-      // Create backup if requested
-      if (this.options.createBackup) {
-        await this.createBackup(config, fromVersion);
-      }
-
-      // Apply migrations sequentially
-      let currentConfig = { ...config };
-      let currentVersion = fromVersion;
-
-      const applicableMigrations = this.getApplicableMigrations(
-        currentVersion,
+      return await this.executeMigration(
+        config,
+        fromVersion,
         toVersion,
+        result,
       );
-
-      for (const migration of applicableMigrations) {
-        try {
-          currentConfig = migration.migrate(currentConfig);
-          currentVersion = migration.toVersion;
-          result.appliedMigrations.push(
-            `${migration.fromVersion} -> ${migration.toVersion}`,
-          );
-          result.warnings.push(`Applied migration: ${migration.description}`);
-        } catch (error) {
-          result.errors.push(
-            `Migration ${migration.fromVersion} -> ${migration.toVersion} failed: ${error instanceof Error ? error.message : String(error)}`,
-          );
-          return result;
-        }
-      }
-
-      // Update version in configuration
-      currentConfig.version = toVersion;
-
-      // Validate migrated configuration if requested
-      if (this.options.validateAfterMigration) {
-        const validationResult =
-          await this.validateMigratedConfig(currentConfig);
-        if (!validationResult.valid) {
-          result.errors.push(
-            ...validationResult.errors.map(
-              (e: any) => `Validation error: ${e.message}`,
-            ),
-          );
-          return result;
-        }
-        result.warnings.push(
-          ...validationResult.warnings.map(
-            (w: any) => `Validation warning: ${w.message}`,
-          ),
-        );
-      }
-
-      result.success = true;
-      result.config = currentConfig;
-
-      return result;
     } catch (error) {
       result.errors.push(
         `Migration failed: ${error instanceof Error ? error.message : String(error)}`,
       );
       return result;
     }
+  }
+
+  private isMigrationNeeded(fromVersion: string, toVersion: string): boolean {
+    return this.compareVersions(fromVersion, toVersion) < 0;
+  }
+
+  private createNoMigrationNeededResult(
+    result: MigrationResult,
+    config: PartialAppConfig,
+    fromVersion: string,
+  ): MigrationResult {
+    result.success = true;
+    result.config = config;
+    result.warnings.push(
+      `Configuration is already at version ${fromVersion} or newer`,
+    );
+    return result;
+  }
+
+  private performMigrations(
+    config: PartialAppConfig,
+    fromVersion: string,
+    toVersion: string,
+    result: MigrationResult,
+  ): {
+    success: boolean;
+    config?: PartialAppConfig;
+    result: MigrationResult;
+  } {
+    let currentConfig = { ...config };
+    let currentVersion = fromVersion;
+
+    const applicableMigrations = this.getApplicableMigrations(
+      currentVersion,
+      toVersion,
+    );
+
+    for (const migration of applicableMigrations) {
+      try {
+        currentConfig = migration.migrate(currentConfig);
+        currentVersion = migration.toVersion;
+        result.appliedMigrations.push(
+          `${migration.fromVersion} -> ${migration.toVersion}`,
+        );
+        result.warnings.push(`Applied migration: ${migration.description}`);
+      } catch (error) {
+        result.errors.push(
+          `Migration ${migration.fromVersion} -> ${migration.toVersion} failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return { success: false, result };
+      }
+    }
+
+    return { success: true, config: currentConfig, result };
+  }
+
+  private async finalizeMigration(
+    config: PartialAppConfig,
+    toVersion: string,
+    result: MigrationResult,
+  ): Promise<MigrationResult> {
+    // Update version in configuration
+    config.version = toVersion;
+
+    // Validate migrated configuration if requested
+    if (this.options.validateAfterMigration) {
+      const validationResult = await this.validateMigratedConfig(config);
+      if (!validationResult.valid) {
+        result.errors.push(
+          ...validationResult.errors.map(
+            (e: unknown) =>
+              `Validation error: ${(e as { message?: string }).message ?? 'Unknown error'}`,
+          ),
+        );
+        return result;
+      }
+      result.warnings.push(
+        ...validationResult.warnings.map(
+          (w: unknown) =>
+            `Validation warning: ${(w as { message?: string }).message ?? 'Unknown warning'}`,
+        ),
+      );
+    }
+
+    result.success = true;
+    result.config = config;
+    return result;
   }
 
   /**
@@ -247,7 +338,17 @@ export class MigrationManager {
    * Initialize built-in migrations
    */
   private initializeMigrations(): void {
-    // Migration 1.0.0 -> 1.1.0: Add security section
+    this.addSecurityMigration();
+    this.addLoggingMigration();
+    this.addScoringWeightsMigration();
+    this.addProfileMigration();
+    this.addDatabaseWALMigration();
+  }
+
+  /**
+   * Add migration for security configuration section
+   */
+  private addSecurityMigration(): void {
     this.addMigration({
       fromVersion: '1.0.0',
       toVersion: '1.1.0',
@@ -270,8 +371,12 @@ export class MigrationManager {
         return config;
       },
     });
+  }
 
-    // Migration 1.1.0 -> 1.2.0: Add logging section
+  /**
+   * Add migration for logging configuration section
+   */
+  private addLoggingMigration(): void {
     this.addMigration({
       fromVersion: '1.1.0',
       toVersion: '1.2.0',
@@ -294,8 +399,12 @@ export class MigrationManager {
         return config;
       },
     });
+  }
 
-    // Migration 1.2.0 -> 1.3.0: Update scoring weights
+  /**
+   * Add migration for search scoring weights update
+   */
+  private addScoringWeightsMigration(): void {
     this.addMigration({
       fromVersion: '1.2.0',
       toVersion: '1.3.0',
@@ -306,21 +415,27 @@ export class MigrationManager {
           typeof config.search === 'object' &&
           'scoringWeights' in config.search
         ) {
-          const weights = (config.search as any).scoringWeights;
+          const weights = (
+            config.search as { scoringWeights: Partial<ScoringWeights> }
+          ).scoringWeights;
           weights.content ??= 2.0;
           // Adjust other weights for better balance
-          if (weights.filename === 5.0) {
-            weights.filename = 5.0;
+          if (weights.filename === DEFAULT_FILENAME_WEIGHT) {
+            weights.filename = DEFAULT_FILENAME_WEIGHT;
           }
-          if (weights.path === 3.0) {
-            weights.path = 3.0;
+          if (weights.path === DEFAULT_PATH_WEIGHT) {
+            weights.path = DEFAULT_PATH_WEIGHT;
           }
         }
         return config;
       },
     });
+  }
 
-    // Migration 1.3.0 -> 1.4.0: Add profile support
+  /**
+   * Add migration for profile support
+   */
+  private addProfileMigration(): void {
     this.addMigration({
       fromVersion: '1.3.0',
       toVersion: '1.4.0',
@@ -328,11 +443,11 @@ export class MigrationManager {
       migrate: config => {
         if (!config.profile) {
           // Auto-detect profile based on existing settings
-          const logging = config.logging as any;
-          const watching = config.watching as any;
-          if (logging?.level === 'debug' && watching?.enabled) {
+          const logging = config.logging as LoggingConfig;
+          const watching = config.watching as WatchingConfig;
+          if (logging.level === 'debug' && watching.enabled) {
             config.profile = 'development';
-          } else if (logging?.level === 'warn' && !watching?.enabled) {
+          } else if (logging.level === 'warn' && !watching.enabled) {
             config.profile = 'production';
           } else {
             config.profile = 'development';
@@ -341,21 +456,21 @@ export class MigrationManager {
         return config;
       },
     });
+  }
 
-    // Migration 1.4.0 -> 1.5.0: Add database WAL settings
+  /**
+   * Add migration for database WAL settings
+   */
+  private addDatabaseWALMigration(): void {
     this.addMigration({
       fromVersion: '1.4.0',
       toVersion: '1.5.0',
       description: 'Add database WAL and vacuum settings',
       migrate: config => {
         if (config.database) {
-          const database = config.database as any;
-          if (database.enableWAL === undefined) {
-            database.enableWAL = database.type === 'sqlite';
-          }
-          if (database.vacuumIntervalHours === undefined) {
-            database.vacuumIntervalHours = 24;
-          }
+          const database = config.database as Partial<DatabaseConfig>;
+          database.enableWAL ??= database.type === 'sqlite';
+          database.vacuumIntervalHours ??= 24;
         }
         return config;
       },
@@ -439,7 +554,9 @@ export class MigrationManager {
    * @param config - Configuration to validate
    * @returns Promise<ValidationResult>
    */
-  private async validateMigratedConfig(config: PartialAppConfig): Promise<any> {
+  private async validateMigratedConfig(
+    config: PartialAppConfig,
+  ): Promise<ValidationResult> {
     // Import validators dynamically to avoid circular dependencies
     const { SchemaValidator } = await import('../validators/SchemaValidator');
     const { SemanticValidator } =

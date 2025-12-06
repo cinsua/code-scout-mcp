@@ -7,15 +7,10 @@
 
 import CodeScoutServer from './index';
 
-async function main(): Promise<void> {
+function main(): void {
   const server = new CodeScoutServer();
 
-  try {
-    await server.start();
-  } catch (error) {
-    console.error('Failed to start Code-Scout MCP Server:', error);
-    process.exit(1);
-  }
+  server.start();
 }
 
 // Handle process termination
@@ -29,7 +24,4 @@ process.on('SIGTERM', () => {
   process.exit(0);
 });
 
-void main().catch(error => {
-  console.error('Unhandled error:', error);
-  process.exit(1);
-});
+main();

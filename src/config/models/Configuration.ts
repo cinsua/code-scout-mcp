@@ -17,6 +17,11 @@ import type {
 import { ConfigurationError } from '../errors/ConfigurationError';
 
 /**
+ * Maximum number of configuration snapshots to keep
+ */
+const MAX_SNAPSHOTS = 10;
+
+/**
  * Main configuration model that holds the current configuration state
  * and provides methods for accessing and modifying it.
  */
@@ -138,9 +143,16 @@ export class Configuration extends EventEmitter {
       );
     }
 
-    const keys = path.split('.');
-    const lastKey = keys.pop()!;
-    const target = keys.reduce(
+    const keys = path.split('.').filter(key => key.length > 0);
+    if (keys.length === 0) {
+      throw new ConfigurationError(
+        'Invalid configuration path',
+        'INVALID_PATH',
+      );
+    }
+    const lastKey = keys[keys.length - 1] as string;
+    const targetKeys = keys.slice(0, -1);
+    const target = targetKeys.reduce(
       (obj, key) => {
         if (!obj[key] || typeof obj[key] !== 'object') {
           obj[key] = {};
@@ -277,55 +289,141 @@ export class Configuration extends EventEmitter {
    */
   compare(config1: AppConfig, config2: AppConfig): ConfigurationChangeEvent[] {
     const changes: ConfigurationChangeEvent[] = [];
-
-    const findChanges = (obj1: any, obj2: any, path: string = '') => {
-      const keys = new Set([
-        ...Object.keys(obj1 ?? {}),
-        ...Object.keys(obj2 ?? {}),
-      ]);
-
-      for (const key of keys) {
-        const currentPath = path ? `${path}.${key}` : key;
-        const val1 = obj1?.[key];
-        const val2 = obj2?.[key];
-
-        if (val1 === undefined && val2 !== undefined) {
-          changes.push({
-            type: 'added',
-            path: currentPath,
-            newValue: val2,
-            source: 'comparison',
-          });
-        } else if (val1 !== undefined && val2 === undefined) {
-          changes.push({
-            type: 'removed',
-            path: currentPath,
-            oldValue: val1,
-            source: 'comparison',
-          });
-        } else if (JSON.stringify(val1) !== JSON.stringify(val2)) {
-          if (
-            typeof val1 === 'object' &&
-            typeof val2 === 'object' &&
-            val1 !== null &&
-            val2 !== null
-          ) {
-            findChanges(val1, val2, currentPath);
-          } else {
-            changes.push({
-              type: 'updated',
-              path: currentPath,
-              oldValue: val1,
-              newValue: val2,
-              source: 'comparison',
-            });
-          }
-        }
-      }
-    };
-
-    findChanges(config1, config2);
+    this.findConfigurationChanges(config1, config2, changes);
     return changes;
+  }
+
+  /**
+   * Get all unique keys from both objects
+   */
+  private getAllKeys(obj1: unknown, obj2: unknown): Set<string> {
+    const obj1Record = obj1 as Record<string, unknown> | null | undefined;
+    const obj2Record = obj2 as Record<string, unknown> | null | undefined;
+
+    return new Set([
+      ...Object.keys(obj1Record ?? {}),
+      ...Object.keys(obj2Record ?? {}),
+    ]);
+  }
+
+  /**
+   * Recursively find changes between two configuration objects
+   */
+  private findConfigurationChanges(
+    obj1: unknown,
+    obj2: unknown,
+    changes: ConfigurationChangeEvent[],
+    path: string = '',
+  ): void {
+    const keys = this.getAllKeys(obj1, obj2);
+    const obj1Record = obj1 as Record<string, unknown> | null | undefined;
+    const obj2Record = obj2 as Record<string, unknown> | null | undefined;
+
+    for (const key of keys) {
+      const currentPath = path ? `${path}.${key}` : key;
+      this.compareValues(
+        obj1Record?.[key],
+        obj2Record?.[key],
+        changes,
+        currentPath,
+      );
+    }
+  }
+
+  /**
+   * Check if both values are non-null objects for deep comparison
+   */
+  private areBothObjects(val1: unknown, val2: unknown): boolean {
+    return (
+      typeof val1 === 'object' &&
+      typeof val2 === 'object' &&
+      val1 !== null &&
+      val2 !== null
+    );
+  }
+
+  /**
+   * Compare two values and record changes
+   */
+  private compareValues(
+    val1: unknown,
+    val2: unknown,
+    changes: ConfigurationChangeEvent[],
+    path: string,
+  ): void {
+    // Handle added values
+    if (val1 === undefined && val2 !== undefined) {
+      this.recordAddedChange(changes, path, val2);
+      return;
+    }
+
+    // Handle removed values
+    if (val1 !== undefined && val2 === undefined) {
+      this.recordRemovedChange(changes, path, val1);
+      return;
+    }
+
+    // Handle unchanged values
+    if (JSON.stringify(val1) === JSON.stringify(val2)) {
+      return;
+    }
+
+    // Handle nested or updated values
+    if (this.areBothObjects(val1, val2)) {
+      this.findConfigurationChanges(val1, val2, changes, path);
+    } else {
+      this.recordUpdatedChange(changes, path, val1, val2);
+    }
+  }
+
+  /**
+   * Record an added change
+   */
+  private recordAddedChange(
+    changes: ConfigurationChangeEvent[],
+    path: string,
+    newValue: unknown,
+  ): void {
+    changes.push({
+      type: 'added',
+      path,
+      newValue,
+      source: 'comparison',
+    });
+  }
+
+  /**
+   * Record a removed change
+   */
+  private recordRemovedChange(
+    changes: ConfigurationChangeEvent[],
+    path: string,
+    oldValue: unknown,
+  ): void {
+    changes.push({
+      type: 'removed',
+      path,
+      oldValue,
+      source: 'comparison',
+    });
+  }
+
+  /**
+   * Record an updated change
+   */
+  private recordUpdatedChange(
+    changes: ConfigurationChangeEvent[],
+    path: string,
+    oldValue: unknown,
+    newValue: unknown,
+  ): void {
+    changes.push({
+      type: 'updated',
+      path,
+      oldValue,
+      newValue,
+      source: 'comparison',
+    });
   }
 
   /**
@@ -348,6 +446,7 @@ export class Configuration extends EventEmitter {
   /**
    * Deep merge two objects
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private deepMerge<T extends Record<string, any>>(
     target: T,
     source: Partial<T>,
@@ -355,25 +454,40 @@ export class Configuration extends EventEmitter {
     const result = { ...target };
 
     for (const key in source) {
-      if (source[key] === undefined) {
+      const sourceValue = source[key];
+      if (sourceValue === undefined) {
         continue;
       }
 
-      if (
-        source[key] &&
-        typeof source[key] === 'object' &&
-        !Array.isArray(source[key]) &&
-        result[key] &&
-        typeof result[key] === 'object' &&
-        !Array.isArray(result[key])
-      ) {
-        result[key] = this.deepMerge(result[key], source[key] as any);
+      if (this.shouldDeepMerge(result[key], sourceValue)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        result[key] = this.deepMerge(result[key], sourceValue as any);
       } else {
-        result[key] = source[key] as any;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        result[key] = sourceValue as any;
       }
     }
 
     return result;
+  }
+
+  /**
+   * Check if two values should be deep merged
+   */
+  private shouldDeepMerge(targetValue: unknown, sourceValue: unknown): boolean {
+    return this.isValidObject(targetValue) && this.isValidObject(sourceValue);
+  }
+
+  /**
+   * Check if a value is a valid object for deep merging
+   */
+  private isValidObject(value: unknown): boolean {
+    return (
+      value !== null &&
+      value !== undefined &&
+      typeof value === 'object' &&
+      !Array.isArray(value)
+    );
   }
 
   /**
@@ -443,7 +557,7 @@ export class ConfigurationSnapshot {
  */
 export class ConfigurationHistory {
   private snapshots: ConfigurationSnapshot[] = [];
-  private maxSnapshots: number = 10;
+  private maxSnapshots: number = MAX_SNAPSHOTS;
 
   /**
    * Add a snapshot to the history

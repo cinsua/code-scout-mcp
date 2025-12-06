@@ -9,7 +9,17 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 
 import { ConfigurationError } from '../errors/ConfigurationError';
-import type { PartialAppConfig, ProfileType } from '../types/ConfigTypes';
+import type {
+  PartialAppConfig,
+  ProfileType,
+  IndexingConfig,
+  SearchConfig,
+  DatabaseConfig,
+  WatchingConfig,
+  LanguagesConfig,
+  LoggingConfig,
+  SecurityConfig,
+} from '../types/ConfigTypes';
 import { SchemaValidator } from '../validators/SchemaValidator';
 import { SemanticValidator } from '../validators/SemanticValidator';
 
@@ -58,14 +68,11 @@ export interface ProfileLoadOptions {
   mergeWithDefaults?: boolean;
 
   /**
-   * Custom profile directory
+   * Custom profile directory path
    */
   profileDir?: string;
 }
 
-/**
- * Profile Manager class
- */
 export class ProfileManager {
   private profilesDir: string;
   private schemaValidator: SchemaValidator;
@@ -132,62 +139,81 @@ export class ProfileManager {
     profileName: ProfileType,
     options: ProfileLoadOptions = {},
   ): Promise<PartialAppConfig> {
-    const {
-      validate = true,
-      mergeWithDefaults = true,
-      profileDir = this.profilesDir,
-    } = options;
+    const processedOptions = this.processLoadOptions(options);
 
     // Check cache first
-    if (this.profileCache.has(profileName)) {
-      const cachedConfig = this.profileCache.get(profileName)!;
+    const cachedConfig = this.profileCache.get(profileName);
+    if (cachedConfig) {
       return { ...cachedConfig };
     }
 
-    const profilePath = path.join(profileDir, `${profileName}.json`);
+    const profilePath = path.join(
+      processedOptions.profileDir,
+      `${profileName}.json`,
+    );
 
     try {
-      // Check if profile file exists
-      await fs.access(profilePath);
-
-      // Read and parse profile
-      const content = await fs.readFile(profilePath, 'utf-8');
-      let config = JSON.parse(content) as PartialAppConfig;
-
-      // Validate profile if requested
-      if (validate) {
-        const schemaResult = this.schemaValidator.validate(config);
-        const semanticResult = this.semanticValidator.validate(config);
-
-        if (!schemaResult.valid || !semanticResult.valid) {
-          const errors = [...schemaResult.errors, ...semanticResult.errors];
-          throw new ConfigurationError(
-            `Profile '${profileName}' is invalid: ${errors.map(e => e.message).join(', ')}`,
-            'INVALID_PROFILE',
-          );
-        }
-      }
-
-      // Merge with defaults if requested
-      if (mergeWithDefaults) {
-        const defaultConfig = this.loadDefaultProfile();
-        config = this.mergeConfigurations(defaultConfig, config);
-      }
+      const config = await this.readProfileFile(profilePath);
+      const finalConfig = this.processProfileConfig(
+        config,
+        profileName,
+        processedOptions,
+      );
 
       // Cache the profile
-      this.profileCache.set(profileName, { ...config });
+      this.profileCache.set(profileName, { ...finalConfig });
 
-      return config;
+      return finalConfig;
     } catch (error) {
-      if (error instanceof ConfigurationError) {
-        throw error;
-      }
+      return this.handleProfileLoadError(error, profileName);
+    }
+  }
 
+  /**
+   * Read and parse a profile file
+   */
+  private async readProfileFile(
+    profilePath: string,
+  ): Promise<PartialAppConfig> {
+    // Check if profile file exists
+    await fs.access(profilePath);
+
+    // Read and parse profile
+    const content = await fs.readFile(profilePath, 'utf-8');
+    return JSON.parse(content) as PartialAppConfig;
+  }
+
+  /**
+   * Validate a profile configuration
+   */
+  private validateProfileConfig(
+    config: PartialAppConfig,
+    profileName: string,
+  ): void {
+    const schemaResult = this.schemaValidator.validate(config);
+    const semanticResult = this.semanticValidator.validate(config);
+
+    if (!schemaResult.valid || !semanticResult.valid) {
+      const errors = [...schemaResult.errors, ...semanticResult.errors];
       throw new ConfigurationError(
-        `Failed to load profile '${profileName}': ${error instanceof Error ? error.message : String(error)}`,
-        'PROFILE_LOAD_ERROR',
+        `Profile '${profileName}' is invalid: ${errors.map(e => e.message).join(', ')}`,
+        'INVALID_PROFILE',
       );
     }
+  }
+
+  /**
+   * Handle profile load errors
+   */
+  private handleProfileLoadError(error: unknown, profileName: string): never {
+    if (error instanceof ConfigurationError) {
+      throw error;
+    }
+
+    throw new ConfigurationError(
+      `Failed to load profile '${profileName}': ${error instanceof Error ? error.message : String(error)}`,
+      'PROFILE_LOAD_ERROR',
+    );
   }
 
   /**
@@ -234,53 +260,21 @@ export class ProfileManager {
 
     try {
       // Validate configuration before saving
-      const schemaResult = this.schemaValidator.validate(config);
-      const semanticResult = this.semanticValidator.validate(config);
-
-      if (!schemaResult.valid || !semanticResult.valid) {
-        const errors = [...schemaResult.errors, ...semanticResult.errors];
-        throw new ConfigurationError(
-          `Cannot save invalid profile: ${errors.map(e => e.message).join(', ')}`,
-          'INVALID_PROFILE_CONFIG',
-        );
-      }
+      this.validateProfileConfig(config, profileName);
 
       // Ensure directory exists
       await fs.mkdir(targetDir, { recursive: true });
 
-      // Add profile metadata
-      const profileConfig = {
-        ...config,
-        profile: profileName,
-        version: config.version ?? '1.0.0',
-      };
-
-      // Write profile file
-      await fs.writeFile(
-        profilePath,
-        JSON.stringify(profileConfig, null, 2),
-        'utf-8',
-      );
+      // Create and write profile
+      const profileConfig = this.createProfileConfig(config, profileName);
+      await this.writeProfileFile(profilePath, profileConfig);
 
       // Clear cache
       this.profileCache.delete(profileName);
 
-      return {
-        name: profileName,
-        description: this.getProfileDescription(profileName),
-        filePath: profilePath,
-        builtIn: false,
-        version: profileConfig.version || '1.0.0',
-      };
+      return this.createProfileInfo(profileName, profilePath, profileConfig);
     } catch (error) {
-      if (error instanceof ConfigurationError) {
-        throw error;
-      }
-
-      throw new ConfigurationError(
-        `Failed to save profile '${profileName}': ${error instanceof Error ? error.message : String(error)}`,
-        'PROFILE_SAVE_ERROR',
-      );
+      return this.handleProfileSaveError(error, profileName);
     }
   }
 
@@ -341,99 +335,13 @@ export class ProfileManager {
   private loadDefaultProfile(): PartialAppConfig {
     return {
       version: '1.0.0',
-      indexing: {
-        maxFileSize: 10485760,
-        maxWorkers: 4,
-        batchSize: 100,
-        debounceMs: 300,
-        batchWindowMs: 1000,
-        followSymlinks: false,
-        maxDepth: 10,
-        incremental: true,
-      },
-      search: {
-        defaultLimit: 20,
-        maxLimit: 100,
-        fuzzySearch: true,
-        fuzzyThreshold: 0.8,
-        enableRegex: true,
-        timeoutMs: 5000,
-        scoringWeights: {
-          filename: 5.0,
-          path: 3.0,
-          definitions: 3.0,
-          imports: 2.0,
-          documentation: 1.0,
-          content: 2.0,
-        },
-      },
-      database: {
-        path: './.code-scout/database.db',
-        type: 'sqlite',
-        maxConnections: 10,
-        connectionTimeout: 30000,
-        enableWAL: true,
-        vacuumIntervalHours: 24,
-      },
-      watching: {
-        enabled: true,
-        ignorePatterns: [
-          'node_modules',
-          '.git',
-          'dist',
-          'build',
-          '__pycache__',
-          '*.pyc',
-        ],
-        includePatterns: [],
-        recursive: true,
-        debounceMs: 300,
-      },
-      languages: {
-        typescript: {
-          extensions: ['.ts', '.tsx', '.js', '.jsx'],
-          parser: 'TypeScriptParser',
-          enabled: true,
-        },
-        javascript: {
-          extensions: ['.js', '.jsx'],
-          parser: 'JavaScriptParser',
-          enabled: true,
-        },
-        python: {
-          extensions: ['.py'],
-          parser: 'PythonParser',
-          enabled: true,
-        },
-      },
-      logging: {
-        level: 'info',
-        format: 'text',
-        file: {
-          enabled: true,
-          maxSize: '50MB',
-          maxFiles: 5,
-        },
-        console: {
-          enabled: true,
-          colorize: true,
-        },
-        structured: false,
-      },
-      security: {
-        allowedExtensions: [
-          '.ts',
-          '.tsx',
-          '.js',
-          '.jsx',
-          '.py',
-          '.json',
-          '.md',
-        ],
-        blockedPatterns: ['**/*.pem', '**/*.key', '**/.env*'],
-        maxPathLength: 1024,
-        enableSandbox: false,
-      },
+      indexing: this.getDefaultIndexingConfig(),
+      search: this.getDefaultSearchConfig(),
+      database: this.getDefaultDatabaseConfig(),
+      watching: this.getDefaultWatchingConfig(),
+      languages: this.getDefaultLanguagesConfig(),
+      logging: this.getDefaultLoggingConfig(),
+      security: this.getDefaultSecurityConfig(),
     };
   }
 
@@ -446,32 +354,45 @@ export class ProfileManager {
   private autoDetectProfile(
     env: Record<string, string | undefined>,
   ): ProfileType | null {
-    // Check for CI environment
-    if (
-      env.CI ||
-      env.CONTINUOUS_INTEGRATION ||
-      env.JENKINS_URL ||
-      env.GITHUB_ACTIONS
-    ) {
+    if (this.isCiEnvironment(env)) {
       return 'cicd';
     }
 
-    // Check for production environment
-    if (env.NODE_ENV === 'production' || env.PRODUCTION === 'true') {
+    if (this.isProductionEnvironment(env)) {
       return 'production';
     }
 
-    // Check for development environment
-    if (
-      env.NODE_ENV === 'development' ||
-      env.DEV === 'true' ||
-      process.env.DEBUG
-    ) {
+    if (this.isDevelopmentEnvironment(env)) {
       return 'development';
     }
 
     // Default to development for local development
     return 'development';
+  }
+
+  private isCiEnvironment(env: Record<string, string | undefined>): boolean {
+    return Boolean(
+      env.CI ??
+      env.CONTINUOUS_INTEGRATION ??
+      env.JENKINS_URL ??
+      env.GITHUB_ACTIONS,
+    );
+  }
+
+  private isProductionEnvironment(
+    env: Record<string, string | undefined>,
+  ): boolean {
+    return env.NODE_ENV === 'production' || env.PRODUCTION === 'true';
+  }
+
+  private isDevelopmentEnvironment(
+    env: Record<string, string | undefined>,
+  ): boolean {
+    return !!(
+      env.NODE_ENV === 'development' ||
+      env.DEV === 'true' ||
+      process.env.DEBUG
+    );
   }
 
   /**
@@ -485,6 +406,229 @@ export class ProfileManager {
   }
 
   /**
+   * Process load options with defaults
+   */
+  private processLoadOptions(
+    options: ProfileLoadOptions,
+  ): Required<ProfileLoadOptions> {
+    return {
+      validate: options.validate ?? true,
+      mergeWithDefaults: options.mergeWithDefaults ?? true,
+      profileDir: options.profileDir ?? this.profilesDir,
+    };
+  }
+
+  /**
+   * Process profile configuration after loading
+   */
+  private processProfileConfig(
+    config: PartialAppConfig,
+    profileName: ProfileType,
+    options: Required<ProfileLoadOptions>,
+  ): PartialAppConfig {
+    let processedConfig = config;
+
+    // Validate if requested
+    if (options.validate) {
+      this.validateProfileConfig(processedConfig, profileName);
+    }
+
+    // Merge with defaults if requested
+    if (options.mergeWithDefaults) {
+      const defaults = this.loadDefaultProfile();
+      processedConfig = this.mergeConfigurations(defaults, processedConfig);
+    }
+
+    return processedConfig;
+  }
+
+  /**
+   * Create profile configuration for saving
+   */
+  private createProfileConfig(
+    config: PartialAppConfig,
+    profileName: ProfileType,
+  ): PartialAppConfig {
+    return {
+      ...config,
+      version: config.version ?? '1.0.0',
+      profile: profileName,
+    };
+  }
+
+  /**
+   * Write profile file
+   */
+  private async writeProfileFile(
+    profilePath: string,
+    config: PartialAppConfig,
+  ): Promise<void> {
+    const content = JSON.stringify(config, null, 2);
+    await fs.writeFile(profilePath, content, 'utf-8');
+  }
+
+  /**
+   * Create profile info
+   */
+  private createProfileInfo(
+    profileName: ProfileType,
+    profilePath: string,
+    config: PartialAppConfig,
+  ): ProfileInfo {
+    return {
+      name: profileName,
+      description: this.getProfileDescription(profileName),
+      filePath: profilePath,
+      builtIn: false, // Custom profiles are not built-in
+      version: config.version ?? '1.0.0',
+    };
+  }
+
+  /**
+   * Handle profile save errors
+   */
+  private handleProfileSaveError(error: unknown, profileName: string): never {
+    if (error instanceof ConfigurationError) {
+      throw error;
+    }
+
+    throw new ConfigurationError(
+      `Failed to save profile '${profileName}': ${error instanceof Error ? error.message : String(error)}`,
+      'PROFILE_SAVE_ERROR',
+    );
+  }
+
+  /**
+   * Get default indexing configuration
+   */
+  private getDefaultIndexingConfig(): IndexingConfig {
+    const BYTES_PER_KB = 1024;
+    const BYTES_PER_MB = BYTES_PER_KB * BYTES_PER_KB;
+    const DEFAULT_MAX_FILE_SIZE_MB = 10;
+
+    return {
+      maxFileSize: DEFAULT_MAX_FILE_SIZE_MB * BYTES_PER_MB,
+      maxWorkers: 4,
+      batchSize: 100,
+      debounceMs: 300,
+      batchWindowMs: 100,
+      followSymlinks: false,
+      maxDepth: 10,
+      incremental: true,
+    };
+  }
+
+  /**
+   * Get default search configuration
+   */
+  private getDefaultSearchConfig(): SearchConfig {
+    return {
+      defaultLimit: 50,
+      maxLimit: 1000,
+      scoringWeights: {
+        filename: 1.0,
+        path: 0.8,
+        definitions: 0.9,
+        imports: 0.7,
+        documentation: 0.6,
+        content: 0.5,
+      },
+      fuzzySearch: true,
+      fuzzyThreshold: 0.8,
+      enableRegex: true,
+      timeoutMs: 5000,
+    };
+  }
+
+  /**
+   * Get default database configuration
+   */
+  private getDefaultDatabaseConfig(): DatabaseConfig {
+    return {
+      path: './data/code-scout.db',
+      maxConnections: 10,
+      connectionTimeout: 30000,
+      type: 'sqlite',
+      enableWAL: true,
+      vacuumIntervalHours: 24,
+    };
+  }
+
+  /**
+   * Get default watching configuration
+   */
+  private getDefaultWatchingConfig(): WatchingConfig {
+    return {
+      enabled: true,
+      ignorePatterns: ['node_modules/**', '.git/**', 'dist/**', 'build/**'],
+      includePatterns: ['**/*.ts', '**/*.js', '**/*.py'],
+      recursive: true,
+      debounceMs: 300,
+    };
+  }
+
+  /**
+   * Get default languages configuration
+   */
+  private getDefaultLanguagesConfig(): LanguagesConfig {
+    return {
+      typescript: {
+        extensions: ['.ts', '.tsx'],
+        parser: 'typescript',
+        enabled: true,
+      },
+      javascript: {
+        extensions: ['.js', '.jsx', '.mjs'],
+        parser: 'javascript',
+        enabled: true,
+      },
+      python: {
+        extensions: ['.py'],
+        parser: 'python',
+        enabled: true,
+      },
+    };
+  }
+
+  /**
+   * Get default logging configuration
+   */
+  private getDefaultLoggingConfig(): LoggingConfig {
+    return {
+      level: 'info',
+      format: 'text',
+      file: {
+        enabled: true,
+        path: './logs/code-scout.log',
+        maxSize: '10m',
+        maxFiles: 5,
+      },
+      console: {
+        enabled: true,
+        colorize: true,
+      },
+      structured: false,
+    };
+  }
+
+  /**
+   * Get default security configuration
+   */
+  private getDefaultSecurityConfig(): SecurityConfig {
+    return {
+      allowedExtensions: ['.ts', '.js', '.py', '.json', '.md', '.txt'],
+      blockedPatterns: ['**/node_modules/**', '**/.git/**', '**/dist/**'],
+      maxPathLength: 4096,
+      enableSandbox: true,
+      sandbox: {
+        timeoutMs: 10000,
+        memoryLimitMB: 512,
+        allowNetworkAccess: false,
+      },
+    };
+  }
+
+  /**
    * Merge two configurations
    *
    * @param base - Base configuration
@@ -495,7 +639,10 @@ export class ProfileManager {
     base: PartialAppConfig,
     override: PartialAppConfig,
   ): PartialAppConfig {
-    const mergeDeep = (target: any, source: any): any => {
+    const mergeDeep = (
+      target: Record<string, unknown>,
+      source: Record<string, unknown>,
+    ): Record<string, unknown> => {
       const result = { ...target };
 
       for (const key in source) {
@@ -504,7 +651,10 @@ export class ProfileManager {
           typeof source[key] === 'object' &&
           !Array.isArray(source[key])
         ) {
-          result[key] = mergeDeep(result[key] ?? {}, source[key]);
+          result[key] = mergeDeep(
+            result[key] as Record<string, unknown>,
+            source[key] as Record<string, unknown>,
+          );
         } else {
           result[key] = source[key];
         }

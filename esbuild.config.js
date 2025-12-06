@@ -5,7 +5,7 @@
 
 import esbuild from 'esbuild';
 import { copyFileSync, existsSync, mkdirSync } from 'fs';
-import { join, dirname } from 'path';
+import { join } from 'path';
 
 const isProduction = process.env.NODE_ENV === 'production';
 const isWatchMode = process.argv.includes('--watch');

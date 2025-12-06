@@ -82,90 +82,124 @@ export interface FileResolutionResult {
 }
 
 /**
+ * Check file existence and permissions
+ */
+async function checkFileInfo(
+  resolvedPath: string,
+  checkPermissions: boolean,
+  warnings: string[],
+): Promise<{
+  exists: boolean;
+  stats: Stats | undefined;
+  readable: boolean;
+  writable: boolean;
+}> {
+  let exists = false;
+  let stats: Stats | undefined;
+  let readable = false;
+  let writable = false;
+
+  try {
+    stats = await fs.stat(resolvedPath);
+    exists = true;
+
+    // Check permissions if requested
+    if (checkPermissions) {
+      try {
+        await fs.access(resolvedPath, fs.constants.R_OK);
+        readable = true;
+      } catch {
+        warnings.push(`File is not readable: ${resolvedPath}`);
+      }
+
+      try {
+        await fs.access(resolvedPath, fs.constants.W_OK);
+        writable = true;
+      } catch {
+        // Not writable is not necessarily a warning
+      }
+    }
+  } catch {
+    // File doesn't exist
+  }
+
+  return { exists, stats, readable, writable };
+}
+
+/**
  * Resolve a file path with various options
  *
  * @param filePath - Path to resolve
  * @param options - Resolution options
  * @returns Promise<FileResolutionResult>
  */
+/**
+ * Process path through various transformations based on options
+ */
+async function processPath(
+  filePath: string,
+  options: Required<
+    Pick<
+      FileResolutionOptions,
+      'expandEnvVars' | 'normalizePaths' | 'resolveSymlinks' | 'baseDir'
+    >
+  >,
+  warnings: string[],
+): Promise<string> {
+  let processedPath = filePath;
+
+  // Expand environment variables
+  if (options.expandEnvVars) {
+    processedPath = expandEnvironmentVariables(processedPath);
+  }
+
+  // Convert to absolute path if relative
+  if (!path.isAbsolute(processedPath)) {
+    processedPath = path.resolve(options.baseDir, processedPath);
+  }
+
+  // Normalize path separators and resolve .. and .
+  if (options.normalizePaths) {
+    processedPath = path.normalize(processedPath);
+  }
+
+  // Resolve symlinks if requested
+  if (options.resolveSymlinks) {
+    try {
+      processedPath = await fs.realpath(processedPath);
+    } catch (error) {
+      warnings.push(
+        `Failed to resolve symlinks: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  return processedPath;
+}
+
 export async function resolveFile(
   filePath: string,
   options: FileResolutionOptions = {},
 ): Promise<FileResolutionResult> {
-  const {
-    expandEnvVars = true,
-    normalizePaths = true,
-    resolveSymlinks = false,
-    checkPermissions = true,
-    baseDir = process.cwd(),
-  } = options;
-
+  const processedOptions = processResolutionOptions(options);
   const warnings: string[] = [];
-  let resolvedPath = filePath;
 
   try {
-    // Expand environment variables
-    if (expandEnvVars) {
-      resolvedPath = expandEnvironmentVariables(resolvedPath);
-    }
+    const resolvedPath = await processPath(
+      filePath,
+      processedOptions,
+      warnings,
+    );
 
-    // Convert to absolute path if relative
-    if (!path.isAbsolute(resolvedPath)) {
-      resolvedPath = path.resolve(baseDir, resolvedPath);
-    }
-
-    // Normalize path separators and resolve .. and .
-    if (normalizePaths) {
-      resolvedPath = path.normalize(resolvedPath);
-    }
-
-    // Resolve symlinks if requested
-    if (resolveSymlinks) {
-      try {
-        resolvedPath = await fs.realpath(resolvedPath);
-      } catch (error) {
-        warnings.push(
-          `Failed to resolve symlinks: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
-    }
-
-    // Check if file exists
-    let exists = false;
-    let stats: Stats | undefined;
-    let readable = false;
-    let writable = false;
-
-    try {
-      stats = await fs.stat(resolvedPath);
-      exists = true;
-
-      // Check permissions if requested
-      if (checkPermissions) {
-        try {
-          await fs.access(resolvedPath, fs.constants.R_OK);
-          readable = true;
-        } catch {
-          warnings.push(`File is not readable: ${resolvedPath}`);
-        }
-
-        try {
-          await fs.access(resolvedPath, fs.constants.W_OK);
-          writable = true;
-        } catch {
-          // Not writable is not necessarily a warning
-        }
-      }
-    } catch {
-      // File doesn't exist
-    }
+    const fileInfo = await checkFileInfo(
+      resolvedPath,
+      processedOptions.checkPermissions,
+      warnings,
+    );
 
     return {
       resolvedPath,
-      exists,
-      stats,
-      readable,
-      writable,
+      ...fileInfo,
       originalPath: filePath,
       warnings,
     };
@@ -175,6 +209,24 @@ export async function resolveFile(
       'FILE_RESOLUTION_ERROR',
     );
   }
+}
+
+/**
+ * Process and normalize resolution options
+ */
+/**
+ * Process and normalize resolution options
+ */
+function processResolutionOptions(
+  options: FileResolutionOptions,
+): Required<FileResolutionOptions> {
+  return {
+    expandEnvVars: options.expandEnvVars ?? true,
+    normalizePaths: options.normalizePaths ?? true,
+    resolveSymlinks: options.resolveSymlinks ?? false,
+    checkPermissions: options.checkPermissions ?? true,
+    baseDir: options.baseDir ?? process.cwd(),
+  };
 }
 
 /**
@@ -248,6 +300,31 @@ export function isPathSafe(
  * @param options - Resolution options
  * @returns Promise<FileResolutionResult | null>
  */
+/**
+ * Try to resolve a single config file path and collect errors
+ */
+async function tryResolveConfigPath(
+  configPath: string,
+  options: FileResolutionOptions,
+  errors: string[],
+): Promise<FileResolutionResult | null> {
+  try {
+    const result = await resolveFile(configPath, options);
+
+    if (result.exists && result.readable) {
+      return result;
+    } else if (result.exists && !result.readable) {
+      errors.push(`Config file exists but is not readable: ${configPath}`);
+    }
+  } catch (error) {
+    errors.push(
+      `Failed to resolve config file '${configPath}': ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  return null;
+}
+
 export async function findConfigFileWithFallback(
   possiblePaths: string[],
   options: FileResolutionOptions = {},
@@ -255,18 +332,9 @@ export async function findConfigFileWithFallback(
   const errors: string[] = [];
 
   for (const configPath of possiblePaths) {
-    try {
-      const result = await resolveFile(configPath, options);
-
-      if (result.exists && result.readable) {
-        return result;
-      } else if (result.exists && !result.readable) {
-        errors.push(`Config file exists but is not readable: ${configPath}`);
-      }
-    } catch (error) {
-      errors.push(
-        `Failed to resolve config file '${configPath}': ${error instanceof Error ? error.message : String(error)}`,
-      );
+    const result = await tryResolveConfigPath(configPath, options, errors);
+    if (result) {
+      return result;
     }
   }
 
@@ -322,7 +390,8 @@ export function createTempPath(
   suffix: string = '.tmp',
 ): string {
   const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2);
+  const BASE36_RADIX = 36;
+  const random = Math.random().toString(BASE36_RADIX).substring(2);
   return path.join(
     process.env.TMPDIR ?? process.env.TEMP ?? '/tmp',
     `${prefix}-${timestamp}-${random}${suffix}`,

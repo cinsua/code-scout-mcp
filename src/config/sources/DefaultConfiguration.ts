@@ -5,9 +5,24 @@
  * for the Code-Scout MCP server.
  */
 
-import type { PartialAppConfig } from '../types/ConfigTypes';
+import type { AppConfig, PartialAppConfig } from '../types/ConfigTypes';
 
 import { ConfigurationSource } from './ConfigurationSource';
+
+/**
+ * Minimum file size for indexing in bytes
+ */
+const MIN_DEFAULT_FILE_SIZE = 1024;
+
+/**
+ * Maximum number of indexing workers
+ */
+const MAX_DEFAULT_WORKERS = 64;
+
+/**
+ * Maximum sum of scoring weights
+ */
+const MAX_SCORING_WEIGHT_SUM = 20;
 
 /**
  * Default configuration source with built-in values
@@ -158,7 +173,7 @@ export class DefaultConfiguration extends ConfigurationSource {
    */
   getDefaultValue(path: string): unknown {
     const keys = path.split('.');
-    let value: any = this.defaults;
+    let value: unknown = this.defaults;
 
     for (const key of keys) {
       if (value && typeof value === 'object' && key in value) {
@@ -189,33 +204,48 @@ export class DefaultConfiguration extends ConfigurationSource {
    * Validate that defaults are consistent
    */
   validateDefaults(): void {
-    // Check that search limits are consistent
+    this.validateSearchLimits();
+    this.validateFileSize();
+    this.validateWorkerCount();
+    this.validateScoringWeights();
+  }
+
+  private validateSearchLimits(): void {
     const search = this.defaults.search;
     if (search && search.defaultLimit > search.maxLimit) {
       throw new Error('Default search limit cannot exceed maximum limit');
     }
+  }
 
-    // Check that file size is reasonable
+  private validateFileSize(): void {
     const indexing = this.defaults.indexing;
-    if (indexing && indexing.maxFileSize < 1024) {
+    if (indexing && indexing.maxFileSize < MIN_DEFAULT_FILE_SIZE) {
       throw new Error('Maximum file size must be at least 1KB');
     }
+  }
 
-    // Check that worker count is reasonable
-    if (indexing && (indexing.maxWorkers < 1 || indexing.maxWorkers > 64)) {
-      throw new Error('Max workers must be between 1 and 64');
+  private validateWorkerCount(): void {
+    const indexing = this.defaults.indexing;
+    if (
+      indexing &&
+      (indexing.maxWorkers < 1 || indexing.maxWorkers > MAX_DEFAULT_WORKERS)
+    ) {
+      throw new Error(
+        `Max workers must be between 1 and ${MAX_DEFAULT_WORKERS}`,
+      );
     }
+  }
 
-    // Check that scoring weights sum to a reasonable value
-    const weights = search?.scoringWeights;
+  private validateScoringWeights(): void {
+    const weights = this.defaults.search?.scoringWeights;
     if (weights) {
       const total = Object.values(weights).reduce(
         (sum, weight) => sum + weight,
         0,
       );
-      if (total <= 0 || total > 20) {
+      if (total <= 0 || total > MAX_SCORING_WEIGHT_SUM) {
         throw new Error(
-          'Scoring weights must sum to a positive value less than 20',
+          `Scoring weights must sum to a positive value less than ${MAX_SCORING_WEIGHT_SUM}`,
         );
       }
     }
@@ -225,70 +255,88 @@ export class DefaultConfiguration extends ConfigurationSource {
    * Get default configuration for a specific profile
    */
   getProfileDefaults(profile: string): PartialAppConfig {
-    const baseDefaults = this.getAllDefaults();
+    const baseDefaults = this.getAllDefaults() as AppConfig;
 
     switch (profile) {
       case 'development':
-        return {
-          ...baseDefaults,
-          logging: {
-            ...baseDefaults.logging!,
-            level: 'debug',
-            console: {
-              ...baseDefaults.logging!.console,
-              colorize: true,
-            },
-          },
-          watching: {
-            ...baseDefaults.watching!,
-            enabled: true,
-          },
-        };
-
+        return this.getDevelopmentDefaults(baseDefaults);
       case 'production':
-        return {
-          ...baseDefaults,
-          logging: {
-            ...baseDefaults.logging!,
-            level: 'warn',
-            console: {
-              ...baseDefaults.logging!.console,
-              colorize: false,
-            },
-          },
-          watching: {
-            ...baseDefaults.watching!,
-            enabled: false,
-          },
-          security: {
-            ...baseDefaults.security!,
-            enableSandbox: true,
-          },
-        };
-
+        return this.getProductionDefaults(baseDefaults);
       case 'cicd':
-        return {
-          ...baseDefaults,
-          logging: {
-            ...baseDefaults.logging!,
-            level: 'error',
-            console: {
-              ...baseDefaults.logging!.console,
-              enabled: false,
-            },
-          },
-          watching: {
-            ...baseDefaults.watching!,
-            enabled: false,
-          },
-          indexing: {
-            ...baseDefaults.indexing!,
-            maxWorkers: Math.min(baseDefaults.indexing?.maxWorkers ?? 4, 2),
-          },
-        };
-
+        return this.getCicdDefaults(baseDefaults);
       default:
         return baseDefaults;
     }
+  }
+
+  /**
+   * Get development profile defaults
+   */
+  private getDevelopmentDefaults(baseDefaults: AppConfig): PartialAppConfig {
+    return {
+      ...baseDefaults,
+      logging: {
+        ...baseDefaults.logging,
+        level: 'debug',
+        console: {
+          ...baseDefaults.logging.console,
+          colorize: true,
+        },
+      },
+      watching: {
+        ...baseDefaults.watching,
+        enabled: true,
+      },
+    };
+  }
+
+  /**
+   * Get production profile defaults
+   */
+  private getProductionDefaults(baseDefaults: AppConfig): PartialAppConfig {
+    return {
+      ...baseDefaults,
+      logging: {
+        ...baseDefaults.logging,
+        level: 'warn',
+        console: {
+          ...baseDefaults.logging.console,
+          colorize: false,
+        },
+      },
+      watching: {
+        ...baseDefaults.watching,
+        enabled: false,
+      },
+      security: {
+        ...baseDefaults.security,
+        enableSandbox: true,
+      },
+    };
+  }
+
+  /**
+   * Get CI/CD profile defaults
+   */
+  private getCicdDefaults(baseDefaults: AppConfig): PartialAppConfig {
+    return {
+      ...baseDefaults,
+      logging: {
+        ...baseDefaults.logging,
+        level: 'error',
+        console: {
+          ...baseDefaults.logging.console,
+          enabled: false,
+        },
+      },
+      watching: {
+        ...baseDefaults.watching,
+        enabled: false,
+      },
+      indexing: {
+        ...baseDefaults.indexing,
+        maxWorkers: Math.min(baseDefaults.indexing.maxWorkers, 2),
+      },
+    };
   }
 }

@@ -11,6 +11,11 @@ import { ConfigurationError } from '../errors/ConfigurationError';
 import { ConfigurationSource } from './ConfigurationSource';
 
 /**
+ * Priority level for command line configuration (highest priority)
+ */
+const COMMAND_LINE_PRIORITY = 4;
+
+/**
  * Command line argument definition
  */
 interface CliArgument {
@@ -65,7 +70,7 @@ const CLI_ARGUMENTS: CliArgument[] = [
  * Command line configuration source with highest priority
  */
 export class CommandLineConfiguration extends ConfigurationSource {
-  public readonly priority = 4;
+  public readonly priority = COMMAND_LINE_PRIORITY;
   public readonly name = 'command-line';
 
   private parsedArgs: Map<string, unknown> = new Map();
@@ -216,6 +221,7 @@ export class CommandLineConfiguration extends ConfigurationSource {
     return num;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private setNestedValue(obj: any, path: string, value: unknown): void {
     const keys = path.split('.');
     let current = obj;

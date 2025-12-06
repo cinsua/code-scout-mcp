@@ -135,30 +135,41 @@ export class ConfigWatcher extends EventEmitter {
   constructor(options: ConfigWatcherOptions = {}) {
     super();
 
-    this.options = {
-      enabled: options.enabled ?? true,
-      debounceMs: options.debounceMs ?? 300,
-      recursive: options.recursive ?? false,
-      ignoreInitial: options.ignoreInitial ?? true,
-      patterns: options.patterns ?? [
-        '**/*.json',
-        '**/*.yaml',
-        '**/*.yml',
-        '**/*.toml',
-      ],
-      ignored: options.ignored ?? [
-        '**/node_modules/**',
-        '**/.git/**',
-        '**/dist/**',
-        '**/build/**',
-      ],
-      validateBeforeApply: options.validateBeforeApply ?? true,
-      createBackup: options.createBackup ?? true,
-      maxBackups: options.maxBackups ?? 5,
-    };
-
+    this.options = this.createDefaultOptions(options);
     this.schemaValidator = new SchemaValidator();
     this.semanticValidator = new SemanticValidator();
+  }
+
+  /**
+   * Get default file patterns to watch
+   */
+  private getDefaultPatterns(): string[] {
+    return ['**/*.json', '**/*.yaml', '**/*.yml', '**/*.toml'];
+  }
+
+  /**
+   * Get default ignore patterns
+   */
+  private getDefaultIgnored(): string[] {
+    return ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/build/**'];
+  }
+
+  private createDefaultOptions(
+    options: ConfigWatcherOptions,
+  ): Required<ConfigWatcherOptions> {
+    const defaults = {
+      enabled: true,
+      debounceMs: 300,
+      recursive: false,
+      ignoreInitial: true,
+      patterns: this.getDefaultPatterns(),
+      ignored: this.getDefaultIgnored(),
+      validateBeforeApply: true,
+      createBackup: true,
+      maxBackups: 5,
+    };
+
+    return { ...defaults, ...options };
   }
 
   /**
@@ -477,9 +488,9 @@ export class ConfigWatcher extends EventEmitter {
   }
 
   /**
-   * Check and process configuration change
+   * Check configuration change for a file
    *
-   * @param filePath - File path that changed
+   * @param filePath - Path to the configuration file
    * @param changeType - Type of change
    */
   private async checkConfigurationChange(
@@ -487,79 +498,154 @@ export class ConfigWatcher extends EventEmitter {
     changeType: 'added' | 'updated' | 'removed',
   ): Promise<void> {
     try {
-      let newConfig: PartialAppConfig = {};
-      let oldValue: unknown = undefined;
-      let newValue: unknown = undefined;
+      const { newConfig, oldValue, newValue } = await this.loadConfigData(
+        filePath,
+        changeType,
+      );
 
-      // Get old configuration value
-      oldValue = this.getConfigValue(this.currentConfig, filePath);
+      const { validated, validationErrors } = this.validateConfig(
+        newConfig,
+        changeType,
+      );
 
-      if (changeType !== 'removed') {
-        // Read new configuration
-        const content = await fs.readFile(filePath, 'utf-8');
-        newConfig = JSON.parse(content);
-        newValue = newConfig;
-      }
-
-      // Validate new configuration
-      let validated = true;
-      const validationErrors: string[] = [];
-
-      if (this.options.validateBeforeApply && changeType !== 'removed') {
-        const schemaResult = this.schemaValidator.validate(newConfig);
-        const semanticResult = this.semanticValidator.validate(newConfig);
-
-        if (!schemaResult.valid || !semanticResult.valid) {
-          validated = false;
-          validationErrors.push(
-            ...schemaResult.errors.map(e => e.message),
-            ...semanticResult.errors.map(e => e.message),
-          );
-        }
-      }
-
-      // Create backup before applying changes
-      if (this.options.createBackup && validated && changeType !== 'removed') {
-        await this.createBackup(this.currentConfig);
-      }
-
-      // Apply changes if validated
       if (validated) {
-        if (changeType === 'removed') {
-          this.removeConfigValue(this.currentConfig, filePath);
-        } else {
-          this.mergeConfig(this.currentConfig, newConfig);
-        }
-
-        // Emit change event
-        const eventData: ConfigChangeEventData = {
-          type: changeType,
-          path: filePath,
+        await this.applyValidatedChanges(filePath, changeType, {
+          newConfig,
           oldValue,
           newValue,
-          source: 'file-watcher',
-          timestamp: new Date(),
-          filePath,
           validated,
-          validationErrors: undefined,
-        };
-
-        this.emit('config:changed', eventData);
-      } else {
-        // Emit validation error event
-        this.emit('config:validation-error', {
-          filePath,
-          errors: validationErrors,
-          changeType,
         });
+      } else {
+        this.emitValidationError(filePath, validationErrors, changeType);
       }
     } catch (error) {
-      this.emit('config:error', {
-        filePath,
-        error: error instanceof Error ? error.message : String(error),
-        changeType,
-      });
+      this.emitConfigError(filePath, error, changeType);
     }
+  }
+
+  /**
+   * Load configuration data for change processing
+   */
+  private async loadConfigData(
+    filePath: string,
+    changeType: 'added' | 'updated' | 'removed',
+  ): Promise<{
+    newConfig: PartialAppConfig;
+    oldValue: unknown;
+    newValue: unknown;
+  }> {
+    let newConfig: PartialAppConfig = {};
+    let oldValue: unknown = undefined;
+    let newValue: unknown = undefined;
+
+    // Get old configuration value
+    oldValue = this.getConfigValue(this.currentConfig, filePath);
+
+    if (changeType !== 'removed') {
+      // Read new configuration
+      const content = await fs.readFile(filePath, 'utf-8');
+      newConfig = JSON.parse(content);
+      newValue = newConfig;
+    }
+
+    return { newConfig, oldValue, newValue };
+  }
+
+  /**
+   * Validate configuration changes
+   */
+  private validateConfig(
+    newConfig: PartialAppConfig,
+    changeType: 'added' | 'updated' | 'removed',
+  ): { validated: boolean; validationErrors: string[] } {
+    let validated = true;
+    const validationErrors: string[] = [];
+
+    if (this.options.validateBeforeApply && changeType !== 'removed') {
+      const schemaResult = this.schemaValidator.validate(newConfig);
+      const semanticResult = this.semanticValidator.validate(newConfig);
+
+      if (!schemaResult.valid || !semanticResult.valid) {
+        validated = false;
+        validationErrors.push(
+          ...schemaResult.errors.map(e => e.message),
+          ...semanticResult.errors.map(e => e.message),
+        );
+      }
+    }
+
+    return { validated, validationErrors };
+  }
+
+  /**
+   * Apply validated configuration changes
+   */
+  private async applyValidatedChanges(
+    filePath: string,
+    changeType: 'added' | 'updated' | 'removed',
+    configData: {
+      newConfig: PartialAppConfig;
+      oldValue: unknown;
+      newValue: unknown;
+      validated: boolean;
+    },
+  ): Promise<void> {
+    // Create backup before applying changes
+    if (this.options.createBackup && changeType !== 'removed') {
+      await this.createBackup(this.currentConfig);
+    }
+
+    // Apply changes
+    if (changeType === 'removed') {
+      this.removeConfigValue(this.currentConfig, filePath);
+    } else {
+      this.mergeConfig(this.currentConfig, configData.newConfig);
+    }
+
+    // Emit change event
+    const eventData: ConfigChangeEventData = {
+      type: changeType,
+      path: filePath,
+      oldValue: configData.oldValue,
+      newValue: configData.newValue,
+      source: 'file-watcher',
+      timestamp: new Date(),
+      filePath,
+      validated: configData.validated,
+      validationErrors: undefined,
+    };
+
+    this.emit('config:changed', eventData);
+  }
+
+  /**
+   * Emit validation error event
+   */
+  private emitValidationError(
+    filePath: string,
+    validationErrors: string[],
+    changeType: 'added' | 'updated' | 'removed',
+  ): void {
+    this.emit('config:validation-error', {
+      filePath,
+      errors: validationErrors,
+      changeType,
+    });
+  }
+
+  /**
+   * Emit configuration error event
+   */
+  private emitConfigError(
+    filePath: string,
+    error: unknown,
+    changeType: 'added' | 'updated' | 'removed',
+  ): void {
+    this.emit('config:error', {
+      filePath,
+      error: error instanceof Error ? error.message : String(error),
+      changeType,
+    });
   }
 
   /**
@@ -600,7 +686,10 @@ export class ConfigWatcher extends EventEmitter {
     source: PartialAppConfig,
   ): void {
     // Deep merge configuration
-    const mergeDeep = (target: any, source: any): any => {
+    const mergeDeep = (
+      target: Record<string, unknown>,
+      source: Record<string, unknown>,
+    ): Record<string, unknown> => {
       for (const key in source) {
         if (
           source[key] &&
@@ -608,7 +697,10 @@ export class ConfigWatcher extends EventEmitter {
           !Array.isArray(source[key])
         ) {
           target[key] = target[key] ?? {};
-          mergeDeep(target[key], source[key]);
+          mergeDeep(
+            target[key] as Record<string, unknown>,
+            source[key] as Record<string, unknown>,
+          );
         } else {
           target[key] = source[key];
         }

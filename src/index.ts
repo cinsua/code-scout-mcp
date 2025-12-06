@@ -8,13 +8,11 @@ export class CodeScoutServer {
     // Server initialization will be implemented in subsequent tasks
   }
 
-  async start(): Promise<void> {
-    console.log('Code-Scout MCP Server starting...');
+  start(): void {
     // Implementation will follow in subsequent tasks
   }
 
-  async stop(): Promise<void> {
-    console.log('Code-Scout MCP Server stopping...');
+  stop(): void {
     // Implementation will follow in subsequent tasks
   }
 }

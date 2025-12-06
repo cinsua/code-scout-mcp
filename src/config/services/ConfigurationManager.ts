@@ -31,6 +31,21 @@ import {
 } from '../models/Configuration';
 
 /**
+ * Maximum number of indexing workers allowed
+ */
+const MAX_INDEXING_WORKERS = 64;
+
+/**
+ * Minimum file size for indexing in bytes
+ */
+const MIN_INDEXING_FILE_SIZE = 1024;
+
+/**
+ * Maximum number of database connections allowed
+ */
+const MAX_DATABASE_CONNECTIONS = 100;
+
+/**
  * Main configuration manager that orchestrates all configuration sources
  */
 export class ConfigurationManager extends EventEmitter {
@@ -135,13 +150,27 @@ export class ConfigurationManager extends EventEmitter {
    * Perform the actual loading process
    */
   private async performLoad(): Promise<AppConfig> {
-    const loadResults: Array<{
+    const loadResults = await this.loadFromAllSources();
+
+    this.checkForCriticalErrors(loadResults);
+
+    const mergedConfig = this.mergeConfigurations(
+      loadResults.map(r => r.config),
+    );
+
+    return this.validateAndReturnConfig(mergedConfig);
+  }
+
+  /**
+   * Load configuration from all sources in parallel
+   */
+  private loadFromAllSources(): Promise<
+    Array<{
       source: ConfigurationSource;
       config: PartialAppConfig;
       error?: Error;
-    }> = [];
-
-    // Load from all sources in parallel
+    }>
+  > {
     const loadPromises = this.sources.map(async source => {
       try {
         const isAvailable = await source.isAvailable();
@@ -160,10 +189,19 @@ export class ConfigurationManager extends EventEmitter {
       }
     });
 
-    const results = await Promise.all(loadPromises);
-    loadResults.push(...results);
+    return Promise.all(loadPromises);
+  }
 
-    // Check for critical errors
+  /**
+   * Check for critical errors in load results
+   */
+  private checkForCriticalErrors(
+    loadResults: Array<{
+      source: ConfigurationSource;
+      config: PartialAppConfig;
+      error?: Error;
+    }>,
+  ): void {
     const criticalErrors = loadResults.filter(r => r.error);
     if (criticalErrors.length > 0) {
       const errorMessages = criticalErrors.map(
@@ -180,13 +218,12 @@ export class ConfigurationManager extends EventEmitter {
         },
       );
     }
+  }
 
-    // Merge configurations in priority order
-    const mergedConfig = this.mergeConfigurations(
-      loadResults.map(r => r.config),
-    );
-
-    // Validate merged configuration
+  /**
+   * Validate merged configuration and return it
+   */
+  private validateAndReturnConfig(mergedConfig: PartialAppConfig): AppConfig {
     const validationResult = this.validateConfiguration(mergedConfig);
     this.configuration.setValidationResult(validationResult);
 
@@ -209,6 +246,7 @@ export class ConfigurationManager extends EventEmitter {
   /**
    * Deep merge two objects
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private deepMerge(target: any, source: any): any {
     const result = { ...target };
 
@@ -230,8 +268,130 @@ export class ConfigurationManager extends EventEmitter {
   /**
    * Check if value is an object
    */
-  private isObject(value: any): value is Record<string, any> {
+  private isObject(value: unknown): value is Record<string, unknown> {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  /**
+   * Validate basic structural requirements
+   */
+  private validateStructure(
+    config: PartialAppConfig,
+    errors: Array<{
+      path: string;
+      message: string;
+      code: string;
+      suggestion?: string;
+    }>,
+  ): void {
+    if (!config.version) {
+      errors.push({
+        path: 'version',
+        message: 'Configuration version is required',
+        code: 'MISSING_VERSION',
+        suggestion: 'Add version field to configuration',
+      });
+    }
+  }
+
+  /**
+   * Validate search configuration
+   */
+  private validateSearchConfig(
+    config: PartialAppConfig,
+    errors: Array<{
+      path: string;
+      message: string;
+      code: string;
+      suggestion?: string;
+    }>,
+  ): void {
+    if (!config.search) {
+      return;
+    }
+
+    if (config.search.defaultLimit && config.search.maxLimit) {
+      if (config.search.defaultLimit > config.search.maxLimit) {
+        errors.push({
+          path: 'search.defaultLimit',
+          message: 'Default search limit cannot exceed maximum limit',
+          code: 'INVALID_SEARCH_LIMITS',
+          suggestion: 'Set defaultLimit <= maxLimit',
+        });
+      }
+    }
+  }
+
+  /**
+   * Validate indexing configuration
+   */
+  private validateIndexingConfig(
+    config: PartialAppConfig,
+    errors: Array<{
+      path: string;
+      message: string;
+      code: string;
+      suggestion?: string;
+    }>,
+  ): void {
+    if (!config.indexing) {
+      return;
+    }
+
+    if (
+      config.indexing.maxWorkers &&
+      (config.indexing.maxWorkers < 1 ||
+        config.indexing.maxWorkers > MAX_INDEXING_WORKERS)
+    ) {
+      errors.push({
+        path: 'indexing.maxWorkers',
+        message: `Max workers must be between 1 and ${MAX_INDEXING_WORKERS}`,
+        code: 'INVALID_WORKER_COUNT',
+        suggestion: `Set maxWorkers to a value between 1 and ${MAX_INDEXING_WORKERS}`,
+      });
+    }
+
+    if (
+      config.indexing.maxFileSize &&
+      config.indexing.maxFileSize < MIN_INDEXING_FILE_SIZE
+    ) {
+      errors.push({
+        path: 'indexing.maxFileSize',
+        message: `Max file size must be at least ${MIN_INDEXING_FILE_SIZE} bytes`,
+        code: 'INVALID_FILE_SIZE',
+        suggestion: `Set maxFileSize to at least ${MIN_INDEXING_FILE_SIZE}`,
+      });
+    }
+  }
+
+  /**
+   * Validate database configuration
+   */
+  private validateDatabaseConfig(
+    config: PartialAppConfig,
+    errors: Array<{
+      path: string;
+      message: string;
+      code: string;
+      suggestion?: string;
+    }>,
+  ): void {
+    if (!config.database) {
+      return;
+    }
+
+    if (
+      config.database.maxConnections &&
+      (config.database.maxConnections < 1 ||
+        config.database.maxConnections > MAX_DATABASE_CONNECTIONS)
+    ) {
+      errors.push({
+        path: 'database.maxConnections',
+        message: `Max connections must be between 1 and ${MAX_DATABASE_CONNECTIONS}`,
+        code: 'INVALID_CONNECTION_COUNT',
+        suggestion: `Set maxConnections to a value between 1 and ${MAX_DATABASE_CONNECTIONS}`,
+      });
+    }
   }
 
   /**
@@ -246,69 +406,11 @@ export class ConfigurationManager extends EventEmitter {
     }> = [];
     const warnings: Array<{ path: string; message: string; code: string }> = [];
 
-    // Basic structural validation
-    if (!config.version) {
-      errors.push({
-        path: 'version',
-        message: 'Configuration version is required',
-        code: 'MISSING_VERSION',
-        suggestion: 'Add version field to configuration',
-      });
-    }
-
-    // Validate search limits
-    if (config.search) {
-      if (config.search.defaultLimit && config.search.maxLimit) {
-        if (config.search.defaultLimit > config.search.maxLimit) {
-          errors.push({
-            path: 'search.defaultLimit',
-            message: 'Default search limit cannot exceed maximum limit',
-            code: 'INVALID_SEARCH_LIMITS',
-            suggestion: 'Set defaultLimit <= maxLimit',
-          });
-        }
-      }
-    }
-
-    // Validate indexing configuration
-    if (config.indexing) {
-      if (
-        config.indexing.maxWorkers &&
-        (config.indexing.maxWorkers < 1 || config.indexing.maxWorkers > 64)
-      ) {
-        errors.push({
-          path: 'indexing.maxWorkers',
-          message: 'Max workers must be between 1 and 64',
-          code: 'INVALID_WORKER_COUNT',
-          suggestion: 'Set maxWorkers to a value between 1 and 64',
-        });
-      }
-
-      if (config.indexing.maxFileSize && config.indexing.maxFileSize < 1024) {
-        errors.push({
-          path: 'indexing.maxFileSize',
-          message: 'Max file size must be at least 1024 bytes',
-          code: 'INVALID_FILE_SIZE',
-          suggestion: 'Set maxFileSize to at least 1024',
-        });
-      }
-    }
-
-    // Validate database configuration
-    if (config.database) {
-      if (
-        config.database.maxConnections &&
-        (config.database.maxConnections < 1 ||
-          config.database.maxConnections > 100)
-      ) {
-        errors.push({
-          path: 'database.maxConnections',
-          message: 'Max connections must be between 1 and 100',
-          code: 'INVALID_CONNECTION_COUNT',
-          suggestion: 'Set maxConnections to a value between 1 and 100',
-        });
-      }
-    }
+    // Run all validation checks
+    this.validateStructure(config, errors);
+    this.validateSearchConfig(config, errors);
+    this.validateIndexingConfig(config, errors);
+    this.validateDatabaseConfig(config, errors);
 
     return {
       valid: errors.length === 0,
@@ -405,6 +507,7 @@ export class ConfigurationManager extends EventEmitter {
   /**
    * Set nested value in object
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private setNestedValue(obj: any, path: string, value: unknown): void {
     const keys = path.split('.');
     let current = obj;
