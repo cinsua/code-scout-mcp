@@ -8,9 +8,11 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import { ConfigurationSource } from './ConfigurationSource';
-import { PartialAppConfig } from '../types/ConfigTypes';
+
+import type { PartialAppConfig } from '../types/ConfigTypes';
 import { ConfigurationError } from '../errors/ConfigurationError';
+
+import { ConfigurationSource } from './ConfigurationSource';
 
 /**
  * Global configuration source loading from user's home directory
@@ -33,16 +35,12 @@ export class GlobalConfiguration extends ConfigurationSource {
    * Load global configuration from ~/.code-scout/config.json
    */
   async load(): Promise<PartialAppConfig> {
-    try {
-      await this.validateAvailability();
+    await this.validateAvailability();
 
-      const content = await fs.readFile(this.configPath, 'utf-8');
-      const config = this.safeJsonParse(content, 'global configuration file');
+    const content = await fs.readFile(this.configPath, 'utf-8');
+    const config = this.safeJsonParse(content, 'global configuration file');
 
-      return this.createPartialConfig(config);
-    } catch (error) {
-      this.handleLoadError(error);
-    }
+    return this.createPartialConfig(config);
   }
 
   /**
@@ -89,7 +87,7 @@ export class GlobalConfiguration extends ConfigurationSource {
       throw ConfigurationError.fileAccess(
         `Failed to create global config directory: ${error instanceof Error ? error.message : 'Unknown error'}`,
         configDir,
-        this.name
+        this.name,
       );
     }
   }
@@ -110,7 +108,7 @@ export class GlobalConfiguration extends ConfigurationSource {
       throw ConfigurationError.fileAccess(
         `Failed to save global configuration: ${error instanceof Error ? error.message : 'Unknown error'}`,
         this.configPath,
-        this.name
+        this.name,
       );
     }
   }
@@ -126,7 +124,7 @@ export class GlobalConfiguration extends ConfigurationSource {
         throw ConfigurationError.fileAccess(
           `Failed to remove global configuration: ${error instanceof Error ? error.message : 'Unknown error'}`,
           this.configPath,
-          this.name
+          this.name,
         );
       }
     }
@@ -166,7 +164,7 @@ export class GlobalConfiguration extends ConfigurationSource {
       }
 
       // Check that file is not world-readable or group-readable
-      const mode = parseInt(stats.permissions || '0', 8);
+      const mode = parseInt(stats.permissions ?? '0', 8);
       const hasGroupRead = (mode & 0o040) !== 0;
       const hasWorldRead = (mode & 0o004) !== 0;
 
@@ -186,7 +184,7 @@ export class GlobalConfiguration extends ConfigurationSource {
       throw ConfigurationError.fileAccess(
         `Failed to fix permissions on global configuration: ${error instanceof Error ? error.message : 'Unknown error'}`,
         this.configPath,
-        this.name
+        this.name,
       );
     }
   }
@@ -195,9 +193,9 @@ export class GlobalConfiguration extends ConfigurationSource {
    * Backup global configuration
    */
   async backupConfig(backupPath?: string): Promise<string> {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const timestamp = new Date().toISOString().replace(/[.:]/g, '-');
     const defaultBackupPath = `${this.configPath}.backup.${timestamp}`;
-    const finalBackupPath = backupPath || defaultBackupPath;
+    const finalBackupPath = backupPath ?? defaultBackupPath;
 
     try {
       const content = await fs.readFile(this.configPath, 'utf-8');
@@ -208,7 +206,7 @@ export class GlobalConfiguration extends ConfigurationSource {
       throw ConfigurationError.fileAccess(
         `Failed to backup global configuration: ${error instanceof Error ? error.message : 'Unknown error'}`,
         this.configPath,
-        this.name
+        this.name,
       );
     }
   }
@@ -224,7 +222,7 @@ export class GlobalConfiguration extends ConfigurationSource {
       throw ConfigurationError.fileAccess(
         `Failed to restore from backup: ${error instanceof Error ? error.message : 'Unknown error'}`,
         backupPath,
-        this.name
+        this.name,
       );
     }
   }
@@ -237,12 +235,12 @@ export class GlobalConfiguration extends ConfigurationSource {
       const configDir = path.dirname(this.configPath);
       const files = await fs.readdir(configDir);
       const backupPattern = new RegExp(
-        `${path.basename(this.configPath)}\\.backup\\..+`
+        `${path.basename(this.configPath)}\\.backup\\..+`,
       );
 
       return files
-        .filter((file) => backupPattern.test(file))
-        .map((file) => path.join(configDir, file))
+        .filter(file => backupPattern.test(file))
+        .map(file => path.join(configDir, file))
         .sort(); // Sort by filename (which includes timestamp)
     } catch {
       return [];

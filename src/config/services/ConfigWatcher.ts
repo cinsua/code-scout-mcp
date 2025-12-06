@@ -5,12 +5,14 @@
  * enabling hot reloading of configuration changes without service restart.
  */
 
-import * as chokidar from 'chokidar';
 import { EventEmitter } from 'events';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+
+import * as chokidar from 'chokidar';
+
 import { ConfigurationError } from '../errors/ConfigurationError';
-import {
+import type {
   PartialAppConfig,
   ConfigurationChangeEvent,
 } from '../types/ConfigTypes';
@@ -175,7 +177,7 @@ export class ConfigWatcher extends EventEmitter {
     }
 
     // Normalize file paths
-    const normalizedPaths = filePaths.map((filePath) => path.resolve(filePath));
+    const normalizedPaths = filePaths.map(filePath => path.resolve(filePath));
 
     // Create watcher
     this.watcher = chokidar.watch(normalizedPaths, {
@@ -198,13 +200,13 @@ export class ConfigWatcher extends EventEmitter {
 
     // Set up event handlers
     this.watcher
-      .on('add', (filePath) => this.handleFileAdd(filePath))
-      .on('change', (filePath) => this.handleFileChange(filePath))
-      .on('unlink', (filePath) => this.handleFileDelete(filePath))
-      .on('error', (error) => this.handleWatcherError(error));
+      .on('add', filePath => this.handleFileAdd(filePath))
+      .on('change', filePath => this.handleFileChange(filePath))
+      .on('unlink', filePath => this.handleFileDelete(filePath))
+      .on('error', error => this.handleWatcherError(error));
 
     // Add to watched files
-    normalizedPaths.forEach((filePath) => this.watchedFiles.add(filePath));
+    normalizedPaths.forEach(filePath => this.watchedFiles.add(filePath));
 
     this.emit('watcher:started', { paths: normalizedPaths });
   }
@@ -235,7 +237,7 @@ export class ConfigWatcher extends EventEmitter {
    * @param filePath - File path to add
    * @returns Promise<void>
    */
-  async addFile(filePath: string): Promise<void> {
+  addFile(filePath: string): void {
     const resolvedPath = path.resolve(filePath);
 
     if (!this.watchedFiles.has(resolvedPath)) {
@@ -253,7 +255,7 @@ export class ConfigWatcher extends EventEmitter {
    * @param filePath - File path to remove
    * @returns Promise<void>
    */
-  async removeFile(filePath: string): Promise<void> {
+  removeFile(filePath: string): void {
     const resolvedPath = path.resolve(filePath);
 
     if (this.watchedFiles.has(resolvedPath)) {
@@ -315,13 +317,13 @@ export class ConfigWatcher extends EventEmitter {
     } catch (error) {
       throw new ConfigurationError(
         `Failed to create configuration backup: ${error instanceof Error ? error.message : String(error)}`,
-        'BACKUP_FAILED'
+        'BACKUP_FAILED',
       );
     }
 
     // Add to backups array and maintain max backups
     this.backups.push(backup);
-    this.maintainBackups();
+    await this.maintainBackups();
 
     this.emit('backup:created', backup);
     return backup;
@@ -333,7 +335,7 @@ export class ConfigWatcher extends EventEmitter {
    * @param backup - Backup to restore from
    * @returns Promise<PartialAppConfig>
    */
-  async restoreFromBackup(backup: ConfigBackup): Promise<PartialAppConfig> {
+  restoreFromBackup(backup: ConfigBackup): PartialAppConfig {
     try {
       // Validate backup configuration
       if (this.options.validateBeforeApply) {
@@ -343,8 +345,8 @@ export class ConfigWatcher extends EventEmitter {
         if (!schemaResult.valid || !semanticResult.valid) {
           const errors = [...schemaResult.errors, ...semanticResult.errors];
           throw new ConfigurationError(
-            `Backup configuration is invalid: ${errors.map((e) => e.message).join(', ')}`,
-            'INVALID_BACKUP'
+            `Backup configuration is invalid: ${errors.map(e => e.message).join(', ')}`,
+            'INVALID_BACKUP',
           );
         }
       }
@@ -357,7 +359,7 @@ export class ConfigWatcher extends EventEmitter {
     } catch (error) {
       throw new ConfigurationError(
         `Failed to restore from backup: ${error instanceof Error ? error.message : String(error)}`,
-        'RESTORE_FAILED'
+        'RESTORE_FAILED',
       );
     }
   }
@@ -369,34 +371,34 @@ export class ConfigWatcher extends EventEmitter {
    */
   getBackups(): ConfigBackup[] {
     return [...this.backups].sort(
-      (a, b) => b.timestamp.getTime() - a.timestamp.getTime()
+      (a, b) => b.timestamp.getTime() - a.timestamp.getTime(),
     );
   }
 
   /**
    * Delete old backups to maintain maximum count
    */
-  private maintainBackups(): void {
+  private async maintainBackups(): Promise<void> {
     if (this.backups.length > this.options.maxBackups) {
       const sortedBackups = this.backups.sort(
-        (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+        (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
       );
       const toDelete = sortedBackups.slice(
         0,
-        this.backups.length - this.options.maxBackups
+        this.backups.length - this.options.maxBackups,
       );
 
-      toDelete.forEach(async (backup) => {
-        try {
-          await fs.unlink(backup.filePath);
-        } catch {
-          // Ignore errors when deleting backup files
-        }
-      });
-
-      this.backups = this.backups.filter(
-        (backup) => !toDelete.includes(backup)
+      await Promise.allSettled(
+        toDelete.map(async backup => {
+          try {
+            await fs.unlink(backup.filePath);
+          } catch {
+            // Ignore errors when deleting backup files
+          }
+        }),
       );
+
+      this.backups = this.backups.filter(backup => !toDelete.includes(backup));
     }
   }
 
@@ -407,12 +409,12 @@ export class ConfigWatcher extends EventEmitter {
    * @returns Backup file path
    */
   private generateBackupPath(timestamp: Date): string {
-    const timestampStr = timestamp.toISOString().replace(/[:.]/g, '-');
+    const timestampStr = timestamp.toISOString().replace(/[.:]/g, '-');
     return path.join(
       process.cwd(),
       `.code-scout`,
       `backups`,
-      `config-backup-${timestampStr}.json`
+      `config-backup-${timestampStr}.json`,
     );
   }
 
@@ -463,14 +465,14 @@ export class ConfigWatcher extends EventEmitter {
    */
   private scheduleConfigCheck(
     filePath: string,
-    changeType: 'added' | 'updated' | 'removed'
+    changeType: 'added' | 'updated' | 'removed',
   ): void {
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
     }
 
-    this.debounceTimer = setTimeout(async () => {
-      await this.checkConfigurationChange(filePath, changeType);
+    this.debounceTimer = setTimeout(() => {
+      void this.checkConfigurationChange(filePath, changeType);
     }, this.options.debounceMs);
   }
 
@@ -482,7 +484,7 @@ export class ConfigWatcher extends EventEmitter {
    */
   private async checkConfigurationChange(
     filePath: string,
-    changeType: 'added' | 'updated' | 'removed'
+    changeType: 'added' | 'updated' | 'removed',
   ): Promise<void> {
     try {
       let newConfig: PartialAppConfig = {};
@@ -510,8 +512,8 @@ export class ConfigWatcher extends EventEmitter {
         if (!schemaResult.valid || !semanticResult.valid) {
           validated = false;
           validationErrors.push(
-            ...schemaResult.errors.map((e) => e.message),
-            ...semanticResult.errors.map((e) => e.message)
+            ...schemaResult.errors.map(e => e.message),
+            ...semanticResult.errors.map(e => e.message),
           );
         }
       }
@@ -539,7 +541,7 @@ export class ConfigWatcher extends EventEmitter {
           timestamp: new Date(),
           filePath,
           validated,
-          validationErrors: validated ? undefined : validationErrors,
+          validationErrors: undefined,
         };
 
         this.emit('config:changed', eventData);
@@ -581,7 +583,7 @@ export class ConfigWatcher extends EventEmitter {
    */
   private removeConfigValue(
     _config: PartialAppConfig,
-    _filePath: string
+    _filePath: string,
   ): void {
     // This is a simplified implementation
     // In practice, you'd want to map file paths to configuration sections
@@ -595,7 +597,7 @@ export class ConfigWatcher extends EventEmitter {
    */
   private mergeConfig(
     target: PartialAppConfig,
-    source: PartialAppConfig
+    source: PartialAppConfig,
   ): void {
     // Deep merge configuration
     const mergeDeep = (target: any, source: any): any => {
@@ -605,7 +607,7 @@ export class ConfigWatcher extends EventEmitter {
           typeof source[key] === 'object' &&
           !Array.isArray(source[key])
         ) {
-          target[key] = target[key] || {};
+          target[key] = target[key] ?? {};
           mergeDeep(target[key], source[key]);
         } else {
           target[key] = source[key];
@@ -637,7 +639,7 @@ export class ConfigWatcher extends EventEmitter {
  * @returns ConfigWatcher instance
  */
 export function createConfigWatcher(
-  options?: ConfigWatcherOptions
+  options?: ConfigWatcherOptions,
 ): ConfigWatcher {
   return new ConfigWatcher(options);
 }

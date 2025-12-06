@@ -5,7 +5,7 @@
  * and provides common functionality for loading configuration.
  */
 
-import {
+import type {
   ConfigurationSource as IConfigurationSource,
   PartialAppConfig,
 } from '../types/ConfigTypes';
@@ -43,7 +43,7 @@ export abstract class ConfigurationSource implements IConfigurationSource {
       throw new ConfigurationError(
         `Configuration source '${this.name}' is not available`,
         'SOURCE_UNAVAILABLE',
-        { source: this.name }
+        { source: this.name },
       );
     }
   }
@@ -60,7 +60,7 @@ export abstract class ConfigurationSource implements IConfigurationSource {
     throw ConfigurationError.source(
       `Failed to load configuration from ${this.name}: ${message}`,
       this.name,
-      error instanceof Error ? error : undefined
+      error instanceof Error ? error : undefined,
     );
   }
 
@@ -88,7 +88,7 @@ export abstract class ConfigurationSource implements IConfigurationSource {
       throw ConfigurationError.parsing(
         `Invalid JSON in ${context}: ${error instanceof Error ? error.message : 'Unknown error'}`,
         this.name,
-        error instanceof Error ? error : undefined
+        error instanceof Error ? error : undefined,
       );
     }
   }

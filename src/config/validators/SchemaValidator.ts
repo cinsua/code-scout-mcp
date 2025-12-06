@@ -5,9 +5,11 @@
  * using the AJV library for high-performance validation.
  */
 
-import Ajv, { ErrorObject, ValidateFunction } from 'ajv';
+import type { ErrorObject, ValidateFunction } from 'ajv';
+import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
-import {
+
+import type {
   PartialAppConfig,
   ValidationResult,
   ValidationError,
@@ -117,7 +119,7 @@ export class SchemaValidator {
     if (!isValid && this.validateFunction.errors) {
       // Convert AJV errors to our ValidationError format
       const validationErrors = this.convertAjvErrors(
-        this.validateFunction.errors
+        this.validateFunction.errors,
       );
       errors.push(...validationErrors);
     }
@@ -137,7 +139,7 @@ export class SchemaValidator {
       errors,
       warnings,
       config: isValid ? config : undefined,
-      ajvErrors: this.validateFunction.errors || undefined,
+      ajvErrors: this.validateFunction.errors ?? undefined,
       validatedConfig: config,
     };
   }
@@ -151,7 +153,7 @@ export class SchemaValidator {
    */
   validateSection(
     config: PartialAppConfig,
-    section: keyof PartialAppConfig
+    section: keyof PartialAppConfig,
   ): SchemaValidationResult {
     if (!config[section]) {
       return {
@@ -186,14 +188,10 @@ export class SchemaValidator {
     const sectionErrors: ValidationError[] = [];
 
     for (const [sectionName, sectionValue] of Object.entries(config)) {
-      if (sectionValue === undefined || sectionValue === null) {
-        continue;
-      }
-
       try {
         const sectionResult = this.validateSection(
           config,
-          sectionName as keyof PartialAppConfig
+          sectionName as keyof PartialAppConfig,
         );
 
         if (sectionResult.valid) {
@@ -252,7 +250,7 @@ export class SchemaValidator {
     const { instancePath, keyword, message, params } = error;
 
     // Get the property name from the path
-    const propertyName = instancePath.split('/').pop() || 'property';
+    const propertyName = instancePath.split('/').pop() ?? 'property';
 
     switch (keyword) {
       case 'type':
@@ -286,7 +284,7 @@ export class SchemaValidator {
         return `Additional property not allowed: ${params.additionalProperty}`;
 
       default:
-        return message || `Validation error at ${instancePath}`;
+        return message ?? `Validation error at ${instancePath}`;
     }
   }
 
@@ -348,10 +346,10 @@ export class SchemaValidator {
         return `Decrease the value to at most ${params.limit}`;
 
       case 'minLength':
-        return `Add at least ${params.limit - (params.data?.length || 0)} more characters`;
+        return `Add at least ${params.limit - (params.data?.length ?? 0)} more characters`;
 
       case 'maxLength':
-        return `Remove at least ${(params.data?.length || 0) - params.limit} characters`;
+        return `Remove at least ${(params.data?.length ?? 0) - params.limit} characters`;
 
       case 'pattern':
         return `Ensure the value matches the required pattern`;
@@ -377,7 +375,7 @@ export class SchemaValidator {
    * @returns Array of validation warnings
    */
   private checkAdditionalProperties(
-    config: PartialAppConfig
+    config: PartialAppConfig,
   ): ValidationWarning[] {
     const warnings: ValidationWarning[] = [];
 
@@ -496,7 +494,7 @@ export class SchemaValidator {
  * @returns SchemaValidator instance
  */
 export function createSchemaValidator(
-  options?: SchemaValidatorOptions
+  options?: SchemaValidatorOptions,
 ): SchemaValidator {
   return new SchemaValidator(options);
 }

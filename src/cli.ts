@@ -19,17 +19,17 @@ async function main(): Promise<void> {
 }
 
 // Handle process termination
-process.on('SIGINT', async () => {
+process.on('SIGINT', () => {
   console.log('\nReceived SIGINT, shutting down gracefully...');
   process.exit(0);
 });
 
-process.on('SIGTERM', async () => {
+process.on('SIGTERM', () => {
   console.log('\nReceived SIGTERM, shutting down gracefully...');
   process.exit(0);
 });
 
-main().catch((error) => {
+void main().catch(error => {
   console.error('Unhandled error:', error);
   process.exit(1);
 });

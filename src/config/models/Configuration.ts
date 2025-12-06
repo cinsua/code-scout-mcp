@@ -6,7 +6,8 @@
  */
 
 import { EventEmitter } from 'events';
-import {
+
+import type {
   AppConfig,
   PartialAppConfig,
   ConfigurationChangeEvent,
@@ -32,7 +33,7 @@ export class Configuration extends EventEmitter {
     if (!this._config) {
       throw new ConfigurationError(
         'Configuration not loaded',
-        'CONFIG_NOT_LOADED'
+        'CONFIG_NOT_LOADED',
       );
     }
     return this._config;
@@ -89,7 +90,7 @@ export class Configuration extends EventEmitter {
     if (!this._config) {
       throw new ConfigurationError(
         'Configuration not loaded',
-        'CONFIG_NOT_LOADED'
+        'CONFIG_NOT_LOADED',
       );
     }
 
@@ -115,7 +116,7 @@ export class Configuration extends EventEmitter {
     if (!this._config) {
       throw new ConfigurationError(
         'Configuration not loaded',
-        'CONFIG_NOT_LOADED'
+        'CONFIG_NOT_LOADED',
       );
     }
 
@@ -133,7 +134,7 @@ export class Configuration extends EventEmitter {
     if (!this._config) {
       throw new ConfigurationError(
         'Configuration not loaded',
-        'CONFIG_NOT_LOADED'
+        'CONFIG_NOT_LOADED',
       );
     }
 
@@ -146,7 +147,7 @@ export class Configuration extends EventEmitter {
         }
         return obj[key] as Record<string, unknown>;
       },
-      this._config as unknown as Record<string, unknown>
+      this._config as unknown as Record<string, unknown>,
     );
 
     target[lastKey] = value;
@@ -167,7 +168,7 @@ export class Configuration extends EventEmitter {
     if (value === undefined) {
       throw new ConfigurationError(
         `Configuration section '${section}' not found`,
-        'SECTION_NOT_FOUND'
+        'SECTION_NOT_FOUND',
       );
     }
     return value as T;
@@ -185,7 +186,7 @@ export class Configuration extends EventEmitter {
    * Remove a configuration source
    */
   removeSource(name: string): boolean {
-    const index = this._sources.findIndex((source) => source.name === name);
+    const index = this._sources.findIndex(source => source.name === name);
     if (index >= 0) {
       this._sources.splice(index, 1);
       return true;
@@ -208,7 +209,7 @@ export class Configuration extends EventEmitter {
     if (!this._config) {
       throw new ConfigurationError(
         'Configuration not loaded',
-        'CONFIG_NOT_LOADED'
+        'CONFIG_NOT_LOADED',
       );
     }
     return JSON.stringify(this._config, null, pretty ? 2 : 0);
@@ -224,7 +225,7 @@ export class Configuration extends EventEmitter {
     } catch (error) {
       throw new ConfigurationError(
         `Failed to import configuration: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'IMPORT_FAILED'
+        'IMPORT_FAILED',
       );
     }
   }
@@ -246,7 +247,7 @@ export class Configuration extends EventEmitter {
     if (!this._config) {
       throw new ConfigurationError(
         'Configuration not loaded',
-        'CONFIG_NOT_LOADED'
+        'CONFIG_NOT_LOADED',
       );
     }
     return JSON.parse(JSON.stringify(this._config)) as AppConfig;
@@ -259,7 +260,7 @@ export class Configuration extends EventEmitter {
     if (!this._config) {
       throw new ConfigurationError(
         'Configuration not loaded',
-        'CONFIG_NOT_LOADED'
+        'CONFIG_NOT_LOADED',
       );
     }
 
@@ -279,8 +280,8 @@ export class Configuration extends EventEmitter {
 
     const findChanges = (obj1: any, obj2: any, path: string = '') => {
       const keys = new Set([
-        ...Object.keys(obj1 || {}),
-        ...Object.keys(obj2 || {}),
+        ...Object.keys(obj1 ?? {}),
+        ...Object.keys(obj2 ?? {}),
       ]);
 
       for (const key of keys) {
@@ -333,7 +334,7 @@ export class Configuration extends EventEmitter {
   private emitChanges(
     oldConfig: AppConfig,
     newConfig: AppConfig,
-    source: string
+    source: string,
   ): void {
     const changes = this.compare(oldConfig, newConfig);
 
@@ -349,12 +350,14 @@ export class Configuration extends EventEmitter {
    */
   private deepMerge<T extends Record<string, any>>(
     target: T,
-    source: Partial<T>
+    source: Partial<T>,
   ): T {
     const result = { ...target };
 
     for (const key in source) {
-      if (source[key] === undefined) continue;
+      if (source[key] === undefined) {
+        continue;
+      }
 
       if (
         source[key] &&
@@ -392,7 +395,7 @@ export class ConfigurationSnapshot {
     public readonly config: AppConfig,
     public readonly timestamp: Date = new Date(),
     public readonly source: string = 'snapshot',
-    public readonly description?: string
+    public readonly description?: string,
   ) {}
 
   /**
@@ -430,7 +433,7 @@ export class ConfigurationSnapshot {
       data.config,
       new Date(data.timestamp),
       data.source,
-      data.description
+      data.description,
     );
   }
 }
@@ -502,7 +505,7 @@ export class ConfigurationHistory {
   getRecentSnapshots(ms: number): ConfigurationSnapshot[] {
     const cutoff = Date.now() - ms;
     return this.snapshots.filter(
-      (snapshot) => snapshot.timestamp.getTime() > cutoff
+      snapshot => snapshot.timestamp.getTime() > cutoff,
     );
   }
 }

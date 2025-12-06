@@ -6,7 +6,8 @@
  */
 
 import { EventEmitter } from 'events';
-import {
+
+import type {
   AppConfig,
   PartialAppConfig,
   ConfigurationSource,
@@ -17,18 +18,17 @@ import {
   ConfigurationError,
   BatchValidationError,
 } from '../errors/ConfigurationError';
-import { Configuration } from '../models/Configuration';
-import {
-  ConfigurationHistory,
-  ConfigurationSnapshot,
-} from '../models/Configuration';
-
 // Import all configuration sources
 import { DefaultConfiguration } from '../sources/DefaultConfiguration';
 import { GlobalConfiguration } from '../sources/GlobalConfiguration';
 import { ProjectConfiguration } from '../sources/ProjectConfiguration';
 import { EnvironmentConfiguration } from '../sources/EnvironmentConfiguration';
 import { CommandLineConfiguration } from '../sources/CommandLineConfiguration';
+import {
+  Configuration,
+  ConfigurationHistory,
+  ConfigurationSnapshot,
+} from '../models/Configuration';
 
 /**
  * Main configuration manager that orchestrates all configuration sources
@@ -77,14 +77,14 @@ export class ConfigurationManager extends EventEmitter {
       'config:changed',
       (change: ConfigurationChangeEvent) => {
         this.emit('config:changed', change);
-      }
+      },
     );
 
     this.configuration.on(
       'config:loaded',
       (data: { config: AppConfig; source: string }) => {
         this.emit('config:loaded', data);
-      }
+      },
     );
 
     this.configuration.on('config:validated', (result: ValidationResult) => {
@@ -113,7 +113,7 @@ export class ConfigurationManager extends EventEmitter {
         config,
         new Date(),
         'load',
-        'Configuration loaded from all sources'
+        'Configuration loaded from all sources',
       );
       this.history.addSnapshot(snapshot);
 
@@ -142,7 +142,7 @@ export class ConfigurationManager extends EventEmitter {
     }> = [];
 
     // Load from all sources in parallel
-    const loadPromises = this.sources.map(async (source) => {
+    const loadPromises = this.sources.map(async source => {
       try {
         const isAvailable = await source.isAvailable();
         if (!isAvailable) {
@@ -164,10 +164,10 @@ export class ConfigurationManager extends EventEmitter {
     loadResults.push(...results);
 
     // Check for critical errors
-    const criticalErrors = loadResults.filter((r) => r.error);
+    const criticalErrors = loadResults.filter(r => r.error);
     if (criticalErrors.length > 0) {
       const errorMessages = criticalErrors.map(
-        (r) => `${r.source.name}: ${r.error?.message || 'Unknown error'}`
+        r => `${r.source.name}: ${r.error?.message ?? 'Unknown error'}`,
       );
       throw new ConfigurationError(
         `Failed to load configuration from ${criticalErrors.length} source(s):\n${errorMessages.join('\n')}`,
@@ -177,17 +177,17 @@ export class ConfigurationManager extends EventEmitter {
             'Check configuration file permissions',
             'Verify configuration format',
           ],
-        }
+        },
       );
     }
 
     // Merge configurations in priority order
     const mergedConfig = this.mergeConfigurations(
-      loadResults.map((r) => r.config)
+      loadResults.map(r => r.config),
     );
 
     // Validate merged configuration
-    const validationResult = await this.validateConfiguration(mergedConfig);
+    const validationResult = this.validateConfiguration(mergedConfig);
     this.configuration.setValidationResult(validationResult);
 
     if (!validationResult.valid) {
@@ -237,9 +237,7 @@ export class ConfigurationManager extends EventEmitter {
   /**
    * Validate configuration
    */
-  private async validateConfiguration(
-    config: PartialAppConfig
-  ): Promise<ValidationResult> {
+  private validateConfiguration(config: PartialAppConfig): ValidationResult {
     const errors: Array<{
       path: string;
       message: string;
@@ -314,13 +312,13 @@ export class ConfigurationManager extends EventEmitter {
 
     return {
       valid: errors.length === 0,
-      errors: errors.map((e) => ({
+      errors: errors.map(e => ({
         path: e.path,
         message: e.message,
         code: e.code,
         suggestion: e.suggestion,
       })),
-      warnings: warnings.map((w) => ({
+      warnings: warnings.map(w => ({
         path: w.path,
         message: w.message,
         code: w.code,
@@ -379,14 +377,14 @@ export class ConfigurationManager extends EventEmitter {
   async updateConfiguration(
     path: string,
     value: unknown,
-    source: string = 'manual'
+    source: string = 'manual',
   ): Promise<void> {
     // Create snapshot before update
     const snapshot = new ConfigurationSnapshot(
       this.configuration.config,
       new Date(),
       source,
-      `Update ${path} to ${JSON.stringify(value)}`
+      `Update ${path} to ${JSON.stringify(value)}`,
     );
     this.history.addSnapshot(snapshot);
 
@@ -394,13 +392,14 @@ export class ConfigurationManager extends EventEmitter {
     const testConfig = this.configuration.clone();
     this.setNestedValue(testConfig, path, value);
 
-    const validationResult = await this.validateConfiguration(testConfig);
+    const validationResult = this.validateConfiguration(testConfig);
     if (!validationResult.valid) {
       throw new BatchValidationError(validationResult.errors);
     }
 
     // Apply the update
     this.configuration.updatePath(path, value, source);
+    await Promise.resolve();
   }
 
   /**
@@ -434,12 +433,12 @@ export class ConfigurationManager extends EventEmitter {
       this.configuration.config,
       new Date(),
       'reset',
-      'Reset to defaults'
+      'Reset to defaults',
     );
     this.history.addSnapshot(snapshot);
 
     // Load only defaults
-    const defaultSource = this.sources.find((s) => s.name === 'defaults');
+    const defaultSource = this.sources.find(s => s.name === 'defaults');
     if (defaultSource) {
       const defaultConfig = await defaultSource.load();
       this.configuration.setConfig(defaultConfig as AppConfig, 'reset');
@@ -459,25 +458,26 @@ export class ConfigurationManager extends EventEmitter {
    */
   async importConfiguration(
     json: string,
-    source: string = 'import'
+    source: string = 'import',
   ): Promise<void> {
     const snapshot = new ConfigurationSnapshot(
       this.configuration.config,
       new Date(),
       source,
-      'Import configuration'
+      'Import configuration',
     );
     this.history.addSnapshot(snapshot);
 
     // Validate imported configuration
     const testConfig = JSON.parse(json);
-    const validationResult = await this.validateConfiguration(testConfig);
+    const validationResult = this.validateConfiguration(testConfig);
     if (!validationResult.valid) {
       throw new BatchValidationError(validationResult.errors);
     }
 
     this.configuration.import(json, source);
     this.emit('config:imported', { source });
+    await Promise.resolve();
   }
 
   /**
@@ -495,12 +495,13 @@ export class ConfigurationManager extends EventEmitter {
       this.configuration.config,
       new Date(),
       'rollback',
-      `Rollback to ${snapshot.timestamp.toISOString()}`
+      `Rollback to ${snapshot.timestamp.toISOString()}`,
     );
     this.history.addSnapshot(rollbackSnapshot);
 
     this.configuration.setConfig(snapshot.config, 'rollback');
     this.emit('config:rollback', { snapshot });
+    await Promise.resolve();
   }
 
   /**
@@ -514,7 +515,7 @@ export class ConfigurationManager extends EventEmitter {
    * Get source by name
    */
   getSource(name: string): ConfigurationSource | undefined {
-    return this.sources.find((s) => s.name === name);
+    return this.sources.find(s => s.name === name);
   }
 
   /**

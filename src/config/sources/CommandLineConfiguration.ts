@@ -5,9 +5,10 @@
  * arguments with highest priority.
  */
 
-import { ConfigurationSource } from './ConfigurationSource';
-import { PartialAppConfig } from '../types/ConfigTypes';
+import type { PartialAppConfig } from '../types/ConfigTypes';
 import { ConfigurationError } from '../errors/ConfigurationError';
+
+import { ConfigurationSource } from './ConfigurationSource';
 
 /**
  * Command line argument definition
@@ -72,28 +73,25 @@ export class CommandLineConfiguration extends ConfigurationSource {
 
   constructor(args?: string[]) {
     super();
-    this.rawArgs = args || process.argv.slice(2);
+    this.rawArgs = args ?? process.argv.slice(2);
     this.parseArguments();
   }
 
   async load(): Promise<PartialAppConfig> {
-    try {
-      await this.validateAvailability();
+    await this.validateAvailability();
 
-      const config: PartialAppConfig = {};
+    const config: PartialAppConfig = {};
 
-      for (const [key, value] of this.parsedArgs) {
-        if (!key.startsWith('_')) {
-          this.setNestedValue(config, key, value);
-        }
+    for (const [key, value] of this.parsedArgs) {
+      if (!key.startsWith('_')) {
+        this.setNestedValue(config, key, value);
       }
-
-      return this.createPartialConfig(config);
-    } catch (error) {
-      this.handleLoadError(error);
     }
+
+    return this.createPartialConfig(config);
   }
 
+  // eslint-disable-next-line require-await
   async isAvailable(): Promise<boolean> {
     return true;
   }
@@ -102,7 +100,7 @@ export class CommandLineConfiguration extends ConfigurationSource {
     for (let i = 0; i < this.rawArgs.length; i++) {
       const arg = this.rawArgs[i];
 
-      if (arg && arg.startsWith('--')) {
+      if (arg?.startsWith('--')) {
         this.parseLongArgument(arg, i);
       } else if (arg && arg.startsWith('-') && !arg.startsWith('--')) {
         this.parseShortArgument(arg, i);
@@ -118,7 +116,7 @@ export class CommandLineConfiguration extends ConfigurationSource {
       const value = arg.substring(eqIndex + 1);
       this.setArgumentValue(name, value);
     } else {
-      const cliArg = CLI_ARGUMENTS.find((a) => a.name === arg);
+      const cliArg = CLI_ARGUMENTS.find(a => a.name === arg);
 
       if (cliArg) {
         if (cliArg.type === 'boolean') {
@@ -130,7 +128,7 @@ export class CommandLineConfiguration extends ConfigurationSource {
           } else {
             throw new ConfigurationError(
               `Argument ${arg} requires a value`,
-              'INVALID_ARGUMENT'
+              'INVALID_ARGUMENT',
             );
           }
         }
@@ -143,7 +141,7 @@ export class CommandLineConfiguration extends ConfigurationSource {
 
     for (let i = 0; i < chars.length; i++) {
       const char = chars[i];
-      const cliArg = CLI_ARGUMENTS.find((a) => a.short === `-${char}`);
+      const cliArg = CLI_ARGUMENTS.find(a => a.short === `-${char}`);
 
       if (cliArg) {
         if (cliArg.type === 'boolean') {
@@ -155,7 +153,7 @@ export class CommandLineConfiguration extends ConfigurationSource {
           } else {
             throw new ConfigurationError(
               `Argument -${char} requires a value`,
-              'INVALID_ARGUMENT'
+              'INVALID_ARGUMENT',
             );
           }
         }
@@ -164,12 +162,12 @@ export class CommandLineConfiguration extends ConfigurationSource {
   }
 
   private setArgumentValue(name: string, value: string): void {
-    const cliArg = CLI_ARGUMENTS.find((a) => a.name === name);
+    const cliArg = CLI_ARGUMENTS.find(a => a.name === name);
 
     if (!cliArg) {
       throw new ConfigurationError(
         `Unknown argument: ${name}`,
-        'UNKNOWN_ARGUMENT'
+        'UNKNOWN_ARGUMENT',
       );
     }
 
@@ -192,12 +190,16 @@ export class CommandLineConfiguration extends ConfigurationSource {
   }
 
   private parseBoolean(value: string, argName: string): boolean {
-    if (value === 'true') return true;
-    if (value === 'false') return false;
+    if (value === 'true') {
+      return true;
+    }
+    if (value === 'false') {
+      return false;
+    }
 
     throw new ConfigurationError(
       `Invalid boolean value for ${argName}: ${value}. Use 'true' or 'false'`,
-      'INVALID_BOOLEAN_VALUE'
+      'INVALID_BOOLEAN_VALUE',
     );
   }
 
@@ -207,7 +209,7 @@ export class CommandLineConfiguration extends ConfigurationSource {
     if (isNaN(num)) {
       throw new ConfigurationError(
         `Invalid number value for ${argName}: ${value}`,
-        'INVALID_NUMBER_VALUE'
+        'INVALID_NUMBER_VALUE',
       );
     }
 

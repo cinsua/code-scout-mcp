@@ -8,8 +8,11 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { ConfigurationError } from '../errors/ConfigurationError';
-import { PartialAppConfig, ConfigurationMigration } from '../types/ConfigTypes';
+
+import type {
+  PartialAppConfig,
+  ConfigurationMigration,
+} from '../types/ConfigTypes';
 
 /**
  * Migration result
@@ -103,10 +106,10 @@ export class MigrationManager {
    */
   async migrate(
     config: PartialAppConfig,
-    targetVersion?: string
+    targetVersion?: string,
   ): Promise<MigrationResult> {
-    const fromVersion = config.version || '1.0.0';
-    const toVersion = targetVersion || this.options.currentVersion;
+    const fromVersion = config.version ?? '1.0.0';
+    const toVersion = targetVersion ?? this.options.currentVersion;
 
     const result: MigrationResult = {
       success: false,
@@ -123,7 +126,7 @@ export class MigrationManager {
         result.success = true;
         result.config = config;
         result.warnings.push(
-          `Configuration is already at version ${fromVersion} or newer`
+          `Configuration is already at version ${fromVersion} or newer`,
         );
         return result;
       }
@@ -139,7 +142,7 @@ export class MigrationManager {
 
       const applicableMigrations = this.getApplicableMigrations(
         currentVersion,
-        toVersion
+        toVersion,
       );
 
       for (const migration of applicableMigrations) {
@@ -147,12 +150,12 @@ export class MigrationManager {
           currentConfig = migration.migrate(currentConfig);
           currentVersion = migration.toVersion;
           result.appliedMigrations.push(
-            `${migration.fromVersion} -> ${migration.toVersion}`
+            `${migration.fromVersion} -> ${migration.toVersion}`,
           );
           result.warnings.push(`Applied migration: ${migration.description}`);
         } catch (error) {
           result.errors.push(
-            `Migration ${migration.fromVersion} -> ${migration.toVersion} failed: ${error instanceof Error ? error.message : String(error)}`
+            `Migration ${migration.fromVersion} -> ${migration.toVersion} failed: ${error instanceof Error ? error.message : String(error)}`,
           );
           return result;
         }
@@ -168,15 +171,15 @@ export class MigrationManager {
         if (!validationResult.valid) {
           result.errors.push(
             ...validationResult.errors.map(
-              (e: any) => `Validation error: ${e.message}`
-            )
+              (e: any) => `Validation error: ${e.message}`,
+            ),
           );
           return result;
         }
         result.warnings.push(
           ...validationResult.warnings.map(
-            (w: any) => `Validation warning: ${w.message}`
-          )
+            (w: any) => `Validation warning: ${w.message}`,
+          ),
         );
       }
 
@@ -186,7 +189,7 @@ export class MigrationManager {
       return result;
     } catch (error) {
       result.errors.push(
-        `Migration failed: ${error instanceof Error ? error.message : String(error)}`
+        `Migration failed: ${error instanceof Error ? error.message : String(error)}`,
       );
       return result;
     }
@@ -199,7 +202,7 @@ export class MigrationManager {
    * @returns Whether migration is needed
    */
   needsMigration(config: PartialAppConfig): boolean {
-    const currentVersion = config.version || '1.0.0';
+    const currentVersion = config.version ?? '1.0.0';
     return (
       this.compareVersions(currentVersion, this.options.currentVersion) < 0
     );
@@ -214,7 +217,7 @@ export class MigrationManager {
    */
   getMigrationPath(
     fromVersion: string,
-    toVersion: string
+    toVersion: string,
   ): ConfigurationMigration[] {
     return this.getApplicableMigrations(fromVersion, toVersion);
   }
@@ -227,7 +230,7 @@ export class MigrationManager {
   addMigration(migration: ConfigurationMigration): void {
     this.migrations.push(migration);
     this.migrations.sort((a, b) =>
-      this.compareVersions(a.fromVersion, b.fromVersion)
+      this.compareVersions(a.fromVersion, b.fromVersion),
     );
   }
 
@@ -249,23 +252,21 @@ export class MigrationManager {
       fromVersion: '1.0.0',
       toVersion: '1.1.0',
       description: 'Add security configuration section',
-      migrate: (config) => {
-        if (!config.security) {
-          config.security = {
-            allowedExtensions: [
-              '.ts',
-              '.tsx',
-              '.js',
-              '.jsx',
-              '.py',
-              '.json',
-              '.md',
-            ],
-            blockedPatterns: ['**/*.pem', '**/*.key', '**/.env*'],
-            maxPathLength: 1024,
-            enableSandbox: false,
-          };
-        }
+      migrate: config => {
+        config.security ??= {
+          allowedExtensions: [
+            '.ts',
+            '.tsx',
+            '.js',
+            '.jsx',
+            '.py',
+            '.json',
+            '.md',
+          ],
+          blockedPatterns: ['**/*.pem', '**/*.key', '**/.env*'],
+          maxPathLength: 1024,
+          enableSandbox: false,
+        };
         return config;
       },
     });
@@ -275,23 +276,21 @@ export class MigrationManager {
       fromVersion: '1.1.0',
       toVersion: '1.2.0',
       description: 'Add logging configuration section',
-      migrate: (config) => {
-        if (!config.logging) {
-          config.logging = {
-            level: 'info',
-            format: 'text',
-            file: {
-              enabled: true,
-              maxSize: '50MB',
-              maxFiles: 5,
-            },
-            console: {
-              enabled: true,
-              colorize: true,
-            },
-            structured: false,
-          };
-        }
+      migrate: config => {
+        config.logging ??= {
+          level: 'info',
+          format: 'text',
+          file: {
+            enabled: true,
+            maxSize: '50MB',
+            maxFiles: 5,
+          },
+          console: {
+            enabled: true,
+            colorize: true,
+          },
+          structured: false,
+        };
         return config;
       },
     });
@@ -301,16 +300,14 @@ export class MigrationManager {
       fromVersion: '1.2.0',
       toVersion: '1.3.0',
       description: 'Update search scoring weights and add content weight',
-      migrate: (config) => {
+      migrate: config => {
         if (
           config.search &&
           typeof config.search === 'object' &&
           'scoringWeights' in config.search
         ) {
           const weights = (config.search as any).scoringWeights;
-          if (!weights.content) {
-            weights.content = 2.0;
-          }
+          weights.content ??= 2.0;
           // Adjust other weights for better balance
           if (weights.filename === 5.0) {
             weights.filename = 5.0;
@@ -328,7 +325,7 @@ export class MigrationManager {
       fromVersion: '1.3.0',
       toVersion: '1.4.0',
       description: 'Add profile support and version tracking',
-      migrate: (config) => {
+      migrate: config => {
         if (!config.profile) {
           // Auto-detect profile based on existing settings
           const logging = config.logging as any;
@@ -350,7 +347,7 @@ export class MigrationManager {
       fromVersion: '1.4.0',
       toVersion: '1.5.0',
       description: 'Add database WAL and vacuum settings',
-      migrate: (config) => {
+      migrate: config => {
         if (config.database) {
           const database = config.database as any;
           if (database.enableWAL === undefined) {
@@ -374,12 +371,12 @@ export class MigrationManager {
    */
   private getApplicableMigrations(
     fromVersion: string,
-    toVersion: string
+    toVersion: string,
   ): ConfigurationMigration[] {
     return this.migrations.filter(
-      (migration) =>
+      migration =>
         this.compareVersions(migration.fromVersion, fromVersion) >= 0 &&
-        this.compareVersions(migration.toVersion, toVersion) <= 0
+        this.compareVersions(migration.toVersion, toVersion) <= 0,
     );
   }
 
@@ -396,11 +393,15 @@ export class MigrationManager {
     const maxLength = Math.max(aParts.length, bParts.length);
 
     for (let i = 0; i < maxLength; i++) {
-      const aPart = aParts[i] || 0;
-      const bPart = bParts[i] || 0;
+      const aPart = aParts[i] ?? 0;
+      const bPart = bParts[i] ?? 0;
 
-      if (aPart < bPart) return -1;
-      if (aPart > bPart) return 1;
+      if (aPart < bPart) {
+        return -1;
+      }
+      if (aPart > bPart) {
+        return 1;
+      }
     }
 
     return 0;
@@ -415,21 +416,20 @@ export class MigrationManager {
    */
   private async createBackup(
     config: PartialAppConfig,
-    version: string
+    version: string,
   ): Promise<void> {
     try {
       await fs.mkdir(this.options.backupDir, { recursive: true });
 
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const timestamp = new Date().toISOString().replace(/[.:]/g, '-');
       const backupPath = path.join(
         this.options.backupDir,
-        `config-backup-v${version}-${timestamp}.json`
+        `config-backup-v${version}-${timestamp}.json`,
       );
 
       await fs.writeFile(backupPath, JSON.stringify(config, null, 2), 'utf-8');
-    } catch (error) {
-      // Don't fail migration if backup fails, just log warning
-      console.warn('Failed to create migration backup:', error);
+    } catch {
+      // Don't fail migration if backup fails
     }
   }
 
@@ -466,7 +466,7 @@ export class MigrationManager {
  * @returns MigrationManager instance
  */
 export function createMigrationManager(
-  options: MigrationManagerOptions
+  options: MigrationManagerOptions,
 ): MigrationManager {
   return new MigrationManager(options);
 }

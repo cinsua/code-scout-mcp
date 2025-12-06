@@ -8,9 +8,11 @@
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
-import { ConfigurationSource } from './ConfigurationSource';
-import { PartialAppConfig } from '../types/ConfigTypes';
+
+import type { PartialAppConfig } from '../types/ConfigTypes';
 import { ConfigurationError } from '../errors/ConfigurationError';
+
+import { ConfigurationSource } from './ConfigurationSource';
 
 /**
  * Project configuration source loading from .code-scout/config.json
@@ -31,7 +33,7 @@ export class ProjectConfiguration extends ConfigurationSource {
 
   constructor(projectRoot?: string) {
     super();
-    this.projectRoot = projectRoot || this.findProjectRootSync();
+    this.projectRoot = projectRoot ?? this.findProjectRootSync();
     this.configPath = path.join(this.projectRoot, '.code-scout', 'config.json');
   }
 
@@ -39,16 +41,12 @@ export class ProjectConfiguration extends ConfigurationSource {
    * Load project configuration from .code-scout/config.json
    */
   async load(): Promise<PartialAppConfig> {
-    try {
-      await this.validateAvailability();
+    await this.validateAvailability();
 
-      const content = await fs.readFile(this.configPath, 'utf-8');
-      const config = this.safeJsonParse(content, 'project configuration file');
+    const content = await fs.readFile(this.configPath, 'utf-8');
+    const config = this.safeJsonParse(content, 'project configuration file');
 
-      return this.createPartialConfig(config);
-    } catch (error) {
-      this.handleLoadError(error);
-    }
+    return this.createPartialConfig(config);
   }
 
   /**
@@ -111,7 +109,7 @@ export class ProjectConfiguration extends ConfigurationSource {
       '.git',
     ];
 
-    return projectMarkers.some((marker) => {
+    return projectMarkers.some(marker => {
       const markerPath = path.join(dir, marker);
       try {
         fsSync.accessSync(markerPath, fsSync.constants.F_OK);
@@ -147,7 +145,7 @@ export class ProjectConfiguration extends ConfigurationSource {
       throw ConfigurationError.fileAccess(
         `Failed to create project config directory: ${error instanceof Error ? error.message : 'Unknown error'}`,
         configDir,
-        this.name
+        this.name,
       );
     }
   }
@@ -168,7 +166,7 @@ export class ProjectConfiguration extends ConfigurationSource {
       throw ConfigurationError.fileAccess(
         `Failed to save project configuration: ${error instanceof Error ? error.message : 'Unknown error'}`,
         this.configPath,
-        this.name
+        this.name,
       );
     }
   }
@@ -184,7 +182,7 @@ export class ProjectConfiguration extends ConfigurationSource {
         throw ConfigurationError.fileAccess(
           `Failed to remove project configuration: ${error instanceof Error ? error.message : 'Unknown error'}`,
           this.configPath,
-          this.name
+          this.name,
         );
       }
     }
@@ -224,7 +222,7 @@ export class ProjectConfiguration extends ConfigurationSource {
       }
 
       // For project config, we allow group read but not world read
-      const mode = parseInt(stats.permissions || '0', 8);
+      const mode = parseInt(stats.permissions ?? '0', 8);
       const hasWorldRead = (mode & 0o004) !== 0;
 
       return !hasWorldRead;
@@ -243,7 +241,7 @@ export class ProjectConfiguration extends ConfigurationSource {
       throw ConfigurationError.fileAccess(
         `Failed to fix permissions on project configuration: ${error instanceof Error ? error.message : 'Unknown error'}`,
         this.configPath,
-        this.name
+        this.name,
       );
     }
   }
@@ -252,9 +250,9 @@ export class ProjectConfiguration extends ConfigurationSource {
    * Backup project configuration
    */
   async backupConfig(backupPath?: string): Promise<string> {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const timestamp = new Date().toISOString().replace(/[.:]/g, '-');
     const defaultBackupPath = `${this.configPath}.backup.${timestamp}`;
-    const finalBackupPath = backupPath || defaultBackupPath;
+    const finalBackupPath = backupPath ?? defaultBackupPath;
 
     try {
       const content = await fs.readFile(this.configPath, 'utf-8');
@@ -265,7 +263,7 @@ export class ProjectConfiguration extends ConfigurationSource {
       throw ConfigurationError.fileAccess(
         `Failed to backup project configuration: ${error instanceof Error ? error.message : 'Unknown error'}`,
         this.configPath,
-        this.name
+        this.name,
       );
     }
   }
@@ -281,7 +279,7 @@ export class ProjectConfiguration extends ConfigurationSource {
       throw ConfigurationError.fileAccess(
         `Failed to restore from backup: ${error instanceof Error ? error.message : 'Unknown error'}`,
         backupPath,
-        this.name
+        this.name,
       );
     }
   }
@@ -294,12 +292,12 @@ export class ProjectConfiguration extends ConfigurationSource {
       const configDir = path.dirname(this.configPath);
       const files = await fs.readdir(configDir);
       const backupPattern = new RegExp(
-        `${path.basename(this.configPath)}\\.backup\\..+`
+        `${path.basename(this.configPath)}\\.backup\\..+`,
       );
 
       return files
-        .filter((file) => backupPattern.test(file))
-        .map((file) => path.join(configDir, file))
+        .filter(file => backupPattern.test(file))
+        .map(file => path.join(configDir, file))
         .sort(); // Sort by filename (which includes timestamp)
     } catch {
       return [];
@@ -316,7 +314,7 @@ export class ProjectConfiguration extends ConfigurationSource {
       if (files.includes('package.json')) {
         const packageJson = await fs.readFile(
           path.join(this.projectRoot, 'package.json'),
-          'utf-8'
+          'utf-8',
         );
         const pkg = JSON.parse(packageJson);
         return pkg.type === 'module' ? 'esm-node' : 'cjs-node';

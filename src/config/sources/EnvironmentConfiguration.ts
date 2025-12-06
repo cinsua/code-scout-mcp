@@ -5,12 +5,13 @@
  * variables with CODE_SCOUT prefix.
  */
 
-import { ConfigurationSource } from './ConfigurationSource';
-import {
+import type {
   PartialAppConfig,
   EnvironmentVariableMapping,
 } from '../types/ConfigTypes';
 import { ConfigurationError } from '../errors/ConfigurationError';
+
+import { ConfigurationSource } from './ConfigurationSource';
 
 /**
  * Environment variable mappings for configuration
@@ -301,29 +302,26 @@ export class EnvironmentConfiguration extends ConfigurationSource {
    * Load configuration from environment variables
    */
   async load(): Promise<PartialAppConfig> {
-    try {
-      await this.validateAvailability();
+    await this.validateAvailability();
 
-      const config: PartialAppConfig = {};
+    const config: PartialAppConfig = {};
 
-      for (const mapping of ENV_MAPPINGS) {
-        const envValue = process.env[mapping.envVar];
+    for (const mapping of ENV_MAPPINGS) {
+      const envValue = process.env[mapping.envVar];
 
-        if (envValue !== undefined) {
-          const convertedValue = this.convertValue(envValue, mapping);
-          this.setNestedValue(config, mapping.configPath, convertedValue);
-        }
+      if (envValue !== undefined) {
+        const convertedValue = this.convertValue(envValue, mapping);
+        this.setNestedValue(config, mapping.configPath, convertedValue);
       }
-
-      return this.createPartialConfig(config);
-    } catch (error) {
-      this.handleLoadError(error);
     }
+
+    return this.createPartialConfig(config);
   }
 
   /**
    * Environment configuration is always available
    */
+  // eslint-disable-next-line require-await
   async isAvailable(): Promise<boolean> {
     return true;
   }
@@ -333,7 +331,7 @@ export class EnvironmentConfiguration extends ConfigurationSource {
    */
   private convertValue(
     value: string,
-    mapping: EnvironmentVariableMapping
+    mapping: EnvironmentVariableMapping,
   ): unknown {
     try {
       switch (mapping.type) {
@@ -354,7 +352,7 @@ export class EnvironmentConfiguration extends ConfigurationSource {
       throw ConfigurationError.validation(
         `Invalid value for ${mapping.envVar}: ${error instanceof Error ? error.message : 'Unknown error'}`,
         mapping.configPath,
-        [`Check ${mapping.envVar} environment variable format`]
+        [`Check ${mapping.envVar} environment variable format`],
       );
     }
   }
@@ -405,12 +403,12 @@ export class EnvironmentConfiguration extends ConfigurationSource {
   /**
    * Parse JSON value from string
    */
-  private parseJson(value: string, envVar: string): unknown {
+  private parseJson(value: string, _envVar: string): unknown {
     try {
       return JSON.parse(value);
     } catch (error) {
       throw new Error(
-        `Invalid JSON: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Invalid JSON: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }
@@ -443,13 +441,14 @@ export class EnvironmentConfiguration extends ConfigurationSource {
    */
   getActiveEnvironmentVariables(): string[] {
     return ENV_MAPPINGS.filter(
-      (mapping) => process.env[mapping.envVar] !== undefined
-    ).map((mapping) => mapping.envVar);
+      mapping => process.env[mapping.envVar] !== undefined,
+    ).map(mapping => mapping.envVar);
   }
 
   /**
    * Validate environment variable values
    */
+  // eslint-disable-next-line require-await
   async validateEnvironment(): Promise<{
     valid: boolean;
     errors: string[];
@@ -466,7 +465,7 @@ export class EnvironmentConfiguration extends ConfigurationSource {
           this.convertValue(envValue, mapping);
         } catch (error) {
           errors.push(
-            `${mapping.envVar}: ${error instanceof Error ? error.message : 'Unknown error'}`
+            `${mapping.envVar}: ${error instanceof Error ? error.message : 'Unknown error'}`,
           );
         }
       }
@@ -481,7 +480,7 @@ export class EnvironmentConfiguration extends ConfigurationSource {
     for (const deprecatedVar of deprecatedVars) {
       if (process.env[deprecatedVar]) {
         warnings.push(
-          `${deprecatedVar} is deprecated and will be removed in a future version`
+          `${deprecatedVar} is deprecated and will be removed in a future version`,
         );
       }
     }
@@ -533,7 +532,7 @@ export class EnvironmentConfiguration extends ConfigurationSource {
       CODE_SCOUT_WATCH_ENABLED: 'Enable file watching',
     };
 
-    return descriptions[envVar] || `Configuration option for ${envVar}`;
+    return descriptions[envVar] ?? `Configuration option for ${envVar}`;
   }
 
   /**

@@ -19,7 +19,7 @@ export class ConfigurationError extends Error {
       source?: string;
       suggestions?: string[];
       cause?: Error;
-    }
+    },
   ) {
     super(message);
     this.name = 'ConfigurationError';
@@ -29,13 +29,11 @@ export class ConfigurationError extends Error {
     this.suggestions = options?.suggestions;
 
     // Maintain stack trace for proper error handling
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, ConfigurationError);
-    }
+    Error.captureStackTrace(this, ConfigurationError);
 
     // Set cause if provided (using non-standard property)
     if (options?.cause) {
-      (this as any).cause = options.cause;
+      (this as Error & { cause: unknown }).cause = options.cause;
     }
   }
 
@@ -45,12 +43,12 @@ export class ConfigurationError extends Error {
   static validation(
     message: string,
     path: string,
-    suggestions?: string[]
+    suggestions?: string[],
   ): ConfigurationError {
     return new ConfigurationError(
       `Validation failed: ${message}`,
       'VALIDATION_ERROR',
-      { path, suggestions }
+      { path, suggestions },
     );
   }
 
@@ -60,7 +58,7 @@ export class ConfigurationError extends Error {
   static fileAccess(
     message: string,
     path: string,
-    source?: string
+    source?: string,
   ): ConfigurationError {
     return new ConfigurationError(
       `File access error: ${message}`,
@@ -69,7 +67,7 @@ export class ConfigurationError extends Error {
         path,
         source,
         suggestions: ['Check file permissions', 'Verify file exists'],
-      }
+      },
     );
   }
 
@@ -79,7 +77,7 @@ export class ConfigurationError extends Error {
   static parsing(
     message: string,
     source?: string,
-    cause?: Error
+    cause?: Error,
   ): ConfigurationError {
     return new ConfigurationError(
       `Configuration parsing error: ${message}`,
@@ -88,7 +86,7 @@ export class ConfigurationError extends Error {
         source,
         cause,
         suggestions: ['Check JSON syntax', 'Validate configuration format'],
-      }
+      },
     );
   }
 
@@ -98,12 +96,12 @@ export class ConfigurationError extends Error {
   static source(
     message: string,
     source: string,
-    cause?: Error
+    cause?: Error,
   ): ConfigurationError {
     return new ConfigurationError(
       `Configuration source error: ${message}`,
       'SOURCE_ERROR',
-      { source, cause }
+      { source, cause },
     );
   }
 
@@ -114,7 +112,7 @@ export class ConfigurationError extends Error {
     message: string,
     fromVersion: string,
     toVersion: string,
-    cause?: Error
+    cause?: Error,
   ): ConfigurationError {
     return new ConfigurationError(
       `Configuration migration error: ${message}`,
@@ -126,7 +124,7 @@ export class ConfigurationError extends Error {
           'Verify configuration format',
           `Ensure migration from ${fromVersion} to ${toVersion} is supported`,
         ],
-      }
+      },
     );
   }
 
@@ -136,19 +134,19 @@ export class ConfigurationError extends Error {
   static schema(
     message: string,
     path?: string,
-    suggestions?: string[]
+    suggestions?: string[],
   ): ConfigurationError {
     return new ConfigurationError(
       `Schema validation failed: ${message}`,
       'SCHEMA_VALIDATION_ERROR',
       {
         path,
-        suggestions: suggestions || [
+        suggestions: suggestions ?? [
           'Check configuration against schema',
           'Verify required fields are present',
           'Ensure field types are correct',
         ],
-      }
+      },
     );
   }
 
@@ -158,19 +156,19 @@ export class ConfigurationError extends Error {
   static semantic(
     message: string,
     path?: string,
-    suggestions?: string[]
+    suggestions?: string[],
   ): ConfigurationError {
     return new ConfigurationError(
       `Semantic validation failed: ${message}`,
       'SEMANTIC_VALIDATION_ERROR',
       {
         path,
-        suggestions: suggestions || [
+        suggestions: suggestions ?? [
           'Check configuration logic',
           'Verify dependencies between settings',
           'Ensure configuration is consistent',
         ],
-      }
+      },
     );
   }
 
@@ -180,7 +178,7 @@ export class ConfigurationError extends Error {
   static hotReload(
     message: string,
     source?: string,
-    cause?: Error
+    cause?: Error,
   ): ConfigurationError {
     return new ConfigurationError(
       `Hot reload error: ${message}`,
@@ -193,7 +191,7 @@ export class ConfigurationError extends Error {
           'Verify file format',
           'Ensure configuration is valid',
         ],
-      }
+      },
     );
   }
 
@@ -228,7 +226,7 @@ export class ConfigurationError extends Error {
 
     if (this.suggestions && this.suggestions.length > 0) {
       result += '\n  Suggestions:';
-      this.suggestions.forEach((suggestion) => {
+      this.suggestions.forEach(suggestion => {
         result += `\n    - ${suggestion}`;
       });
     }
@@ -322,14 +320,14 @@ export class BatchValidationError extends ConfigurationError {
    * Get errors by path
    */
   getErrorsByPath(path: string): ValidationErrorDetail[] {
-    return this.errors.filter((error) => error.path === path);
+    return this.errors.filter(error => error.path === path);
   }
 
   /**
    * Get errors by code
    */
   getErrorsByCode(code: string): ValidationErrorDetail[] {
-    return this.errors.filter((error) => error.code === code);
+    return this.errors.filter(error => error.code === code);
   }
 
   /**

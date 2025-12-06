@@ -7,7 +7,8 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { Stats } from 'fs';
+import type { Stats } from 'fs';
+
 import { ConfigurationError } from '../errors/ConfigurationError';
 
 /**
@@ -89,7 +90,7 @@ export interface FileResolutionResult {
  */
 export async function resolveFile(
   filePath: string,
-  options: FileResolutionOptions = {}
+  options: FileResolutionOptions = {},
 ): Promise<FileResolutionResult> {
   const {
     expandEnvVars = true,
@@ -124,7 +125,7 @@ export async function resolveFile(
         resolvedPath = await fs.realpath(resolvedPath);
       } catch (error) {
         warnings.push(
-          `Failed to resolve symlinks: ${error instanceof Error ? error.message : String(error)}`
+          `Failed to resolve symlinks: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     }
@@ -171,7 +172,7 @@ export async function resolveFile(
   } catch (error) {
     throw new ConfigurationError(
       `Failed to resolve file path '${filePath}': ${error instanceof Error ? error.message : String(error)}`,
-      'FILE_RESOLUTION_ERROR'
+      'FILE_RESOLUTION_ERROR',
     );
   }
 }
@@ -184,20 +185,20 @@ export async function resolveFile(
  */
 export function expandEnvironmentVariables(inputPath: string): string {
   return inputPath.replace(
-    /\$([A-Z_][A-Z0-9_]*)|\${([A-Z_][A-Z0-9_]*)}/g,
+    /\$([A-Z_][\dA-Z_]*)|\${([A-Z_][\dA-Z_]*)}/g,
     (match, p1, p2) => {
-      const varName = p1 || p2;
+      const varName = p1 ?? p2;
       const value = process.env[varName];
 
       if (value === undefined) {
         throw new ConfigurationError(
           `Environment variable '${varName}' is not set`,
-          'ENV_VAR_NOT_SET'
+          'ENV_VAR_NOT_SET',
         );
       }
 
       return value;
-    }
+    },
   );
 }
 
@@ -210,7 +211,7 @@ export function expandEnvironmentVariables(inputPath: string): string {
  */
 export function normalizePath(
   filePath: string,
-  baseDir: string = process.cwd()
+  baseDir: string = process.cwd(),
 ): string {
   // Convert to absolute if relative
   let normalized = path.isAbsolute(filePath)
@@ -232,7 +233,7 @@ export function normalizePath(
  */
 export function isPathSafe(
   filePath: string,
-  baseDir: string = process.cwd()
+  baseDir: string = process.cwd(),
 ): boolean {
   const resolvedBase = path.resolve(baseDir);
   const resolvedPath = path.resolve(baseDir, filePath);
@@ -249,7 +250,7 @@ export function isPathSafe(
  */
 export async function findConfigFileWithFallback(
   possiblePaths: string[],
-  options: FileResolutionOptions = {}
+  options: FileResolutionOptions = {},
 ): Promise<FileResolutionResult | null> {
   const errors: string[] = [];
 
@@ -264,7 +265,7 @@ export async function findConfigFileWithFallback(
       }
     } catch (error) {
       errors.push(
-        `Failed to resolve config file '${configPath}': ${error instanceof Error ? error.message : String(error)}`
+        `Failed to resolve config file '${configPath}': ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -273,7 +274,7 @@ export async function findConfigFileWithFallback(
   if (errors.length > 0) {
     throw new ConfigurationError(
       `No valid configuration file found. Errors:\n${errors.join('\n')}`,
-      'NO_CONFIG_FILE_FOUND'
+      'NO_CONFIG_FILE_FOUND',
     );
   }
 
@@ -289,7 +290,7 @@ export async function findConfigFileWithFallback(
  */
 export async function validateFilePermissions(
   filePath: string,
-  requireWritable: boolean = false
+  requireWritable: boolean = false,
 ): Promise<boolean> {
   try {
     // Check if file exists
@@ -318,13 +319,13 @@ export async function validateFilePermissions(
  */
 export function createTempPath(
   prefix: string = 'code-scout',
-  suffix: string = '.tmp'
+  suffix: string = '.tmp',
 ): string {
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2);
   return path.join(
-    process.env.TMPDIR || process.env.TEMP || '/tmp',
-    `${prefix}-${timestamp}-${random}${suffix}`
+    process.env.TMPDIR ?? process.env.TEMP ?? '/tmp',
+    `${prefix}-${timestamp}-${random}${suffix}`,
   );
 }
 
@@ -337,7 +338,7 @@ export function createTempPath(
  */
 export async function resolveFirstExisting(
   paths: string[],
-  options: FileResolutionOptions = {}
+  options: FileResolutionOptions = {},
 ): Promise<FileResolutionResult | null> {
   for (const filePath of paths) {
     try {
@@ -385,7 +386,7 @@ export function isValidConfigFile(filePath: string): boolean {
  */
 export function resolveAbsolutePath(
   filePath: string,
-  contexts: string[] = [process.cwd()]
+  contexts: string[] = [process.cwd()],
 ): string {
   if (path.isAbsolute(filePath)) {
     return filePath;

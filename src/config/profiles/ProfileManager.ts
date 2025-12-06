@@ -7,8 +7,9 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
+
 import { ConfigurationError } from '../errors/ConfigurationError';
-import { PartialAppConfig, ProfileType } from '../types/ConfigTypes';
+import type { PartialAppConfig, ProfileType } from '../types/ConfigTypes';
 import { SchemaValidator } from '../validators/SchemaValidator';
 import { SemanticValidator } from '../validators/SemanticValidator';
 
@@ -72,7 +73,7 @@ export class ProfileManager {
   private profileCache: Map<ProfileType, PartialAppConfig> = new Map();
 
   constructor(profilesDir?: string) {
-    this.profilesDir = profilesDir || path.join(__dirname, 'profiles');
+    this.profilesDir = profilesDir ?? path.join(__dirname, 'profiles');
     this.schemaValidator = new SchemaValidator();
     this.semanticValidator = new SemanticValidator();
   }
@@ -102,18 +103,18 @@ export class ProfileManager {
               description: this.getProfileDescription(profileName),
               filePath,
               builtIn: true,
-              version: config.version || '1.0.0',
+              version: config.version ?? '1.0.0',
             });
-          } catch (error) {
+          } catch {
             // Skip invalid profile files
-            console.warn(`Invalid profile file: ${file}`, error);
+            // Error is intentionally ignored to allow loading other valid profiles
           }
         }
       }
     } catch (error) {
       throw new ConfigurationError(
         `Failed to read profiles directory: ${error instanceof Error ? error.message : String(error)}`,
-        'PROFILE_DIR_ERROR'
+        'PROFILE_DIR_ERROR',
       );
     }
 
@@ -129,7 +130,7 @@ export class ProfileManager {
    */
   async loadProfile(
     profileName: ProfileType,
-    options: ProfileLoadOptions = {}
+    options: ProfileLoadOptions = {},
   ): Promise<PartialAppConfig> {
     const {
       validate = true,
@@ -161,15 +162,15 @@ export class ProfileManager {
         if (!schemaResult.valid || !semanticResult.valid) {
           const errors = [...schemaResult.errors, ...semanticResult.errors];
           throw new ConfigurationError(
-            `Profile '${profileName}' is invalid: ${errors.map((e) => e.message).join(', ')}`,
-            'INVALID_PROFILE'
+            `Profile '${profileName}' is invalid: ${errors.map(e => e.message).join(', ')}`,
+            'INVALID_PROFILE',
           );
         }
       }
 
       // Merge with defaults if requested
       if (mergeWithDefaults) {
-        const defaultConfig = await this.loadDefaultProfile();
+        const defaultConfig = this.loadDefaultProfile();
         config = this.mergeConfigurations(defaultConfig, config);
       }
 
@@ -184,7 +185,7 @@ export class ProfileManager {
 
       throw new ConfigurationError(
         `Failed to load profile '${profileName}': ${error instanceof Error ? error.message : String(error)}`,
-        'PROFILE_LOAD_ERROR'
+        'PROFILE_LOAD_ERROR',
       );
     }
   }
@@ -196,13 +197,13 @@ export class ProfileManager {
    * @param config - Existing configuration
    * @returns Promise<ProfileType | null>
    */
-  async detectProfile(
+  detectProfile(
     env: Record<string, string | undefined> = process.env,
-    config?: PartialAppConfig
-  ): Promise<ProfileType | null> {
+    config?: PartialAppConfig,
+  ): ProfileType | null {
     // Check environment variable first
     const envProfile = env.CODE_SCOUT_PROFILE as ProfileType;
-    if (envProfile && this.isValidProfile(envProfile)) {
+    if (this.isValidProfile(envProfile)) {
       return envProfile;
     }
 
@@ -226,9 +227,9 @@ export class ProfileManager {
   async saveProfile(
     profileName: ProfileType,
     config: PartialAppConfig,
-    customDir?: string
+    customDir?: string,
   ): Promise<ProfileInfo> {
-    const targetDir = customDir || this.profilesDir;
+    const targetDir = customDir ?? this.profilesDir;
     const profilePath = path.join(targetDir, `${profileName}.json`);
 
     try {
@@ -239,8 +240,8 @@ export class ProfileManager {
       if (!schemaResult.valid || !semanticResult.valid) {
         const errors = [...schemaResult.errors, ...semanticResult.errors];
         throw new ConfigurationError(
-          `Cannot save invalid profile: ${errors.map((e) => e.message).join(', ')}`,
-          'INVALID_PROFILE_CONFIG'
+          `Cannot save invalid profile: ${errors.map(e => e.message).join(', ')}`,
+          'INVALID_PROFILE_CONFIG',
         );
       }
 
@@ -251,14 +252,14 @@ export class ProfileManager {
       const profileConfig = {
         ...config,
         profile: profileName,
-        version: config.version || '1.0.0',
+        version: config.version ?? '1.0.0',
       };
 
       // Write profile file
       await fs.writeFile(
         profilePath,
         JSON.stringify(profileConfig, null, 2),
-        'utf-8'
+        'utf-8',
       );
 
       // Clear cache
@@ -278,7 +279,7 @@ export class ProfileManager {
 
       throw new ConfigurationError(
         `Failed to save profile '${profileName}': ${error instanceof Error ? error.message : String(error)}`,
-        'PROFILE_SAVE_ERROR'
+        'PROFILE_SAVE_ERROR',
       );
     }
   }
@@ -292,9 +293,9 @@ export class ProfileManager {
    */
   async deleteProfile(
     profileName: ProfileType,
-    customDir?: string
+    customDir?: string,
   ): Promise<void> {
-    const targetDir = customDir || this.profilesDir;
+    const targetDir = customDir ?? this.profilesDir;
     const profilePath = path.join(targetDir, `${profileName}.json`);
 
     try {
@@ -303,7 +304,7 @@ export class ProfileManager {
     } catch (error) {
       throw new ConfigurationError(
         `Failed to delete profile '${profileName}': ${error instanceof Error ? error.message : String(error)}`,
-        'PROFILE_DELETE_ERROR'
+        'PROFILE_DELETE_ERROR',
       );
     }
   }
@@ -329,7 +330,7 @@ export class ProfileManager {
       cicd: 'CI/CD profile optimized for automated testing and builds',
     };
 
-    return descriptions[profileName] || 'Custom profile';
+    return descriptions[profileName];
   }
 
   /**
@@ -337,7 +338,7 @@ export class ProfileManager {
    *
    * @returns Promise<PartialAppConfig>
    */
-  private async loadDefaultProfile(): Promise<PartialAppConfig> {
+  private loadDefaultProfile(): PartialAppConfig {
     return {
       version: '1.0.0',
       indexing: {
@@ -442,9 +443,9 @@ export class ProfileManager {
    * @param env - Environment variables
    * @returns Detected profile or null
    */
-  private async autoDetectProfile(
-    env: Record<string, string | undefined>
-  ): Promise<ProfileType | null> {
+  private autoDetectProfile(
+    env: Record<string, string | undefined>,
+  ): ProfileType | null {
     // Check for CI environment
     if (
       env.CI ||
@@ -492,7 +493,7 @@ export class ProfileManager {
    */
   private mergeConfigurations(
     base: PartialAppConfig,
-    override: PartialAppConfig
+    override: PartialAppConfig,
   ): PartialAppConfig {
     const mergeDeep = (target: any, source: any): any => {
       const result = { ...target };
@@ -503,7 +504,7 @@ export class ProfileManager {
           typeof source[key] === 'object' &&
           !Array.isArray(source[key])
         ) {
-          result[key] = mergeDeep(result[key] || {}, source[key]);
+          result[key] = mergeDeep(result[key] ?? {}, source[key]);
         } else {
           result[key] = source[key];
         }

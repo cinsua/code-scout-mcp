@@ -8,41 +8,38 @@
 import { ConfigurationManager } from './services/ConfigurationManager';
 import { Configuration } from './models/Configuration';
 import {
-  ConfigurationError,
   BatchValidationError,
+  ConfigurationError,
   ConfigurationErrorCode,
 } from './errors/ConfigurationError';
 import type {
   AppConfig,
-  PartialAppConfig,
-  ConfigurationSource,
-  ValidationResult,
   ConfigurationChangeEvent,
-  ProfileType,
-  IndexingConfig,
-  SearchConfig,
+  ConfigurationMigration,
+  ConfigurationSource,
   DatabaseConfig,
-  WatchingConfig,
-  LanguagesConfig,
+  EnvironmentVariableMapping,
+  IndexingConfig,
   LanguageConfig,
+  LanguagesConfig,
   LoggingConfig,
+  PartialAppConfig,
+  ProfileType,
+  SearchConfig,
   SecurityConfig,
   ValidationError,
-  ConfigurationMigration,
-  EnvironmentVariableMapping,
+  ValidationResult,
+  WatchingConfig,
 } from './types/ConfigTypes';
-
-// Export all configuration sources
 import { DefaultConfiguration } from './sources/DefaultConfiguration';
 import { GlobalConfiguration } from './sources/GlobalConfiguration';
 import { ProjectConfiguration } from './sources/ProjectConfiguration';
 import { EnvironmentConfiguration } from './sources/EnvironmentConfiguration';
 import { CommandLineConfiguration } from './sources/CommandLineConfiguration';
-
 // Export configuration models
 import {
-  ConfigurationSnapshot,
   ConfigurationHistory,
+  ConfigurationSnapshot,
 } from './models/Configuration';
 
 /**
@@ -54,18 +51,16 @@ let globalConfigManager: ConfigurationManager | null = null;
  * Get or create the global configuration manager
  */
 export function getConfigurationManager(): ConfigurationManager {
-  if (!globalConfigManager) {
-    globalConfigManager = new ConfigurationManager();
-  }
+  globalConfigManager ??= new ConfigurationManager();
   return globalConfigManager;
 }
 
 /**
  * Load configuration from all sources
  */
-export async function loadConfiguration(): Promise<AppConfig> {
+export function loadConfiguration(): Promise<AppConfig> {
   const manager = getConfigurationManager();
-  return await manager.loadConfiguration();
+  return manager.loadConfiguration();
 }
 
 /**
@@ -103,21 +98,21 @@ export function getSection<T = unknown>(section: string): T {
 /**
  * Update configuration value
  */
-export async function update(
+export function update(
   path: string,
   value: unknown,
-  source?: string
+  source?: string,
 ): Promise<void> {
   const manager = getConfigurationManager();
-  return await manager.updateConfiguration(path, value, source);
+  return manager.updateConfiguration(path, value, source);
 }
 
 /**
  * Reset configuration to defaults
  */
-export async function reset(): Promise<void> {
+export function reset(): Promise<void> {
   const manager = getConfigurationManager();
-  return await manager.resetConfiguration();
+  return manager.resetConfiguration();
 }
 
 /**
@@ -131,12 +126,9 @@ export function exportConfig(pretty?: boolean): string {
 /**
  * Import configuration
  */
-export async function importConfig(
-  json: string,
-  source?: string
-): Promise<void> {
+export function importConfig(json: string, source?: string): Promise<void> {
   const manager = getConfigurationManager();
-  return await manager.importConfiguration(json, source);
+  return manager.importConfiguration(json, source);
 }
 
 /**

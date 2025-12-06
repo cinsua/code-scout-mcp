@@ -21,10 +21,14 @@
     "test:watch": "jest --watch",
     "pretest": "npm run lint && npm run typecheck",
     "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint --fix src/**/*.ts",
+    "test-lint": "eslint --fix",
     "format": "prettier --write src/**/*.ts",
+    "format:check": "prettier --check src/**/*.ts",
     "typecheck": "tsc --noEmit",
     "typecheck:watch": "tsc --noEmit --watch",
     "clean": "rimraf dist",
+    "prepare": "husky install",
     "prebuild": "npm run typecheck",
     "postbuild": "node -e \"console.log('✅ Build process completed')\"",
     "size": "npm run build && du -sh dist/*"
@@ -61,7 +65,12 @@
     "@typescript-eslint/parser": "^8.30.1",
     "esbuild": "^0.27.0",
     "eslint": "^9.39.1",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-security": "^3.0.1",
+    "eslint-plugin-unicorn": "^62.0.0",
+    "husky": "^9.1.7",
     "jest": "^30.2.0",
+    "lint-staged": "^16.2.7",
     "mock-fs": "^5.5.0",
     "nock": "^14.0.10",
     "nodemon": "^3.1.11",
@@ -72,5 +81,11 @@
     "ts-jest": "^29.4.6",
     "tsx": "^4.21.0",
     "typescript": "^5.0.0"
+  },
+  "lint-staged": {
+    "*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ]
   }
 }

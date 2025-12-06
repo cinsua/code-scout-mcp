@@ -5,8 +5,9 @@
  * for the Code-Scout MCP server.
  */
 
+import type { PartialAppConfig } from '../types/ConfigTypes';
+
 import { ConfigurationSource } from './ConfigurationSource';
-import { PartialAppConfig } from '../types/ConfigTypes';
 
 /**
  * Default configuration source with built-in values
@@ -139,13 +140,16 @@ export class DefaultConfiguration extends ConfigurationSource {
    * Load default configuration
    */
   async load(): Promise<PartialAppConfig> {
-    return this.createPartialConfig(this.defaults);
+    const result = this.createPartialConfig(this.defaults);
+    await Promise.resolve();
+    return result;
   }
 
   /**
    * Default configuration is always available
    */
   async isAvailable(): Promise<boolean> {
+    await Promise.resolve();
     return true;
   }
 
@@ -207,11 +211,11 @@ export class DefaultConfiguration extends ConfigurationSource {
     if (weights) {
       const total = Object.values(weights).reduce(
         (sum, weight) => sum + weight,
-        0
+        0,
       );
       if (total <= 0 || total > 20) {
         throw new Error(
-          'Scoring weights must sum to a positive value less than 20'
+          'Scoring weights must sum to a positive value less than 20',
         );
       }
     }
@@ -279,7 +283,7 @@ export class DefaultConfiguration extends ConfigurationSource {
           },
           indexing: {
             ...baseDefaults.indexing!,
-            maxWorkers: Math.min(baseDefaults.indexing?.maxWorkers || 4, 2),
+            maxWorkers: Math.min(baseDefaults.indexing?.maxWorkers ?? 4, 2),
           },
         };
 

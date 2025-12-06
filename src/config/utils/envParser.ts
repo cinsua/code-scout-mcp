@@ -6,7 +6,7 @@
  */
 
 import { ConfigurationError } from '../errors/ConfigurationError';
-import {
+import type {
   PartialAppConfig,
   EnvironmentVariableMapping,
 } from '../types/ConfigTypes';
@@ -358,7 +358,7 @@ export const ENV_MAPPINGS: EnvironmentVariableMapping[] = [
  */
 export function parseEnvironmentVariables(
   env: Record<string, string | undefined> = process.env,
-  mappings: EnvironmentVariableMapping[] = ENV_MAPPINGS
+  mappings: EnvironmentVariableMapping[] = ENV_MAPPINGS,
 ): EnvParseResult {
   const config: PartialAppConfig = {};
   const processedVars: string[] = [];
@@ -368,10 +368,10 @@ export function parseEnvironmentVariables(
   for (const mapping of mappings) {
     const envValue = env[mapping.envVar];
 
-    if (envValue === undefined || envValue === null) {
+    if (envValue === undefined) {
       if (mapping.required) {
         errors.push(
-          `Required environment variable '${mapping.envVar}' is not set`
+          `Required environment variable '${mapping.envVar}' is not set`,
         );
       }
       continue;
@@ -390,7 +390,7 @@ export function parseEnvironmentVariables(
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       errors.push(
-        `Failed to convert '${mapping.envVar}' to ${mapping.type}: ${errorMessage}`
+        `Failed to convert '${mapping.envVar}' to ${mapping.type}: ${errorMessage}`,
       );
     }
   }
@@ -412,7 +412,7 @@ export function parseEnvironmentVariables(
  */
 export function parseEnvironmentVariablesAuto(
   env: Record<string, string | undefined> = process.env,
-  prefix: string = ENV_PREFIX
+  prefix: string = ENV_PREFIX,
 ): EnvParseResult {
   const config: PartialAppConfig = {};
   const processedVars: string[] = [];
@@ -420,11 +420,11 @@ export function parseEnvironmentVariablesAuto(
   const errors: string[] = [];
 
   for (const [envVar, envValue] of Object.entries(env)) {
-    if (!envVar || !envVar.startsWith(prefix + ENV_SEPARATOR)) {
+    if (!envVar.startsWith(prefix + ENV_SEPARATOR)) {
       continue;
     }
 
-    if (envValue === undefined || envValue === null) {
+    if (envValue === undefined) {
       continue;
     }
 
@@ -464,7 +464,7 @@ export function parseEnvironmentVariablesAuto(
 export function convertType(
   value: string,
   type: 'string' | 'number' | 'boolean' | 'json',
-  options: TypeConversionOptions = {}
+  options: TypeConversionOptions = {},
 ): unknown {
   const { strict = true, trimStrings = true } = options;
 
@@ -477,17 +477,18 @@ export function convertType(
     case 'string':
       return processedValue;
 
-    case 'number':
+    case 'number': {
       const numValue = Number(processedValue);
       if (strict && isNaN(numValue)) {
         throw new ConfigurationError(
           `Cannot convert '${value}' to number`,
-          'TYPE_CONVERSION_ERROR'
+          'TYPE_CONVERSION_ERROR',
         );
       }
       return numValue;
+    }
 
-    case 'boolean':
+    case 'boolean': {
       const lowerValue = processedValue.toLowerCase();
       if (['true', '1', 'yes', 'on', 'enabled'].includes(lowerValue)) {
         return true;
@@ -496,10 +497,11 @@ export function convertType(
       } else if (strict) {
         throw new ConfigurationError(
           `Cannot convert '${value}' to boolean`,
-          'TYPE_CONVERSION_ERROR'
+          'TYPE_CONVERSION_ERROR',
         );
       }
       return Boolean(processedValue);
+    }
 
     case 'json':
       try {
@@ -507,14 +509,14 @@ export function convertType(
       } catch (error) {
         throw new ConfigurationError(
           `Invalid JSON in '${value}': ${error instanceof Error ? error.message : String(error)}`,
-          'JSON_PARSE_ERROR'
+          'JSON_PARSE_ERROR',
         );
       }
 
     default:
       throw new ConfigurationError(
         `Unsupported type: ${type}`,
-        'UNSUPPORTED_TYPE'
+        'UNSUPPORTED_TYPE',
       );
   }
 }
@@ -565,7 +567,7 @@ export function inferAndConvertType(value: string): unknown {
  */
 export function envVarToConfigPath(
   envVar: string,
-  prefix: string = ENV_PREFIX
+  prefix: string = ENV_PREFIX,
 ): string {
   // Remove prefix
   const withoutPrefix = envVar.substring(prefix.length + 1); // +1 for separator
@@ -586,7 +588,7 @@ export function envVarToConfigPath(
 export function setNestedProperty(
   obj: any,
   path: string,
-  value: unknown
+  value: unknown,
 ): void {
   const keys = path.split('.');
   let current = obj;
@@ -718,10 +720,10 @@ export function validateEnvironmentValues(config: PartialAppConfig): string[] {
  * @returns Array of environment variable names
  */
 export function getCodeScoutEnvironmentVariables(
-  env: Record<string, string | undefined> = process.env
+  env: Record<string, string | undefined> = process.env,
 ): string[] {
-  return Object.keys(env).filter((key) =>
-    key.startsWith(ENV_PREFIX + ENV_SEPARATOR)
+  return Object.keys(env).filter(key =>
+    key.startsWith(ENV_PREFIX + ENV_SEPARATOR),
   );
 }
 
@@ -732,7 +734,7 @@ export function getCodeScoutEnvironmentVariables(
  * @returns boolean
  */
 export function hasCodeScoutEnvironmentVariables(
-  env: Record<string, string | undefined> = process.env
+  env: Record<string, string | undefined> = process.env,
 ): boolean {
   return getCodeScoutEnvironmentVariables(env).length > 0;
 }
