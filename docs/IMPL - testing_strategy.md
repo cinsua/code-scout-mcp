@@ -3,6 +3,7 @@
 ## Testing Philosophy
 
 ### Quality Assurance Principles
+
 - **Test-Driven Development**: Write tests before implementation where possible
 - **Comprehensive Coverage**: Unit, integration, and end-to-end testing
 - **Continuous Integration**: Automated testing on every change
@@ -10,6 +11,7 @@
 - **Reliability Focus**: Ensure system stability and error handling
 
 ### Testing Pyramid
+
 ```
 End-to-End Tests (10%)
     ↕
@@ -21,13 +23,14 @@ Unit Tests (70%)
 ## Test Infrastructure
 
 ### Testing Dependencies
+
 ```json
 {
   "devDependencies": {
-    "@types/jest": "^29.5.11",
-    "@types/node": "^20.10.0",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.1.1",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^18.0.0",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.6",
     "supertest": "^6.3.3",
     "testcontainers": "^10.2.1",
     "mock-fs": "^5.2.0",
@@ -37,20 +40,18 @@ Unit Tests (70%)
 ```
 
 ### Jest Configuration
+
 ```javascript
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   roots: ['<rootDir>/src', '<rootDir>/tests'],
-  testMatch: [
-    '**/__tests__/**/*.ts',
-    '**/?(*.)+(spec|test).ts'
-  ],
+  testMatch: ['**/__tests__/**/*.ts', '**/?(*.)+(spec|test).ts'],
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.d.ts',
     '!src/index.ts',
-    '!src/**/index.ts'
+    '!src/**/index.ts',
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
@@ -59,16 +60,24 @@ module.exports = {
       branches: 80,
       functions: 80,
       lines: 80,
-      statements: 80
-    }
+      statements: 80,
+    },
   },
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   testTimeout: 10000,
-  maxWorkers: 4
+  maxWorkers: 4,
+  // Modern Jest 30.x configuration
+  extensionsToTreatAsEsm: ['.ts'],
+  globals: {
+    'ts-jest': {
+      useESM: true,
+    },
+  },
 };
 ```
 
 ### Test Setup
+
 ```typescript
 // tests/setup.ts
 import { jest } from '@jest/globals';
@@ -90,13 +99,14 @@ afterAll(async () => {
 expect.extend({
   toBeValidFileMetadata(received) {
     // Custom validation logic
-  }
+  },
 });
 ```
 
 ## Unit Testing
 
 ### Service Layer Testing
+
 ```typescript
 // tests/unit/services/IndexerService.test.ts
 describe('IndexerService', () => {
@@ -107,13 +117,13 @@ describe('IndexerService', () => {
 
   beforeEach(() => {
     mockScanner = {
-      scanRepository: jest.fn()
+      scanRepository: jest.fn(),
     };
     mockParser = {
-      parseFile: jest.fn()
+      parseFile: jest.fn(),
     };
     mockStorage = {
-      saveFile: jest.fn()
+      saveFile: jest.fn(),
     };
 
     indexer = new IndexerService(mockScanner, mockParser, mockStorage);
@@ -122,7 +132,7 @@ describe('IndexerService', () => {
   describe('indexRepository', () => {
     it('should scan repository and parse files', async () => {
       mockScanner.scanRepository.mockResolvedValue([
-        { path: 'src/main.ts', size: 1000, modified: Date.now() }
+        { path: 'src/main.ts', size: 1000, modified: Date.now() },
       ]);
       mockParser.parseFile.mockResolvedValue(mockFileMetadata);
       mockStorage.saveFile.mockResolvedValue();
@@ -147,6 +157,7 @@ describe('IndexerService', () => {
 ```
 
 ### Utility Function Testing
+
 ```typescript
 // tests/unit/utils/pathUtils.test.ts
 describe('pathUtils', () => {
@@ -156,7 +167,9 @@ describe('pathUtils', () => {
     });
 
     it('should handle UNC paths on Windows', () => {
-      expect(normalizePath('\\\\server\\share\\file.ts')).toBe('//server/share/file.ts');
+      expect(normalizePath('\\\\server\\share\\file.ts')).toBe(
+        '//server/share/file.ts'
+      );
     });
   });
 
@@ -178,6 +191,7 @@ describe('pathUtils', () => {
 ```
 
 ### Data Model Testing
+
 ```typescript
 // tests/unit/models/FileMetadata.test.ts
 describe('FileMetadata', () => {
@@ -196,7 +210,7 @@ describe('FileMetadata', () => {
         imports: [],
         symbols: [],
         tags: ['main', 'typescript'],
-        indexedAt: Date.now()
+        indexedAt: Date.now(),
       };
 
       expect(() => validateFileMetadata(validMetadata)).not.toThrow();
@@ -205,10 +219,12 @@ describe('FileMetadata', () => {
     it('should reject invalid paths', () => {
       const invalidMetadata = {
         ...validMetadata,
-        path: '../../../etc/passwd' // Path traversal attempt
+        path: '../../../etc/passwd', // Path traversal attempt
       };
 
-      expect(() => validateFileMetadata(invalidMetadata)).toThrow(ValidationError);
+      expect(() => validateFileMetadata(invalidMetadata)).toThrow(
+        ValidationError
+      );
     });
   });
 });
@@ -217,6 +233,7 @@ describe('FileMetadata', () => {
 ## Integration Testing
 
 ### Feature Integration Tests
+
 ```typescript
 // tests/integration/features/IndexingWorkflow.test.ts
 describe('Indexing Workflow', () => {
@@ -257,7 +274,7 @@ describe('Indexing Workflow', () => {
           export function helper(): string {
             return 'test';
           }
-        `
+        `,
       });
 
       const result = await indexer.indexRepository(testRepo.path);
@@ -269,7 +286,7 @@ describe('Indexing Workflow', () => {
       const files = await storage.getAllFiles();
       expect(files).toHaveLength(2);
 
-      const mainFile = files.find(f => f.filename === 'main.ts');
+      const mainFile = files.find((f) => f.filename === 'main.ts');
       expect(mainFile?.definitions).toHaveLength(1);
       expect(mainFile?.imports).toHaveLength(1);
     });
@@ -280,7 +297,9 @@ describe('Indexing Workflow', () => {
       expect(result1.totalFiles).toBe(2);
 
       // Modify file
-      fs.writeFileSync(path.join(testRepo.path, 'src/main.ts'), `
+      fs.writeFileSync(
+        path.join(testRepo.path, 'src/main.ts'),
+        `
         import { helper } from './utils';
         import { logger } from './logger';
         export class MainApp {
@@ -288,7 +307,8 @@ describe('Indexing Workflow', () => {
           run(): void {}
           log(): void {}
         }
-      `);
+      `
+      );
 
       const result2 = await indexer.indexRepository(testRepo.path);
       expect(result2.totalFiles).toBe(2); // Same count
@@ -303,6 +323,7 @@ describe('Indexing Workflow', () => {
 ```
 
 ### MCP Integration Tests
+
 ```typescript
 // tests/integration/mcp/ServerIntegration.test.ts
 describe('MCP Server Integration', () => {
@@ -331,7 +352,7 @@ describe('MCP Server Integration', () => {
 
       // Execute search
       const result = await client.callTool('code-scout_search', {
-        tags: ['main', 'app']
+        tags: ['main', 'app'],
       });
 
       expect(result.success).toBe(true);
@@ -341,7 +362,7 @@ describe('MCP Server Integration', () => {
 
     it('should handle invalid parameters', async () => {
       const result = await client.callTool('code-scout_search', {
-        tags: [] // Invalid: empty tags
+        tags: [], // Invalid: empty tags
       });
 
       expect(result.success).toBe(false);
@@ -351,7 +372,7 @@ describe('MCP Server Integration', () => {
     it('should handle background indexing', async () => {
       const result = await client.callTool('code-scout_index', {
         path: testRepo.path,
-        background: true
+        background: true,
       });
 
       expect(result.success).toBe(true);
@@ -371,6 +392,7 @@ describe('MCP Server Integration', () => {
 ## Performance Testing
 
 ### Benchmark Tests
+
 ```typescript
 // tests/performance/IndexingBenchmark.test.ts
 describe('Indexing Performance', () => {
@@ -393,22 +415,23 @@ describe('Indexing Performance', () => {
     const repos = [
       createTestRepository('repo1', 100),
       createTestRepository('repo2', 100),
-      createTestRepository('repo3', 100)
+      createTestRepository('repo3', 100),
     ];
 
     const startTime = Date.now();
     const results = await Promise.all(
-      repos.map(repo => indexer.indexRepository(repo.path))
+      repos.map((repo) => indexer.indexRepository(repo.path))
     );
     const duration = Date.now() - startTime;
 
     expect(duration).toBeLessThan(60000); // 1 minute max for concurrent
-    results.forEach(result => expect(result.totalFiles).toBe(100));
+    results.forEach((result) => expect(result.totalFiles).toBe(100));
   });
 });
 ```
 
 ### Query Performance Tests
+
 ```typescript
 // tests/performance/QueryBenchmark.test.ts
 describe('Query Performance', () => {
@@ -440,19 +463,23 @@ describe('Query Performance', () => {
   });
 
   it('should maintain performance under load', async () => {
-    const queries = Array(10).fill(null).map((_, i) => ({
-      tags: [`tag${i}`, 'common'],
-      limit: 20
-    }));
+    const queries = Array(10)
+      .fill(null)
+      .map((_, i) => ({
+        tags: [`tag${i}`, 'common'],
+        limit: 20,
+      }));
 
     const startTime = process.hrtime.bigint();
     const results = await Promise.all(
-      queries.map(q => queryEngine.search(q))
+      queries.map((q) => queryEngine.search(q))
     );
     const duration = Number(process.hrtime.bigint() - startTime) / 1e6;
 
     expect(duration).toBeLessThan(500); // 500ms max for 10 concurrent queries
-    results.forEach(result => expect(result.results.length).toBeGreaterThan(0));
+    results.forEach((result) =>
+      expect(result.results.length).toBeGreaterThan(0)
+    );
   });
 });
 ```
@@ -460,6 +487,7 @@ describe('Query Performance', () => {
 ## Test Data Management
 
 ### Test Fixtures
+
 ```typescript
 // tests/fixtures/index.ts
 export const testRepositories = {
@@ -476,15 +504,20 @@ export const testRepositories = {
       export function helper(): string {
         return 'helper';
       }
-    `
+    `,
   },
   complex: {
     // Large repository with multiple files
-  }
+  },
 };
 
-export function createTestRepository(name: string, files: Record<string, string>): TestRepo {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `code-scout-test-${name}-`));
+export function createTestRepository(
+  name: string,
+  files: Record<string, string>
+): TestRepo {
+  const tempDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), `code-scout-test-${name}-`)
+  );
 
   for (const [filePath, content] of Object.entries(files)) {
     const fullPath = path.join(tempDir, filePath);
@@ -494,12 +527,13 @@ export function createTestRepository(name: string, files: Record<string, string>
 
   return {
     path: tempDir,
-    cleanup: () => fs.rmSync(tempDir, { recursive: true, force: true })
+    cleanup: () => fs.rmSync(tempDir, { recursive: true, force: true }),
   };
 }
 ```
 
 ### Mock Services
+
 ```typescript
 // tests/mocks/index.ts
 export const mockFileMetadata: FileMetadata = {
@@ -519,26 +553,27 @@ export const mockFileMetadata: FileMetadata = {
       column: 0,
       exported: true,
       signature: 'class MainApp',
-      methods: ['run']
-    }
+      methods: ['run'],
+    },
   ],
   imports: [
     {
       module: './utils',
       type: 'local',
       imports: ['helper'],
-      line: 1
-    }
+      line: 1,
+    },
   ],
   symbols: [],
   tags: ['main', 'app', 'typescript'],
-  indexedAt: Date.now()
+  indexedAt: Date.now(),
 };
 ```
 
 ## Continuous Integration
 
 ### GitHub Actions Workflow
+
 ```yaml
 # .github/workflows/test.yml
 name: Test
@@ -552,38 +587,39 @@ jobs:
         node-version: [18, 20]
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Setup Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
+      - uses: actions/checkout@v4
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
 
-    - name: Install dependencies
-      run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Run linting
-      run: npm run lint
+      - name: Run linting
+        run: npm run lint
 
-    - name: Run type checking
-      run: npm run typecheck
+      - name: Run type checking
+        run: npm run typecheck
 
-    - name: Run unit tests
-      run: npm run test:unit
+      - name: Run unit tests
+        run: npm run test:unit
 
-    - name: Run integration tests
-      run: npm run test:integration
+      - name: Run integration tests
+        run: npm run test:integration
 
-    - name: Run performance tests
-      run: npm run test:performance
+      - name: Run performance tests
+        run: npm run test:performance
 
-    - name: Upload coverage
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage/lcov.info
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
 ```
 
 ### Test Scripts
+
 ```json
 {
   "scripts": {
@@ -600,12 +636,14 @@ jobs:
 ## Code Coverage Requirements
 
 ### Coverage Thresholds
+
 - **Statements**: 80% minimum
 - **Branches**: 80% minimum
 - **Functions**: 80% minimum
 - **Lines**: 80% minimum
 
 ### Coverage Exclusions
+
 - **Test Files**: Exclude test files from coverage
 - **Configuration**: Exclude config files
 - **Third-party**: Exclude vendored/third-party code

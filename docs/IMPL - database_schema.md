@@ -3,11 +3,15 @@
 ## Database Architecture
 
 ### Technology Choice
+
 - **SQLite 3.40+**: Embedded database with FTS5 extension
-- **better-sqlite3**: Synchronous wrapper for better performance
+- **better-sqlite3 ^11.4.0 (WiseLibs)**: Synchronous wrapper for better performance
+  - Pure JavaScript with prebuilt binaries (no compilation required)
+  - Cross-platform compatibility
 - **Database Location**: `./.code-scout/database.db` (project-local)
 
 ### Design Principles
+
 - **Normalized Schema**: Proper normalization for data integrity
 - **FTS5 Integration**: Full-text search for tag-based queries
 - **Migration System**: Version-controlled schema evolution
@@ -16,6 +20,7 @@
 ## Core Tables
 
 ### Files Table
+
 ```sql
 CREATE TABLE files (
   id TEXT PRIMARY KEY,              -- UUID v4
@@ -37,6 +42,7 @@ CREATE INDEX idx_files_indexed_at ON files(indexedAt);
 ```
 
 ### Definitions Table
+
 ```sql
 CREATE TABLE definitions (
   id TEXT PRIMARY KEY,              -- UUID v4
@@ -61,6 +67,7 @@ CREATE INDEX idx_definitions_exported ON definitions(exported);
 ```
 
 ### Imports Table
+
 ```sql
 CREATE TABLE imports (
   id TEXT PRIMARY KEY,              -- UUID v4
@@ -82,6 +89,7 @@ CREATE INDEX idx_imports_type ON imports(type);
 ```
 
 ### Symbols Table
+
 ```sql
 CREATE TABLE symbols (
   id TEXT PRIMARY KEY,              -- UUID v4
@@ -103,6 +111,7 @@ CREATE INDEX idx_symbols_name ON symbols(name);
 ## Full-Text Search (FTS5)
 
 ### FTS5 Virtual Table
+
 ```sql
 CREATE VIRTUAL TABLE files_fts USING fts5(
   filename,           -- File name for exact matching
@@ -122,6 +131,7 @@ CREATE VIRTUAL TABLE files_fts USING fts5(
 ```
 
 ### FTS5 Triggers
+
 ```sql
 -- Insert trigger
 CREATE TRIGGER files_fts_insert AFTER INSERT ON files
@@ -155,6 +165,7 @@ END;
 ```
 
 ### File Tags Table (for FTS5)
+
 ```sql
 CREATE TABLE file_tags (
   fileId TEXT NOT NULL,
@@ -174,6 +185,7 @@ CREATE INDEX idx_file_tags_weight ON file_tags(weight);
 ## Migration System
 
 ### Migration Table
+
 ```sql
 CREATE TABLE schema_migrations (
   version INTEGER PRIMARY KEY,
@@ -184,11 +196,22 @@ CREATE TABLE schema_migrations (
 ```
 
 ### Migration Manager
+
 ```typescript
 class MigrationManager {
   private migrations: Migration[] = [
-    { version: 1, name: 'initial_schema', up: initialSchemaUp, down: initialSchemaDown },
-    { version: 2, name: 'add_fts_index', up: addFtsIndexUp, down: addFtsIndexDown },
+    {
+      version: 1,
+      name: 'initial_schema',
+      up: initialSchemaUp,
+      down: initialSchemaDown,
+    },
+    {
+      version: 2,
+      name: 'add_fts_index',
+      up: addFtsIndexUp,
+      down: addFtsIndexDown,
+    },
     // ... more migrations
   ];
 
@@ -196,7 +219,7 @@ class MigrationManager {
     const currentVersion = await this.getCurrentVersion();
 
     if (targetVersion === undefined) {
-      targetVersion = Math.max(...this.migrations.map(m => m.version));
+      targetVersion = Math.max(...this.migrations.map((m) => m.version));
     }
 
     if (targetVersion > currentVersion) {
@@ -208,7 +231,7 @@ class MigrationManager {
 
   private async upgrade(fromVersion: number, toVersion: number): Promise<void> {
     for (let version = fromVersion + 1; version <= toVersion; version++) {
-      const migration = this.migrations.find(m => m.version === version);
+      const migration = this.migrations.find((m) => m.version === version);
       if (!migration) throw new Error(`Migration ${version} not found`);
 
       await this.executeMigration(migration, 'up');
@@ -221,6 +244,7 @@ class MigrationManager {
 ### Migration Scripts
 
 #### Migration 001: Initial Schema
+
 ```typescript
 export const up = async (db: Database): Promise<void> => {
   // Create core tables
@@ -256,7 +280,9 @@ export const up = async (db: Database): Promise<void> => {
 
   // Create indexes
   await db.execute(`CREATE INDEX idx_files_path ON files(path)`);
-  await db.execute(`CREATE INDEX idx_definitions_file_id ON definitions(fileId)`);
+  await db.execute(
+    `CREATE INDEX idx_definitions_file_id ON definitions(fileId)`
+  );
 };
 
 export const down = async (db: Database): Promise<void> => {
@@ -266,6 +292,7 @@ export const down = async (db: Database): Promise<void> => {
 ```
 
 #### Migration 002: Add FTS5 Index
+
 ```typescript
 export const up = async (db: Database): Promise<void> => {
   // Create FTS5 virtual table
@@ -311,6 +338,7 @@ export const down = async (db: Database): Promise<void> => {
 ## Database Operations
 
 ### Connection Management
+
 ```typescript
 class DatabaseService {
   private db: Database;
@@ -327,12 +355,12 @@ class DatabaseService {
 
   execute<T>(query: string, params?: any[]): T {
     const stmt = this.db.prepare(query);
-    return params ? stmt.get(params) as T : stmt.get() as T;
+    return params ? (stmt.get(params) as T) : (stmt.get() as T);
   }
 
   executeAll<T>(query: string, params?: any[]): T[] {
     const stmt = this.db.prepare(query);
-    return params ? stmt.all(params) as T[] : stmt.all() as T[];
+    return params ? (stmt.all(params) as T[]) : (stmt.all() as T[]);
   }
 
   executeRun(query: string, params?: any[]): Database.RunResult {
@@ -347,6 +375,7 @@ class DatabaseService {
 ```
 
 ### Query Builders
+
 ```typescript
 class FileQueries {
   static insert(file: FileMetadata): { sql: string; params: any[] } {
@@ -356,16 +385,23 @@ class FileQueries {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
-        file.id, file.path, file.filename, file.extension, file.size,
-        file.lastModified, file.hash, file.language, file.indexedAt
-      ]
+        file.id,
+        file.path,
+        file.filename,
+        file.extension,
+        file.size,
+        file.lastModified,
+        file.hash,
+        file.language,
+        file.indexedAt,
+      ],
     };
   }
 
   static findByPath(path: string): { sql: string; params: any[] } {
     return {
       sql: `SELECT * FROM files WHERE path = ?`,
-      params: [path]
+      params: [path],
     };
   }
 }
@@ -374,12 +410,14 @@ class FileQueries {
 ## Performance Optimizations
 
 ### Indexing Strategy
+
 - **Composite Indexes**: Multi-column indexes for common query patterns
 - **Partial Indexes**: Indexes on frequently filtered columns
 - **FTS5 Optimization**: Optimized tokenizer and ranking functions
 - **Query Planning**: Analyze and optimize slow queries
 
 ### Maintenance Operations
+
 ```typescript
 class DatabaseMaintenance {
   // Rebuild FTS5 index
@@ -408,6 +446,7 @@ class DatabaseMaintenance {
 ## Backup and Recovery
 
 ### Backup Strategy
+
 ```typescript
 class DatabaseBackup {
   async createBackup(backupPath: string): Promise<void> {

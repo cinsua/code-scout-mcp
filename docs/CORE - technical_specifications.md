@@ -41,6 +41,7 @@ src/
 **Purpose**: Monitor file system changes with intelligent debouncing
 
 **Structure**:
+
 ```
 features/file-watching/
 ├── services/
@@ -57,18 +58,20 @@ features/file-watching/
 
 **Key Components**:
 
-- **FileWatcher**: Uses `chokidar` for file system monitoring
+- **FileWatcher**: Uses `chokidar ^3.5.0` for file system monitoring
 - **Debouncer**: Prevents rapid-fire events for individual files (300ms)
 - **BatchProcessor**: Groups multiple file changes (1 second window)
 - **Event Types**: Clear TypeScript interfaces for all events
 
 **Event Flow**:
+
 ```
 File System → FileWatcher → Debouncer → EventBus → Indexer
                      ↘ BatchProcessor ↗
 ```
 
 **Business Rules**:
+
 - Debounce individual files for 300ms to prevent rapid updates
 - Batch multiple file changes within 1-second windows
 - Respect ignore patterns and file size limits
@@ -79,6 +82,7 @@ File System → FileWatcher → Debouncer → EventBus → Indexer
 **Purpose**: Language-agnostic code parsing with unified interface
 
 **Structure**:
+
 ```
 features/parsing/
 ├── services/
@@ -97,22 +101,25 @@ features/parsing/
 ```
 
 **Parser Capabilities**:
-- **Tree-sitter Integration**: Robust, error-recovering parsing
+
+- **Tree-sitter Integration**: Robust, error-recovering parsing using tree-sitter ^0.21.1
 - **Multi-language Support**: JavaScript, TypeScript, Python (extensible)
 - **Type Definitions**: Extract classes, functions, components, imports
 - **Metadata Extraction**: Comments, decorators, docstrings
 - **Error Recovery**: Graceful handling of malformed code
 
 **Supported Languages**:
-- JavaScript (.js, .jsx)
-- TypeScript (.ts, .tsx)
-- Python (.py)
+
+- JavaScript (.js, .jsx) - tree-sitter-typescript ^0.21.2
+- TypeScript (.ts, .tsx) - tree-sitter-typescript ^0.21.2
+- Python (.py) - tree-sitter-python ^0.21.0
 
 ### 3. Indexing Feature
 
 **Purpose**: Repository scanning and metadata extraction
 
 **Structure**:
+
 ```
 features/indexing/
 ├── services/
@@ -135,6 +142,7 @@ features/indexing/
 ```
 
 **Indexing Workflow**:
+
 1. **Repository Discovery**: Scan files, detect repository root
 2. **File Filtering**: Apply inclusion/exclusion patterns
 3. **Change Detection**: SHA256 hash comparison for incremental updates
@@ -145,6 +153,7 @@ features/indexing/
 **Tag Derivation System**:
 
 **Tag Sources (with weights)**:
+
 - Filename (5x weight): Full filename, split camelCase/PascalCase/snake_case
 - Path Segments (3x weight): Directory names in file path
 - Code Elements (3x weight): Class/function/component names
@@ -153,6 +162,7 @@ features/indexing/
 - Documentation (1x weight): Tokenized docstrings and comments
 
 **Processing Rules**:
+
 1. Normalize to lowercase
 2. Remove tags < 3 characters
 3. Remove non-alphanumeric characters
@@ -164,6 +174,7 @@ features/indexing/
 **Purpose**: Semantic search with weighted relevance scoring
 
 **Structure**:
+
 ```
 features/querying/
 ├── services/
@@ -184,23 +195,25 @@ features/querying/
 ```
 
 **Scoring Algorithm**:
+
 ```typescript
 const SCORING_WEIGHTS = {
-  filename: 5.0,        // Highest specificity
-  path: 3.0,            // Contextual location
-  classes: 3.0,         // Core code elements
-  functions: 3.0,       // Core code elements
-  components: 3.0,      // Core code elements
-  imports: 2.0,         // Dependencies
-  decorators: 2.0,      // Metadata
-  symbols: 2.0,         // Metadata
-  docstrings: 1.0,      // Documentation
-  comments: 1.0,        // Documentation
-  derivedTags: 1.0      // Semantic tags
+  filename: 5.0, // Highest specificity
+  path: 3.0, // Contextual location
+  classes: 3.0, // Core code elements
+  functions: 3.0, // Core code elements
+  components: 3.0, // Core code elements
+  imports: 2.0, // Dependencies
+  decorators: 2.0, // Metadata
+  symbols: 2.0, // Metadata
+  docstrings: 1.0, // Documentation
+  comments: 1.0, // Documentation
+  derivedTags: 1.0, // Semantic tags
 };
 ```
 
 **Search Pipeline**:
+
 1. Tag Input (1-5 tags)
 2. Tag Expansion for broader matching
 3. FTS5 candidate retrieval
@@ -213,6 +226,7 @@ const SCORING_WEIGHTS = {
 **Purpose**: Database abstraction and data persistence
 
 **Structure**:
+
 ```
 features/storage/
 ├── services/
@@ -233,7 +247,9 @@ features/storage/
 ```
 
 **Database Design**:
+
 - SQLite with FTS5 extension for full-text search
+- better-sqlite3 ^11.4.0 (WiseLibs) for synchronous database operations
 - Connection pooling for performance
 - Schema migrations for version control
 - Project-local database isolation
@@ -244,36 +260,36 @@ features/storage/
 
 ```typescript
 export interface FileMetadata {
-  id: string;                    // Unique identifier
-  path: string;                  // Relative file path
-  filename: string;              // File name with extension
-  extension: string;             // File extension
-  size: number;                  // File size in bytes
-  lastModified: number;          // Modification timestamp
-  hash: string;                  // SHA256 content hash
-  language: string;              // Detected programming language
-  definitions: Definition[];     // Code definitions
-  imports: ImportMetadata[];     // Import statements
-  indexedAt: number;             // Indexing timestamp
+  id: string; // Unique identifier
+  path: string; // Relative file path
+  filename: string; // File name with extension
+  extension: string; // File extension
+  size: number; // File size in bytes
+  lastModified: number; // Modification timestamp
+  hash: string; // SHA256 content hash
+  language: string; // Detected programming language
+  definitions: Definition[]; // Code definitions
+  imports: ImportMetadata[]; // Import statements
+  indexedAt: number; // Indexing timestamp
 }
 
 export interface Definition {
-  name: string;                  // Symbol name
+  name: string; // Symbol name
   type: 'class' | 'function' | 'component' | 'variable' | 'type';
-  line: number;                  // Line number
-  column: number;                // Column position
-  exported: boolean;             // Export visibility
-  docstring?: string;            // Documentation
-  decorators?: string[];         // Decorators/metadata
-  signature?: string;            // Function signature
+  line: number; // Line number
+  column: number; // Column position
+  exported: boolean; // Export visibility
+  docstring?: string; // Documentation
+  decorators?: string[]; // Decorators/metadata
+  signature?: string; // Function signature
 }
 
 export interface ImportMetadata {
-  module: string;                // Module name/path
-  type: 'local' | 'external' | 'builtin';  // Import classification
-  imports: string[];             // Imported symbols
-  alias?: string;                // Import alias
-  isDynamic: boolean;            // Dynamic import flag
+  module: string; // Module name/path
+  type: 'local' | 'external' | 'builtin'; // Import classification
+  imports: string[]; // Imported symbols
+  alias?: string; // Import alias
+  isDynamic: boolean; // Dynamic import flag
 }
 ```
 
@@ -323,58 +339,75 @@ CREATE VIRTUAL TABLE files_fts USING fts5(
 ### MCP Tools
 
 **code-scout_search**
+
 ```typescript
 interface SearchTool {
-  name: "code-scout_search";
-  description: "Search code using LLM-generated tags with relevance scoring";
+  name: 'code-scout_search';
+  description: 'Search code using LLM-generated tags with relevance scoring';
   inputSchema: {
-    type: "object";
+    type: 'object';
     properties: {
       tags: {
-        type: "array",
-        items: { type: "string" },
-        description: "Array of search tags (1-5 tags) generated by LLM based on task context"
+        type: 'array';
+        items: { type: 'string' };
+        description: 'Array of search tags (1-5 tags) generated by LLM based on task context';
       };
-      limit: { type: "number", default: 20, description: "Maximum results" };
+      limit: { type: 'number'; default: 20; description: 'Maximum results' };
       filters: {
-        type: "object",
+        type: 'object';
         properties: {
-          language: { type: "string", description: "Filter by language" },
-          fileType: { type: "string", description: "Filter by file type" },
-          path: { type: "string", description: "Filter by path pattern" }
-        }
-      }
+          language: { type: 'string'; description: 'Filter by language' };
+          fileType: { type: 'string'; description: 'Filter by file type' };
+          path: { type: 'string'; description: 'Filter by path pattern' };
+        };
+      };
     };
-    required: ["tags"];
+    required: ['tags'];
   };
 }
 ```
 
 **code-scout_index**
+
 ```typescript
 interface IndexTool {
-  name: "code-scout_index";
-  description: "Initialize or update code index for current directory";
+  name: 'code-scout_index';
+  description: 'Initialize or update code index for current directory';
   inputSchema: {
-    type: "object";
+    type: 'object';
     properties: {
-      path: { type: "string", description: "Directory path to index (optional, defaults to current)" };
-      force: { type: "boolean", default: false, description: "Force full reindex" };
-      background: { type: "boolean", default: true, description: "Run indexing in background" };
+      path: {
+        type: 'string';
+        description: 'Directory path to index (optional, defaults to current)';
+      };
+      force: {
+        type: 'boolean';
+        default: false;
+        description: 'Force full reindex';
+      };
+      background: {
+        type: 'boolean';
+        default: true;
+        description: 'Run indexing in background';
+      };
     };
   };
 }
 ```
 
 **code-scout_status**
+
 ```typescript
 interface StatusTool {
-  name: "code-scout_status";
-  description: "Get indexing status and database information";
+  name: 'code-scout_status';
+  description: 'Get indexing status and database information';
   inputSchema: {
-    type: "object";
+    type: 'object';
     properties: {
-      path: { type: "string", description: "Project path (optional, defaults to current)" };
+      path: {
+        type: 'string';
+        description: 'Project path (optional, defaults to current)';
+      };
     };
   };
 }
@@ -383,6 +416,7 @@ interface StatusTool {
 ### Response Formats
 
 **Search Results**
+
 ```typescript
 interface SearchResponse {
   total_files: number;
@@ -397,30 +431,30 @@ interface SearchResponse {
 ```typescript
 interface AppConfig {
   indexing: {
-    maxFileSize: number;        // 10MB default
-    maxWorkers: number;         // 4 default
-    batchSize: number;          // 100 default
-    debounceMs: number;         // 300ms default
-    batchWindowMs: number;      // 1000ms default
+    maxFileSize: number; // 10MB default
+    maxWorkers: number; // 4 default
+    batchSize: number; // 100 default
+    debounceMs: number; // 300ms default
+    batchWindowMs: number; // 1000ms default
   };
   search: {
-    defaultLimit: number;       // 20 default
-    maxLimit: number;           // 100 default
+    defaultLimit: number; // 20 default
+    maxLimit: number; // 100 default
     scoringWeights: {
-      filename: number;         // 5.0
-      path: number;             // 3.0
-      definitions: number;      // 3.0
-      imports: number;          // 2.0
-      documentation: number;    // 1.0
+      filename: number; // 5.0
+      path: number; // 3.0
+      definitions: number; // 3.0
+      imports: number; // 2.0
+      documentation: number; // 1.0
     };
   };
   database: {
-    path: string;               // "./code-scout.db"
-    maxConnections: number;     // 10 default
+    path: string; // "./code-scout.db"
+    maxConnections: number; // 10 default
   };
   watching: {
-    enabled: boolean;           // true default
-    ignorePatterns: string[];   // Default ignore patterns
+    enabled: boolean; // true default
+    ignorePatterns: string[]; // Default ignore patterns
   };
   languages: {
     javascript: LanguageConfig;
@@ -439,6 +473,7 @@ interface LanguageConfig {
 ## Error Handling Patterns
 
 ### Error Types
+
 - **ValidationError**: Invalid input parameters
 - **ParsingError**: File parsing failures
 - **DatabaseError**: Database operation failures
@@ -446,6 +481,7 @@ interface LanguageConfig {
 - **ConfigurationError**: Invalid configuration
 
 ### Error Response Format
+
 ```typescript
 interface ErrorResponse {
   error: {
@@ -458,6 +494,7 @@ interface ErrorResponse {
 ```
 
 ### Recovery Strategies
+
 - **Retry Logic**: Exponential backoff for transient failures
 - **Graceful Degradation**: Continue processing other files on individual failures
 - **Fallback Values**: Use defaults for missing optional configuration
@@ -466,18 +503,21 @@ interface ErrorResponse {
 ## Testing Strategy
 
 ### Unit Testing
+
 - Service layer testing with mocked dependencies
 - Utility function testing
 - Data model validation testing
 - Configuration parsing testing
 
 ### Integration Testing
+
 - End-to-end indexing pipeline
 - Search functionality with real database
 - MCP protocol compliance
 - File watching integration
 
 ### Performance Testing
+
 - Query response time benchmarks
 - Memory usage during indexing
 - Concurrent operation handling
@@ -486,6 +526,7 @@ interface ErrorResponse {
 ## Gaps and Missing Information
 
 ### Implementation Details Needed
+
 1. **Tree-sitter Grammar Versions**: Specific versions for each language parser
 2. **FTS5 Query Optimization**: Detailed query patterns and indexing strategies
 3. **Memory Management**: Specific limits and cleanup strategies for large files
@@ -493,16 +534,19 @@ interface ErrorResponse {
 5. **Migration Scripts**: Database schema migration logic and rollback procedures
 
 ### Configuration Questions
+
 1. **Default Ignore Patterns**: Comprehensive list of files/directories to ignore
 2. **Performance Tuning**: Optimal values for batch sizes, timeouts, and limits
 3. **Security Policies**: File access restrictions and sandboxing requirements
 
 ### Integration Points
+
 1. **MCP Protocol Version**: Specific MCP specification version to target
 2. **Claude Code Compatibility**: Version compatibility and integration testing
 3. **VSCode Extension**: Requirements for VSCode MCP extension support
 
 ### Development Workflow
+
 1. **Build System**: Choice between esbuild, webpack, or tsc for compilation
 2. **Package Structure**: NPM package configuration and publishing strategy
 3. **CLI Interface**: Command-line interface design for manual operations

@@ -2,11 +2,12 @@
 
 ## Overview
 
-The Storage feature provides database abstraction and data persistence for the code indexing system, using SQLite with FTS5 extension for efficient full-text search capabilities.
+The Storage feature provides database abstraction and data persistence for the code indexing system, using SQLite with FTS5 extension for efficient full-text search capabilities. The implementation uses better-sqlite3 ^11.4.0 (WiseLibs) for synchronous database operations with cross-platform compatibility.
 
 ## Architecture
 
 ### Structure
+
 ```
 features/storage/
 ├── services/
@@ -35,30 +36,35 @@ features/storage/
 **Purpose**: Main service handling database connections, transactions, and schema management.
 
 **Interface**:
+
 ```typescript
 class DatabaseService {
   constructor(private config: DatabaseConfig) {}
 
-  async initialize(): Promise<void>
-  async close(): Promise<void>
-  async executeQuery<T>(query: string, params?: any[]): Promise<T>
-  async executeTransaction<T>(callback: (db: Database) => Promise<T>): Promise<T>
-  async migrate(): Promise<void>
-  getStats(): DatabaseStats
+  async initialize(): Promise<void>;
+  async close(): Promise<void>;
+  async executeQuery<T>(query: string, params?: any[]): Promise<T>;
+  async executeTransaction<T>(
+    callback: (db: Database) => Promise<T>
+  ): Promise<T>;
+  async migrate(): Promise<void>;
+  getStats(): DatabaseStats;
 }
 ```
 
 **DatabaseConfig**:
+
 ```typescript
 interface DatabaseConfig {
-  path: string;               // Database file path
-  maxConnections: number;     // Connection pool size (default: 10)
-  connectionTimeout: number;  // Timeout in ms (default: 30000)
-  pragmas: {                  // SQLite pragmas
-    journal_mode: string;     // 'WAL'
-    synchronous: string;      // 'NORMAL'
-    cache_size: number;       // 10000
-    temp_store: string;       // 'memory'
+  path: string; // Database file path
+  maxConnections: number; // Connection pool size (default: 10)
+  connectionTimeout: number; // Timeout in ms (default: 30000)
+  pragmas: {
+    // SQLite pragmas
+    journal_mode: string; // 'WAL'
+    synchronous: string; // 'NORMAL'
+    cache_size: number; // 10000
+    temp_store: string; // 'memory'
   };
 }
 ```
@@ -68,21 +74,23 @@ interface DatabaseConfig {
 **Purpose**: Handles CRUD operations for file metadata.
 
 **Interface**:
+
 ```typescript
 class FileRepository {
   constructor(private db: DatabaseService) {}
 
-  async save(metadata: FileMetadata): Promise<void>
-  async findByPath(path: string): Promise<FileMetadata | null>
-  async findById(id: string): Promise<FileMetadata | null>
-  async update(path: string, metadata: Partial<FileMetadata>): Promise<void>
-  async delete(path: string): Promise<void>
-  async count(): Promise<number>
-  async list(options?: ListOptions): Promise<FileMetadata[]>
+  async save(metadata: FileMetadata): Promise<void>;
+  async findByPath(path: string): Promise<FileMetadata | null>;
+  async findById(id: string): Promise<FileMetadata | null>;
+  async update(path: string, metadata: Partial<FileMetadata>): Promise<void>;
+  async delete(path: string): Promise<void>;
+  async count(): Promise<number>;
+  async list(options?: ListOptions): Promise<FileMetadata[]>;
 }
 ```
 
 **Operations**:
+
 - **Save**: Insert or update file metadata with conflict resolution
 - **Find**: Efficient lookup by path or ID
 - **Update**: Partial updates for incremental changes
@@ -95,25 +103,31 @@ class FileRepository {
 **Purpose**: Handles full-text search operations using FTS5.
 
 **Interface**:
+
 ```typescript
 class SearchRepository {
   constructor(private db: DatabaseService) {}
 
-  async searchByTags(tags: string[], options?: SearchOptions): Promise<SearchCandidate[]>
-  async searchByText(query: string): Promise<SearchCandidate[]>
-  async getSuggestions(prefix: string): Promise<string[]>
-  async rebuildIndex(): Promise<void>
-  async optimizeIndex(): Promise<void>
+  async searchByTags(
+    tags: string[],
+    options?: SearchOptions
+  ): Promise<SearchCandidate[]>;
+  async searchByText(query: string): Promise<SearchCandidate[]>;
+  async getSuggestions(prefix: string): Promise<string[]>;
+  async rebuildIndex(): Promise<void>;
+  async optimizeIndex(): Promise<void>;
 }
 ```
 
 **SearchCandidate**:
+
 ```typescript
 interface SearchCandidate {
   id: string;
   path: string;
-  score: number;              // FTS5 rank score
-  matches: {                  // Highlighted match information
+  score: number; // FTS5 rank score
+  matches: {
+    // Highlighted match information
     field: string;
     snippet: string;
   }[];
@@ -123,6 +137,7 @@ interface SearchCandidate {
 ## Database Schema
 
 ### Files Table
+
 ```sql
 CREATE TABLE files (
   id TEXT PRIMARY KEY,
@@ -138,6 +153,7 @@ CREATE TABLE files (
 ```
 
 ### Definitions Table
+
 ```sql
 CREATE TABLE definitions (
   id TEXT PRIMARY KEY,
@@ -155,6 +171,7 @@ CREATE TABLE definitions (
 ```
 
 ### Imports Table
+
 ```sql
 CREATE TABLE imports (
   id TEXT PRIMARY KEY,
@@ -170,6 +187,7 @@ CREATE TABLE imports (
 ```
 
 ### FTS5 Virtual Table
+
 ```sql
 CREATE VIRTUAL TABLE files_fts USING fts5(
   filename,
@@ -186,18 +204,20 @@ CREATE VIRTUAL TABLE files_fts USING fts5(
 ## Migration System
 
 ### Migration Manager
+
 ```typescript
 class MigrationManager {
   constructor(private db: DatabaseService) {}
 
-  async getCurrentVersion(): Promise<number>
-  async migrateTo(version: number): Promise<void>
-  async rollback(version: number): Promise<void>
-  async createMigration(name: string): Promise<string>
+  async getCurrentVersion(): Promise<number>;
+  async migrateTo(version: number): Promise<void>;
+  async rollback(version: number): Promise<void>;
+  async createMigration(name: string): Promise<string>;
 }
 ```
 
 ### Migration Files
+
 ```typescript
 // migrations/001_initial_schema.ts
 export const up = async (db: Database) => {
@@ -220,19 +240,27 @@ export const down = async (db: Database) => {
 ## Query Builders
 
 ### File Queries
+
 ```typescript
 class FileQueries {
-  static insert(metadata: FileMetadata): { sql: string; params: any[] }
-  static update(path: string, updates: Partial<FileMetadata>): { sql: string; params: any[] }
-  static findByPath(path: string): { sql: string; params: any[] }
-  static deleteByPath(path: string): { sql: string; params: any[] }
+  static insert(metadata: FileMetadata): { sql: string; params: any[] };
+  static update(
+    path: string,
+    updates: Partial<FileMetadata>
+  ): { sql: string; params: any[] };
+  static findByPath(path: string): { sql: string; params: any[] };
+  static deleteByPath(path: string): { sql: string; params: any[] };
 }
 ```
 
 ### Search Queries
+
 ```typescript
 class SearchQueries {
-  static searchByTags(tags: string[], limit: number): { sql: string; params: any[] } {
+  static searchByTags(
+    tags: string[],
+    limit: number
+  ): { sql: string; params: any[] } {
     const tagQuery = tags.join(' OR ');
     return {
       sql: `
@@ -243,7 +271,7 @@ class SearchQueries {
         ORDER BY fts.rank
         LIMIT ?
       `,
-      params: [tagQuery, limit]
+      params: [tagQuery, limit],
     };
   }
 }
@@ -252,6 +280,7 @@ class SearchQueries {
 ## Connection Pooling
 
 ### Pool Implementation
+
 ```typescript
 class ConnectionPool {
   private pool: Database[] = [];
@@ -259,38 +288,42 @@ class ConnectionPool {
 
   constructor(private config: PoolConfig) {}
 
-  async getConnection(): Promise<Database>
-  async releaseConnection(db: Database): Promise<void>
-  async closeAll(): Promise<void>
-  getStats(): PoolStats
+  async getConnection(): Promise<Database>;
+  async releaseConnection(db: Database): Promise<void>;
+  async closeAll(): Promise<void>;
+  getStats(): PoolStats;
 }
 ```
 
 **PoolConfig**:
+
 ```typescript
 interface PoolConfig {
-  minConnections: number;      // 2
-  maxConnections: number;      // 10
-  acquireTimeout: number;      // 30000ms
-  idleTimeout: number;        // 600000ms (10min)
+  minConnections: number; // 2
+  maxConnections: number; // 10
+  acquireTimeout: number; // 30000ms
+  idleTimeout: number; // 600000ms (10min)
 }
 ```
 
 ## Business Rules
 
 ### Data Integrity Rules
+
 1. **Unique Paths**: File paths must be unique within repository
 2. **Hash Validation**: Stored hash must match file content
 3. **Referential Integrity**: Foreign key constraints maintained
 4. **Atomic Operations**: All related updates in transactions
 
 ### Performance Rules
+
 1. **Connection Pooling**: Efficient connection reuse
 2. **Query Optimization**: Use indexes and prepared statements
 3. **Batch Operations**: Group multiple operations when possible
 4. **Memory Limits**: Prevent excessive memory usage
 
 ### Consistency Rules
+
 1. **Transaction Boundaries**: Related operations in single transactions
 2. **Rollback Support**: Failed operations don't leave partial state
 3. **Version Control**: Schema migrations maintain compatibility
@@ -299,16 +332,19 @@ interface PoolConfig {
 ## Error Handling
 
 ### Connection Errors
+
 - **Pool Exhaustion**: Queue requests with timeout
 - **Connection Failures**: Retry with exponential backoff
 - **Timeout Handling**: Fail gracefully with clear error messages
 
 ### Query Errors
+
 - **Syntax Errors**: Validate queries before execution
 - **Constraint Violations**: Handle unique constraint failures
 - **Lock Conflicts**: Implement retry logic for busy database
 
 ### Migration Errors
+
 - **Version Conflicts**: Detect and resolve schema version mismatches
 - **Partial Migrations**: Rollback on migration failures
 - **Data Loss Prevention**: Backup before destructive migrations
@@ -316,18 +352,21 @@ interface PoolConfig {
 ## Performance Optimizations
 
 ### Indexing Strategy
+
 - **FTS5 Configuration**: Optimize for search performance
 - **Compound Indexes**: Multi-column indexes for common queries
 - **Query Planning**: Analyze and optimize slow queries
 - **Caching Layer**: Cache frequently accessed metadata
 
 ### Memory Management
+
 - **Streaming Results**: Handle large result sets efficiently
 - **Connection Limits**: Prevent connection pool exhaustion
 - **Query Limits**: Default limits on result set sizes
 - **Cleanup**: Explicit resource cleanup
 
 ### Monitoring
+
 ```typescript
 interface DatabaseStats {
   connections: {
@@ -337,12 +376,12 @@ interface DatabaseStats {
   };
   queries: {
     total: number;
-    slow: number;        // >100ms
+    slow: number; // >100ms
     failed: number;
   };
   size: {
-    database: number;    // bytes
-    indexes: number;     // bytes
+    database: number; // bytes
+    indexes: number; // bytes
   };
 }
 ```
@@ -350,16 +389,19 @@ interface DatabaseStats {
 ## Integration Points
 
 ### Indexing Integration
+
 - Receives metadata from indexer for storage
 - Provides change detection hashes
 - Supports incremental updates
 
 ### Querying Integration
+
 - Executes FTS5 search queries
 - Provides candidate retrieval
 - Handles result pagination
 
 ### Configuration Integration
+
 - Accepts database configuration
 - Supports dynamic reconfiguration
 - Validates configuration on startup
@@ -367,26 +409,30 @@ interface DatabaseStats {
 ## Testing Strategy
 
 ### Unit Tests
+
 - Query builder correctness
 - Migration script validation
 - Connection pool behavior
 - Error handling scenarios
 
 ### Integration Tests
+
 - Full database operations
 - Migration execution
 - Concurrent access patterns
 - Performance benchmarks
 
 ### Database Tests
+
 - Schema validation
 - Data integrity checks
 - Query performance testing
 - Backup and restore procedures
 
 ### Migration Tests
+
 - Forward and backward migrations
 - Data preservation validation
 - Rollback functionality
 - Version conflict resolution</content>
-<parameter name="filePath">docsV2/storage-spec.md
+  <parameter name="filePath">docsV2/storage-spec.md
