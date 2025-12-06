@@ -1,0 +1,9 @@
+{
+  "recommendations": [
+    "esbenp.prettier-vscode@10.4.0",
+    "dbaeumer.vscode-eslint@3.0.10",
+    "ms-vscode.vscode-typescript-next@5.8.20240923",
+    "bradlc.vscode-tailwindcss@0.12.6",
+    "ms-vscode.vscode-json@1.0.4"
+  ]
+}
