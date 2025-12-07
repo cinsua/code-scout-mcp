@@ -12,6 +12,7 @@ import {
   ConfigurationError,
   ConfigurationErrorCode,
 } from './errors/ConfigurationError';
+import { initializeLogging } from './logging';
 import type {
   AppConfig,
   ConfigurationChangeEvent,
@@ -58,9 +59,14 @@ export function getConfigurationManager(): ConfigurationManager {
 /**
  * Load configuration from all sources
  */
-export function loadConfiguration(): Promise<AppConfig> {
+export async function loadConfiguration(): Promise<AppConfig> {
   const manager = getConfigurationManager();
-  return manager.loadConfiguration();
+  const config = await manager.loadConfiguration();
+
+  // Initialize logging system with loaded configuration
+  initializeLogging(config.logging);
+
+  return config;
 }
 
 /**

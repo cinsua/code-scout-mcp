@@ -22,6 +22,7 @@ import type {
 } from '../types/ConfigTypes';
 import { SchemaValidator } from '../validators/SchemaValidator';
 import { SemanticValidator } from '../validators/SemanticValidator';
+import { LOG_FILE_CONFIG } from '../../shared/utils/LoggingConstants';
 
 /**
  * Profile information
@@ -599,9 +600,9 @@ export class ProfileManager {
       format: 'text',
       file: {
         enabled: true,
-        path: './logs/code-scout.log',
-        maxSize: '10m',
-        maxFiles: 5,
+        path: LOG_FILE_CONFIG.DEFAULT_PATH,
+        maxSize: LOG_FILE_CONFIG.DEFAULT_MAX_SIZE,
+        maxFiles: LOG_FILE_CONFIG.DEFAULT_MAX_FILES,
       },
       console: {
         enabled: true,

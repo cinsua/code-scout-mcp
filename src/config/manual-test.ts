@@ -5,6 +5,8 @@
  * is working correctly.
  */
 
+import { LogManager } from '../shared/utils/LogManager';
+
 import { ConfigurationManager } from './services/ConfigurationManager';
 import { ConfigurationError } from './errors/ConfigurationError';
 
@@ -14,60 +16,72 @@ const TEST_MAX_WORKERS = 8;
 async function testConfigurationLoading(
   manager: ConfigurationManager,
 ): Promise<void> {
-  console.log('1. Loading configuration...');
+  const logger = LogManager.getLogger('config-test');
+  logger.info('Loading configuration...');
   const config = await manager.loadConfiguration();
 
-  console.log('✓ Configuration loaded successfully');
-  console.log(`   Version: ${config.version}`);
-  console.log(`   Profile: ${config.profile ?? 'default'}`);
-  console.log(`   Max Workers: ${config.indexing.maxWorkers}`);
-  console.log(`   Database Path: ${config.database.path}`);
-  console.log(`   Log Level: ${config.logging.level}`);
+  logger.info('Configuration loaded successfully', {
+    version: config.version,
+    profile: config.profile ?? 'default',
+    maxWorkers: config.indexing.maxWorkers,
+    databasePath: config.database.path,
+    logLevel: config.logging.level,
+  });
 }
 
 function testConfigurationAccess(manager: ConfigurationManager): void {
-  console.log('\n2. Testing configuration access...');
+  const logger = LogManager.getLogger('config-test');
+  logger.info('Testing configuration access...');
   const maxWorkers = manager.get<number>('indexing.maxWorkers');
-  console.log(`✓ Retrieved maxWorkers: ${maxWorkers}`);
+  logger.info('Retrieved maxWorkers successfully', { maxWorkers });
 }
 
 async function testConfigurationUpdate(
   manager: ConfigurationManager,
 ): Promise<void> {
-  console.log('\n3. Testing configuration update...');
+  const logger = LogManager.getLogger('config-test');
+  logger.info('Testing configuration update...');
   await manager.updateConfiguration(
     'indexing.maxWorkers',
     TEST_MAX_WORKERS,
     'test',
   );
   const updatedWorkers = manager.get<number>('indexing.maxWorkers');
-  console.log(`✓ Updated maxWorkers: ${updatedWorkers}`);
+  logger.info('Updated maxWorkers successfully', { updatedWorkers });
 }
 
 function testConfigurationExport(manager: ConfigurationManager): void {
-  console.log('\n4. Testing configuration export...');
+  const logger = LogManager.getLogger('config-test');
+  logger.info('Testing configuration export...');
   const exported = manager.exportConfiguration(false);
-  console.log(`✓ Exported configuration (${exported.length} chars)`);
+  logger.info('Exported configuration successfully', {
+    length: exported.length,
+  });
 }
 
 function testConfigurationHistory(manager: ConfigurationManager): void {
-  console.log('\n5. Testing configuration history...');
+  const logger = LogManager.getLogger('config-test');
+  logger.info('Testing configuration history...');
   const history = manager.getHistory();
   const snapshots = history.getAllSnapshots();
-  console.log(`✓ History contains ${snapshots.length} snapshots`);
+  logger.info('Retrieved configuration history', {
+    snapshotCount: snapshots.length,
+  });
 }
 
 function testConfigurationSources(manager: ConfigurationManager): void {
-  console.log('\n6. Testing configuration sources...');
+  const logger = LogManager.getLogger('config-test');
+  logger.info('Testing configuration sources...');
   const sources = manager.getSources();
-  console.log(`✓ Found ${sources.length} configuration sources:`);
-  sources.forEach(source => {
-    console.log(`   - ${source.name} (priority: ${source.priority})`);
+  logger.info('Retrieved configuration sources', {
+    sourceCount: sources.length,
+    sources: sources.map(s => ({ name: s.name, priority: s.priority })),
   });
 }
 
 async function testConfigurationSystem(): Promise<void> {
-  console.log('Testing Configuration Management System...\n');
+  const logger = LogManager.getLogger('config-test');
+  logger.info('Starting configuration management system tests');
 
   try {
     // Create configuration manager
@@ -81,13 +95,18 @@ async function testConfigurationSystem(): Promise<void> {
     testConfigurationHistory(manager);
     testConfigurationSources(manager);
 
-    console.log('\n✅ All configuration system tests passed!');
+    logger.info('All configuration system tests passed');
   } catch (error) {
+    const logger = LogManager.getLogger('config-test');
     if (error instanceof ConfigurationError) {
-      console.error(`❌ Configuration Error: ${error.toUserString()}`);
+      logger.error('Configuration test failed', error, {
+        errorType: 'ConfigurationError',
+        userMessage: error.toUserString(),
+      });
     } else {
-      console.error(
-        `❌ Unexpected Error: ${error instanceof Error ? error.message : String(error)}`,
+      logger.error(
+        'Unexpected test error',
+        error instanceof Error ? error : new Error(String(error)),
       );
     }
     process.exit(1);
