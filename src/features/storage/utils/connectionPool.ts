@@ -15,6 +15,7 @@ const WARNING_UTILIZATION_THRESHOLD = 0.8;
  */
 export class ConnectionPool {
   private connections: Database.Database[] = [];
+  private allConnections: Set<Database.Database> = new Set();
   private waiting: Array<{
     resolve: (db: Database.Database) => void;
     reject: (error: Error) => void;
@@ -31,7 +32,7 @@ export class ConnectionPool {
   };
   private isClosing = false;
 
-  constructor(private config: DatabaseConfig) {}
+  constructor(protected config: DatabaseConfig) {}
 
   /**
    * Acquire a database connection from the pool
@@ -124,9 +125,7 @@ export class ConnectionPool {
     });
 
     // Close all connections
-    const connections = this.connections.splice(0);
-    this.stats.available = 0;
-    connections.forEach(connection => {
+    this.allConnections.forEach(connection => {
       try {
         connection.close();
         this.stats.destroyed++;
@@ -135,6 +134,9 @@ export class ConnectionPool {
         // Ignore errors during cleanup
       }
     });
+    this.allConnections.clear();
+    this.connections = [];
+    this.stats.available = 0;
   }
 
   /**
@@ -147,7 +149,7 @@ export class ConnectionPool {
   /**
    * Create a new database connection with proper configuration
    */
-  private createConnection(): Database.Database {
+  protected createConnection(): Database.Database {
     const db = new Database(this.config.path, {
       readonly: this.config.readonly,
       fileMustExist: false,
@@ -156,13 +158,16 @@ export class ConnectionPool {
     // Configure pragmas
     this.configurePragmas(db);
 
+    // Track the connection
+    this.allConnections.add(db);
+
     return db;
   }
 
   /**
    * Configure database pragmas for optimal performance
    */
-  private configurePragmas(db: Database.Database): void {
+  protected configurePragmas(db: Database.Database): void {
     const { pragmas } = this.config;
 
     // Set journal mode

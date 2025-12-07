@@ -7,6 +7,7 @@ import type {
   DatabaseConfig,
   DatabaseStats,
   DatabaseHealth,
+  PerformanceReport,
   QueryOptions,
   TransactionCallback,
   MigrationResult,
@@ -14,26 +15,31 @@ import type {
 } from '../types/StorageTypes';
 import { DatabaseError } from '../types/StorageTypes';
 import { DatabaseErrorType } from '../types/StorageTypes';
-import { ConnectionPool } from '../utils/connectionPool';
+import { EnhancedConnectionPool } from '../utils/EnhancedConnectionPool';
 import { MigrationManager } from '../migrations/MigrationManager';
 import { DatabaseMaintenance } from '../utils/databaseMaintenance';
+import { PerformanceConfigManager } from '../config/PerformanceConfig';
+import { MONITORING_DEFAULTS } from '../config/PerformanceConstants';
+
+import { PerformanceService } from './PerformanceService';
 
 // Constants for database service
-const SLOW_QUERY_THRESHOLD_MS = 100;
+const SLOW_QUERY_THRESHOLD_MS = MONITORING_DEFAULTS.SLOW_QUERY_THRESHOLD_MS;
 
 /**
  * Main database service for SQLite operations
  */
 export class DatabaseService {
-  private pool: ConnectionPool;
+  private pool: EnhancedConnectionPool;
   private migrationManager!: MigrationManager;
   private maintenance!: DatabaseMaintenance;
+  private performanceService?: PerformanceService;
   private stats: DatabaseStats;
   private isInitialized = false;
   private isClosing = false;
 
   constructor(private config: DatabaseConfig) {
-    this.pool = new ConnectionPool(config);
+    this.pool = new EnhancedConnectionPool(config);
     this.stats = this.initializeStats();
   }
 
@@ -59,6 +65,15 @@ export class DatabaseService {
 
         // Initialize maintenance utilities
         this.maintenance = new DatabaseMaintenance(db, this.config);
+
+        // Initialize performance service with centralized configuration
+        const performanceConfig =
+          PerformanceConfigManager.getProfile('development');
+        this.performanceService = new PerformanceService(
+          db,
+          performanceConfig,
+          this.pool,
+        );
 
         // Run migrations
         const migrationResults = await this.migrationManager.migrate();
@@ -120,8 +135,24 @@ export class DatabaseService {
         // Note: busy_timeout is set via pragma in connection pool
       }
 
-      const stmt = db.prepare(query);
-      const result = stmt.run(...params);
+      let result: Database.RunResult;
+
+      // Use performance service if available for monitoring and optimization
+      if (this.performanceService) {
+        const performanceResult = this.performanceService.executeRun(
+          query,
+          params,
+        );
+        // Convert performance service result to match better-sqlite3 RunResult format
+        result = {
+          changes: performanceResult.changes,
+          lastInsertRowid: performanceResult.lastInsertRowid,
+        } as Database.RunResult;
+      } else {
+        // Fallback to direct execution if no performance service
+        const stmt = db.prepare(query);
+        result = stmt.run(...params);
+      }
 
       this.updateQueryStats(Date.now() - startTime, false);
       return result;
@@ -161,8 +192,16 @@ export class DatabaseService {
         // Note: busy_timeout is set via pragma in connection pool
       }
 
-      const stmt = db.prepare(query);
-      const results = stmt.all(...params) as T[];
+      let results: T[];
+
+      // Use performance service if available for monitoring and optimization
+      if (this.performanceService) {
+        results = this.performanceService.executeQuery<T>(query, params);
+      } else {
+        // Fallback to direct execution if no performance service
+        const stmt = db.prepare(query);
+        results = stmt.all(...params) as T[];
+      }
 
       this.updateQueryStats(Date.now() - startTime, false);
       return results;
@@ -452,6 +491,45 @@ export class DatabaseService {
   }
 
   /**
+   * Get performance report from performance service
+   */
+  getPerformanceReport(): PerformanceReport | undefined {
+    this.ensureInitialized();
+    return this.performanceService?.getPerformanceReport();
+  }
+
+  /**
+   * Get performance service instance
+   */
+  getPerformanceService(): PerformanceService | undefined {
+    return this.performanceService;
+  }
+
+  /**
+   * Graceful shutdown of the database service
+   */
+  async gracefulShutdown(timeoutMs: number = 10000): Promise<void> {
+    if (this.isClosing) {
+      return;
+    }
+
+    this.isClosing = true;
+
+    try {
+      // First, close performance service gracefully
+      if (this.performanceService) {
+        await this.performanceService.gracefulShutdown(timeoutMs / 2);
+      }
+
+      // Close connection pool
+      this.pool.closeAll();
+    } catch {
+      // Fallback to immediate close
+      this.close();
+    }
+  }
+
+  /**
    * Close the database service and cleanup resources
    */
   close(): void {
@@ -462,6 +540,11 @@ export class DatabaseService {
     this.isClosing = true;
 
     try {
+      // Close performance service
+      if (this.performanceService) {
+        this.performanceService.close();
+      }
+
       // Close connection pool
       this.pool.closeAll();
     } catch {

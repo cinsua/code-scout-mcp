@@ -6,6 +6,7 @@ import type {
   ListOptions,
   BatchResult,
 } from '../types/StorageTypes';
+import { PERFORMANCE_LIMITS } from '../config/PerformanceConstants';
 
 /**
  * Repository class for handling CRUD operations on file metadata
@@ -377,7 +378,7 @@ export class FileRepository {
     }
 
     // Process in chunks to avoid memory issues
-    const CHUNK_SIZE = 1000;
+    const CHUNK_SIZE = PERFORMANCE_LIMITS.MAX_CACHE_SIZE;
 
     try {
       const transaction = this.db.transaction((items: FileMetadata[]) => {
@@ -480,7 +481,7 @@ export class FileRepository {
       });
 
       // Process in chunks to avoid memory issues
-      const CHUNK_SIZE = 1000;
+      const CHUNK_SIZE = PERFORMANCE_LIMITS.MAX_CACHE_SIZE;
       for (let i = 0; i < validPaths.length; i += CHUNK_SIZE) {
         const chunk = validPaths.slice(i, i + CHUNK_SIZE);
         transaction(chunk);

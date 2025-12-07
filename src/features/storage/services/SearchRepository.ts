@@ -15,6 +15,7 @@ import type {
   SearchMatch,
 } from '../types/StorageTypes';
 import { DatabaseError, DatabaseErrorType } from '../types/StorageTypes';
+import { TIME_INTERVALS } from '../config/PerformanceConstants';
 
 import type { DatabaseService } from './DatabaseService';
 
@@ -27,7 +28,7 @@ export class SearchRepository {
     string,
     { results: SearchCandidate[]; timestamp: number }
   >();
-  private readonly cacheTimeout = 5 * 60 * 1000; // 5 minutes
+  private readonly cacheTimeout = TIME_INTERVALS.FIVE_MINUTES_MS;
   private stats: SearchStats = {
     totalSearches: 0,
     avgSearchTime: 0,
