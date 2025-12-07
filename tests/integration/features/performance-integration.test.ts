@@ -69,7 +69,7 @@ describe('Performance Integration Tests', () => {
   });
 
   describe('End-to-End Performance Validation', () => {
-    it.skip('should handle concurrent operations efficiently', async () => {
+    it('should handle concurrent operations efficiently', async () => {
       // Use existing files table from migrations to avoid table creation issues
       const tableName = 'files';
 
