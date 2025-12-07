@@ -60,7 +60,7 @@ export class ErrorFactory {
   /**
    * Create an error from an error response object
    */
-  static fromResponse(response: any): ServiceError {
+  static fromResponse(response: any, _operation?: string): ServiceError {
     if (!response?.error) {
       return new ConcreteServiceError(
         ErrorType.SERVICE,
