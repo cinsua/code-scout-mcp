@@ -5,22 +5,28 @@
  * Command-line interface entry point
  */
 
+import { LogManager } from './shared/utils/LogManager';
+
 import CodeScoutServer from './index';
 
 function main(): void {
+  const logger = LogManager.getLogger('cli');
   const server = new CodeScoutServer();
 
+  logger.info('Starting Code-Scout MCP server');
   server.start();
 }
 
 // Handle process termination
 process.on('SIGINT', () => {
-  console.log('\nReceived SIGINT, shutting down gracefully...');
+  const logger = LogManager.getLogger('cli');
+  logger.info('Received SIGINT, shutting down gracefully');
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-  console.log('\nReceived SIGTERM, shutting down gracefully...');
+  const logger = LogManager.getLogger('cli');
+  logger.info('Received SIGTERM, shutting down gracefully');
   process.exit(0);
 });
 
