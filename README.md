@@ -24,6 +24,7 @@ When LLM agents need to refactor, debug, or understand complex codebases, they t
 ## 🚧 Development Status
 
 This project is currently under active development. We're working towards a complete MVP with all core features implemented.
+Note: Code Scout is being developed with help of an older (non-MCP Python-based) Code Scout.
 
 ## 🗺️ Development Roadmap
 
@@ -31,63 +32,15 @@ This project is currently under active development. We're working towards a comp
 
 The project is structured in 8 phases, with Phase 1 (Infrastructure), Phase 2 (Data Layer), Phase 3 (Logging), and Phase 4 (Core Error Handling) fully completed.
 
-### Phase 1: Project Setup and Infrastructure (Priority: Critical)
+### ✅ Phase 1: Project Setup and Infrastructure
 
-✅ 1.1 Initialize project structure and package.json
+### ✅ Phase 2: Core Data Layer
 
-✅ 1.2 Configure TypeScript and build system with esbuild
+### ✅ Phase 3: Logging Framework
 
-✅ 1.3 Setup testing framework with Jest and CI/CD pipeline
+### ✅ Phase 4: Core Error Handling Infrastructure
 
-✅ 1.4 Implement configuration management system
-
-✅ 1.5 Setup code quality tools (ESLint, Prettier)
-
-### Phase 2: Core Data Layer (Priority: Critical)
-
-✅ 2.1 Implement database service with SQLite and better-sqlite3
-
-✅ 2.2 Create database schema and migration system
-
-✅ 2.3 Build file repository for CRUD operations
-
-✅ 2.4 Implement search repository with FTS5 integration
-
-✅ 2.5 Add connection pooling and performance optimizations
-
-### Phase 3: Logging Framework (Priority: Critical)
-
-✅ 3.1 Setup Pino logging infrastructure and configuration
-
-✅ 3.2 Implement Logger class with structured logging and child loggers
-
-✅ 3.3 Create LogManager for global access and dynamic configuration
-
-✅ 3.4 Integrate with configuration management and environment variables
-
-✅ 3.5 Add performance monitoring and error handling integration
-
-✅ 3.6 Implement migration from console.log statements
-
-✅ 3.7 Add testing integration and production deployment configuration
-
-### Phase 4: Core Error Handling Infrastructure (Priority: Critical)
-
-✅ 4.1 Implement core error types (ValidationError, ParsingError, FileSystemError, etc.)
-
-✅ 4.2 Create retry logic infrastructure with exponential backoff
-
-✅ 4.3 Build timeout management system for operations
-
-✅ 4.4 Implement circuit breaker pattern for service protection
-
-✅ 4.5 Create standardized error patterns with BaseService
-
-✅ 4.6 Add error aggregation and monitoring capabilities
-
-✅ 4.7 Implement graceful degradation manager
-
-### Phase 5: Error Handling Integration (Priority: Critical)
+### Phase 5: Error Handling Integration
 
 🔄 5.1 Create error constants centralization and configuration
 
@@ -105,7 +58,7 @@ The project is structured in 8 phases, with Phase 1 (Infrastructure), Phase 2 (D
 
 🔄 5.8 Add comprehensive testing strategy for error handling
 
-### Phase 6: Language Parsing System (Priority: Critical)
+### Phase 6: Language Parsing System
 
 6.1 Setup tree-sitter infrastructure and language parsers
 
@@ -117,7 +70,7 @@ The project is structured in 8 phases, with Phase 1 (Infrastructure), Phase 2 (D
 
 6.5 Create metadata extraction and validation system
 
-### Phase 7: Repository Indexing (Priority: Critical)
+### Phase 7: Repository Indexing
 
 7.1 Build RepositoryScanner for file discovery and filtering
 
@@ -129,7 +82,7 @@ The project is structured in 8 phases, with Phase 1 (Infrastructure), Phase 2 (D
 
 7.5 Add concurrent processing and performance optimizations
 
-### Phase 8: Query Engine and Search (Priority: High)
+### Phase 8: Query Engine and Search
 
 8.1 Implement QueryEngine for search orchestration
 
@@ -141,7 +94,7 @@ The project is structured in 8 phases, with Phase 1 (Infrastructure), Phase 2 (D
 
 8.5 Add query caching and performance monitoring
 
-### Phase 9: File Watching System (Priority: High)
+### Phase 9: File Watching System
 
 9.1 Implement FileWatcher with chokidar integration
 
@@ -153,7 +106,7 @@ The project is structured in 8 phases, with Phase 1 (Infrastructure), Phase 2 (D
 
 9.5 Implement ignore patterns and file filtering
 
-### Phase 10: MCP Protocol Integration (Priority: Critical)
+### Phase 10: MCP Protocol Integration
 
 10.1 Setup MCP server with JSON-RPC 2.0 over stdio
 
