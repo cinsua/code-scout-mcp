@@ -50,7 +50,7 @@ describe('FileRepository', () => {
         indexedAt: Date.now(),
       };
 
-      await expect(repository.save(metadata)).resolves.not.toThrow();
+      expect(() => repository.save(metadata)).not.toThrow();
 
       // Verify the file was saved
       const found = await repository.findByPath('/test/file.ts');
@@ -86,8 +86,8 @@ describe('FileRepository', () => {
         // Missing required fields
       } as any;
 
-      await expect(repository.save(invalidMetadata)).rejects.toThrow(
-        'Required field',
+      expect(() => repository.save(invalidMetadata)).toThrow(
+        'Path must be a non-empty string',
       );
     });
 
@@ -104,7 +104,7 @@ describe('FileRepository', () => {
         indexedAt: Date.now(),
       };
 
-      await expect(repository.save(metadata)).rejects.toThrow(
+      expect(() => repository.save(metadata)).toThrow(
         'Hash must be a valid SHA-256 hash',
       );
     });
@@ -135,10 +135,10 @@ describe('FileRepository', () => {
     });
 
     it('should validate path parameter', async () => {
-      await expect(repository.findByPath('')).rejects.toThrow(
+      expect(() => repository.findByPath('')).toThrow(
         'Path must be a non-empty string',
       );
-      await expect(repository.findByPath(null as any)).rejects.toThrow(
+      expect(() => repository.findByPath(null as any)).toThrow(
         'Path must be a non-empty string',
       );
     });
@@ -198,13 +198,13 @@ describe('FileRepository', () => {
     });
 
     it('should throw error for non-existent file', async () => {
-      await expect(
+      expect(() =>
         repository.update('/nonexistent/file.ts', { size: 2048 }),
-      ).rejects.toThrow('File not found for update');
+      ).toThrow('File not found for update');
     });
 
     it('should validate update data', async () => {
-      await expect(repository.update('/test/file.ts', {})).rejects.toThrow(
+      expect(() => repository.update('/test/file.ts', {})).toThrow(
         'At least one field must be provided for update',
       );
     });
@@ -232,9 +232,7 @@ describe('FileRepository', () => {
     });
 
     it('should handle deletion of non-existent file gracefully', async () => {
-      await expect(
-        repository.delete('/nonexistent/file.ts'),
-      ).resolves.not.toThrow();
+      expect(() => repository.delete('/nonexistent/file.ts')).not.toThrow();
     });
   });
 
@@ -339,13 +337,13 @@ describe('FileRepository', () => {
     });
 
     it('should validate sort options', async () => {
-      await expect(
-        repository.list({ sortBy: 'invalid' as any }),
-      ).rejects.toThrow('Invalid sort field');
+      expect(() => repository.list({ sortBy: 'invalid' as any })).toThrow(
+        'Invalid sort field',
+      );
 
-      await expect(
-        repository.list({ sortOrder: 'INVALID' as any }),
-      ).rejects.toThrow('Invalid sort order');
+      expect(() => repository.list({ sortOrder: 'INVALID' as any })).toThrow(
+        'Invalid sort order',
+      );
     });
   });
 
