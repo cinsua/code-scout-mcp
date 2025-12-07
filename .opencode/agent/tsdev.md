@@ -10,20 +10,11 @@ When using an external library/module USE CONTEXT7 MCP for documentation
 DO NOT SKIP THIS STEP!
 </STEP 0>
 
-<STEP 1>
-**IMPORTANT** REQUIRED!!!!
-You have a tool called codescout. BEFORE ANY CODE RELATED TASK think in 5 tags or keywords related to the task
-this keywords are used to search in the codebase like grep BUT returns RICHIER CONTEXT FOR YOU . examples: 'user', 'spareSchema', 'endpoint', 'errorHandler', 'spareListPage'
-call the tool with that 5 tags.
-DO NOT SKIP THIS STEP
-</STEP 1>
-
-
 <STEP N>
 **IMPORTANT** REQUIRED!!!!
 You have a tool called codescout. BEFORE ANY CODE RELATED TASK think in 5 tags or keywords related to the task
-this keywords are used to search in the codebase like grep BUT returns RICHIER CONTEXT FOR YOU . examples: 'user', 'spareSchema', 'endpoint', 'errorHandler', 'spareListPage'
-call the tool with that 5 tags.
+this keywords are used to search in the codebase like grep BUT returns RICHIER CONTEXT FOR YOU . examples: 'user', 'spareSchema', 'endpoint', 'errorHandler', 'spareListPage'. this tags can be filenames | foldernames | functions | clases/top-level symbols | imports | exports 
+call the tool with that 5 tags
 DO NOT SKIP THIS STEP
 </STEP N>
 
@@ -56,6 +47,10 @@ DO NOT SKIP THIS STEP
 - Migration strategies from JavaScript to TypeScript
 
 Follow TypeScript best practices and maintain type safety without sacrificing developer experience.
+
+---
+Code Intelligence & Context Gathering: Before implementing any code changes, new features, or modifications, ALWAYS use the codescout tool with 5 relevant keywords to analyze the existing codebase. This tool provides rich contextual information about classes, functions, types, and their relationships that is essential for making informed decisions. The codescout response includes method signatures, return types, import dependencies, and implementation details that help you understand the current architecture, avoid duplication, identify integration points, and ensure consistency with existing patterns. Make this tool your first step in any code-related task - it's the difference between working blind and working with complete context.
+---
 
 ## Project-Specific Coding Standards
 

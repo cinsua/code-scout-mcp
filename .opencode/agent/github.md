@@ -195,6 +195,10 @@ git commit --amend --no-edit
 4. **Keep it focused** - Don't mix unrelated changes
 5. **Write for humans** - Future you will read this
 
+## if hook pre-commit fails (TEST ESLINT or similar)
+1. DO NO TRY TO FIX YOURSELF
+2. ONLY REPORT THE PROBLEM
+
 ## Commit message checklist
 
 - [ ] Type is appropriate (feat/fix/docs/etc.)

@@ -199,6 +199,69 @@ export enum DatabaseErrorType {
 }
 
 /**
+ * File metadata interface
+ */
+export interface FileMetadata {
+  /** Unique file identifier */
+  id: string;
+  /** Absolute file path */
+  path: string;
+  /** File name with extension */
+  filename: string;
+  /** File extension without dot */
+  extension: string;
+  /** File size in bytes */
+  size: number;
+  /** Last modified timestamp (Unix epoch) */
+  lastModified: number;
+  /** File content hash (SHA-256) */
+  hash: string;
+  /** Detected programming language */
+  language: string;
+  /** Indexing timestamp (Unix epoch) */
+  indexedAt: number;
+}
+
+/**
+ * List options for file queries
+ */
+export interface ListOptions {
+  /** Pagination limit */
+  limit?: number;
+  /** Pagination offset */
+  offset?: number;
+  /** Filter by language */
+  language?: string;
+  /** Filter by file extension */
+  extension?: string;
+  /** Filter by path pattern (LIKE) */
+  pathPattern?: string;
+  /** Sort field */
+  sortBy?: 'indexedAt' | 'lastModified' | 'size' | 'filename';
+  /** Sort direction */
+  sortOrder?: 'ASC' | 'DESC';
+}
+
+/**
+ * Batch operation result
+ */
+export interface BatchResult {
+  /** Number of successfully processed items */
+  success: number;
+  /** Number of failed items */
+  failed: number;
+  /** Total processing time in milliseconds */
+  duration: number;
+  /** Error details for failed items */
+  errors?: Array<{
+    /** Item identifier */
+    id: string;
+    /** Error message */
+    error: string;
+  }>;
+}
+
+/**
  * Database error class
  */
 export class DatabaseError extends Error {

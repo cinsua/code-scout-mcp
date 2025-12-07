@@ -1,5 +1,6 @@
 // Main exports
 export { DatabaseService } from './services/DatabaseService';
+export { FileRepository } from './services/FileRepository';
 
 // Types
 export type {
@@ -14,6 +15,9 @@ export type {
   ConnectionPoolStats,
   BackupOptions,
   MaintenanceOptions,
+  FileMetadata,
+  ListOptions,
+  BatchResult,
 } from './types/StorageTypes';
 
 // Utilities
