@@ -453,6 +453,436 @@ export class FTSQueryBuilder {
 }
 
 /**
+ * Search Query Builder for FTS5 operations
+ */
+export class SearchQueryBuilder {
+  /**
+   * Build tag search query with FTS5 MATCH
+   */
+  static buildTagSearchQuery(
+    tags: string[],
+    limit: number,
+    offset: number = 0,
+    includeSnippets: boolean = false,
+    filters?: {
+      language?: string;
+      fileType?: string;
+      path?: string;
+      sizeRange?: { min?: number; max?: number };
+      dateRange?: { after?: number; before?: number };
+    },
+    minScore?: number,
+  ) {
+    // Build FTS5 MATCH expression
+    const tagQuery = tags.map(tag => `"${tag}"`).join(' OR ');
+
+    let sql = `
+      SELECT 
+        f.id,
+        f.path,
+        f.filename,
+        f.extension,
+        f.language,
+        f.size,
+        f.lastModified,
+        fts.rank,
+        ${
+          includeSnippets
+            ? `
+          snippet(files_fts, 0, '<mark>', '</mark>', '...', 32) as filename_snippet,
+          snippet(files_fts, 1, '<mark>', '</mark>', '...', 64) as path_snippet,
+          snippet(files_fts, 2, '<mark>', '</mark>', '...', 128) as definitions_snippet,
+        `
+            : ''
+        }
+        1 as match_count
+      FROM files f
+      JOIN files_fts fts ON f.rowid = fts.rowid
+      WHERE files_fts MATCH ?
+    `;
+
+    const params: unknown[] = [tagQuery];
+
+    // Add filters
+    if (filters) {
+      if (filters.language) {
+        sql += ' AND f.language = ?';
+        params.push(filters.language);
+      }
+
+      if (filters.fileType) {
+        sql += ' AND f.extension = ?';
+        params.push(filters.fileType);
+      }
+
+      if (filters.path) {
+        sql += ' AND f.path LIKE ?';
+        params.push(`%${filters.path}%`);
+      }
+
+      if (filters.sizeRange) {
+        if (filters.sizeRange.min !== undefined) {
+          sql += ' AND f.size >= ?';
+          params.push(filters.sizeRange.min);
+        }
+
+        if (filters.sizeRange.max !== undefined) {
+          sql += ' AND f.size <= ?';
+          params.push(filters.sizeRange.max);
+        }
+      }
+
+      if (filters.dateRange) {
+        if (filters.dateRange.after !== undefined) {
+          sql += ' AND f.lastModified >= ?';
+          params.push(filters.dateRange.after);
+        }
+
+        if (filters.dateRange.before !== undefined) {
+          sql += ' AND f.lastModified <= ?';
+          params.push(filters.dateRange.before);
+        }
+      }
+    }
+
+    // Add minimum score filter
+    if (minScore && minScore > 0) {
+      sql += ' AND fts.rank >= ?';
+      params.push(minScore);
+    }
+
+    sql += ' ORDER BY fts.rank DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+
+    return { sql, params };
+  }
+
+  /**
+   * Build text search query with FTS5 MATCH
+   */
+  static buildTextSearchQuery(
+    query: string,
+    limit: number,
+    offset: number = 0,
+    includeSnippets: boolean = false,
+    filters?: {
+      language?: string;
+      fileType?: string;
+      path?: string;
+      sizeRange?: { min?: number; max?: number };
+      dateRange?: { after?: number; before?: number };
+    },
+    minScore?: number,
+  ) {
+    let sql = `
+      SELECT 
+        f.id,
+        f.path,
+        f.filename,
+        f.extension,
+        f.language,
+        f.size,
+        f.lastModified,
+        fts.rank,
+        ${
+          includeSnippets
+            ? `
+          snippet(files_fts, 0, '<mark>', '</mark>', '...', 32) as filename_snippet,
+          snippet(files_fts, 1, '<mark>', '</mark>', '...', 64) as path_snippet,
+          snippet(files_fts, 2, '<mark>', '</mark>', '...', 128) as definitions_snippet,
+          snippet(files_fts, 3, '<mark>', '</mark>', '...', 128) as imports_snippet,
+          snippet(files_fts, 4, '<mark>', '</mark>', '...', 128) as docstrings_snippet,
+        `
+            : ''
+        }
+        1 as match_count
+      FROM files f
+      JOIN files_fts fts ON f.rowid = fts.rowid
+      WHERE files_fts MATCH ?
+    `;
+
+    const params: unknown[] = [query];
+
+    // Add filters (same as tag search)
+    if (filters) {
+      if (filters.language) {
+        sql += ' AND f.language = ?';
+        params.push(filters.language);
+      }
+
+      if (filters.fileType) {
+        sql += ' AND f.extension = ?';
+        params.push(filters.fileType);
+      }
+
+      if (filters.path) {
+        sql += ' AND f.path LIKE ?';
+        params.push(`%${filters.path}%`);
+      }
+
+      if (filters.sizeRange) {
+        if (filters.sizeRange.min !== undefined) {
+          sql += ' AND f.size >= ?';
+          params.push(filters.sizeRange.min);
+        }
+
+        if (filters.sizeRange.max !== undefined) {
+          sql += ' AND f.size <= ?';
+          params.push(filters.sizeRange.max);
+        }
+      }
+
+      if (filters.dateRange) {
+        if (filters.dateRange.after !== undefined) {
+          sql += ' AND f.lastModified >= ?';
+          params.push(filters.dateRange.after);
+        }
+
+        if (filters.dateRange.before !== undefined) {
+          sql += ' AND f.lastModified <= ?';
+          params.push(filters.dateRange.before);
+        }
+      }
+    }
+
+    // Add minimum score filter
+    if (minScore && minScore > 0) {
+      sql += ' AND fts.rank >= ?';
+      params.push(minScore);
+    }
+
+    sql += ' ORDER BY fts.rank DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+
+    return { sql, params };
+  }
+
+  /**
+   * Build suggestions query for autocomplete
+   */
+  static buildSuggestionsQuery(prefix: string, limit: number = 20) {
+    const sql = `
+      SELECT DISTINCT 
+        substr(tags, instr(tags, ?)) as text,
+        'tag' as type,
+        COUNT(*) as score,
+        NULL as context
+      FROM files_fts 
+      WHERE tags MATCH ?
+      GROUP BY text
+      ORDER BY score DESC
+      LIMIT ?
+      
+      UNION ALL
+      
+      SELECT DISTINCT 
+        substr(filename, instr(filename, ?)) as text,
+        'filename' as type,
+        COUNT(*) as score,
+        path as context
+      FROM files_fts 
+      WHERE filename MATCH ?
+      GROUP BY text
+      ORDER BY score DESC
+      LIMIT ?
+    `;
+
+    const prefixPattern = `${prefix}*`;
+
+    return {
+      sql,
+      params: [
+        prefix,
+        prefixPattern,
+        Math.floor(limit / 2),
+        prefix,
+        prefixPattern,
+        Math.ceil(limit / 2),
+      ],
+    };
+  }
+
+  /**
+   * Build index maintenance query
+   */
+  static buildIndexMaintenanceQuery(
+    operation: 'rebuild' | 'optimize' | 'analyze' | 'check',
+  ) {
+    switch (operation) {
+      case 'rebuild':
+        return {
+          sql: "INSERT INTO files_fts(files_fts) VALUES('rebuild')",
+          params: [] as unknown[],
+        };
+
+      case 'optimize':
+        return {
+          sql: "INSERT INTO files_fts(files_fts) VALUES('optimize')",
+          params: [] as unknown[],
+        };
+
+      case 'analyze':
+        return {
+          sql: 'ANALYZE',
+          params: [] as unknown[],
+        };
+
+      case 'check':
+        return {
+          sql: 'PRAGMA integrity_check',
+          params: [] as unknown[],
+        };
+
+      default:
+        throw new Error(`Unknown maintenance operation: ${operation}`);
+    }
+  }
+
+  /**
+   * Sanitize search query to prevent injection
+   */
+  static sanitizeQuery(query: string): string {
+    // Remove potentially dangerous characters
+    return query
+      .replace(/["']/g, '')
+      .replace(/[;-]/g, '')
+      .replace(/--/g, '')
+      .replace(/\/\*/g, '')
+      .replace(/\*\//g, '')
+      .trim();
+  }
+
+  /**
+   * Validate search parameters
+   */
+  static validateSearchParams(params: {
+    tags?: string[];
+    query?: string;
+    limit?: number;
+    offset?: number;
+  }): void {
+    if (params.tags) {
+      if (!Array.isArray(params.tags)) {
+        throw new Error('Tags must be an array');
+      }
+
+      if (params.tags.length === 0) {
+        throw new Error('At least one tag is required');
+      }
+
+      if (params.tags.length > 5) {
+        throw new Error('Maximum 5 tags allowed');
+      }
+
+      for (const tag of params.tags) {
+        if (typeof tag !== 'string' || tag.trim().length === 0) {
+          throw new Error('All tags must be non-empty strings');
+        }
+
+        if (tag.length > 100) {
+          throw new Error('Tag length cannot exceed 100 characters');
+        }
+      }
+    }
+
+    if (params.query) {
+      if (typeof params.query !== 'string') {
+        throw new Error('Query must be a string');
+      }
+
+      if (params.query.trim().length === 0) {
+        throw new Error('Query cannot be empty');
+      }
+
+      if (params.query.length > 1000) {
+        throw new Error('Query length cannot exceed 1000 characters');
+      }
+    }
+
+    if (params.limit !== undefined) {
+      if (typeof params.limit !== 'number' || params.limit <= 0) {
+        throw new Error('Limit must be a positive number');
+      }
+
+      if (params.limit > 1000) {
+        throw new Error('Limit cannot exceed 1000');
+      }
+    }
+
+    if (params.offset !== undefined) {
+      if (typeof params.offset !== 'number' || params.offset < 0) {
+        throw new Error('Offset must be a non-negative number');
+      }
+    }
+  }
+
+  /**
+   * Expand tags with common variations
+   */
+  static expandTags(tags: string[]): string[] {
+    const expanded: string[] = [];
+
+    for (const tag of tags) {
+      expanded.push(tag);
+
+      // Add case variations
+      if (tag.toLowerCase() !== tag) {
+        expanded.push(tag.toLowerCase());
+      }
+      if (tag.toUpperCase() !== tag) {
+        expanded.push(tag.toUpperCase());
+      }
+
+      // Add common substitutions
+      const substitutions = this.getTagSubstitutions(tag);
+      expanded.push(...substitutions);
+    }
+
+    // Remove duplicates while preserving order
+    return [...new Set(expanded)];
+  }
+
+  /**
+   * Get common tag substitutions
+   */
+  private static getTagSubstitutions(tag: string): string[] {
+    const substitutions: string[] = [];
+
+    // Common programming language substitutions
+    const languageMap: Record<string, string[]> = {
+      js: ['javascript'],
+      ts: ['typescript'],
+      py: ['python'],
+      rb: ['ruby'],
+      go: ['golang'],
+      cs: ['csharp', 'c#'],
+      cpp: ['c++'],
+    };
+
+    const languageSubstitutions = languageMap[tag.toLowerCase()];
+    if (languageSubstitutions) {
+      substitutions.push(...languageSubstitutions);
+    }
+
+    // Common framework substitutions
+    const frameworkMap: Record<string, string[]> = {
+      react: ['jsx', 'tsx'],
+      vue: ['vuejs'],
+      angular: ['ng'],
+      express: ['expressjs'],
+      django: ['djangopython'],
+    };
+
+    const frameworkSubstitutions = frameworkMap[tag.toLowerCase()];
+    if (frameworkSubstitutions) {
+      substitutions.push(...frameworkSubstitutions);
+    }
+
+    return substitutions;
+  }
+}
+
+/**
  * Utility functions for common query patterns
  */
 export class QueryUtils {

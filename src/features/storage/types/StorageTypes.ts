@@ -262,6 +262,164 @@ export interface BatchResult {
 }
 
 /**
+ * Search candidate interface for FTS5 results
+ */
+export interface SearchCandidate {
+  /** Unique file identifier */
+  id: string;
+  /** Absolute file path */
+  path: string;
+  /** File name with extension */
+  filename: string;
+  /** FTS5 rank score (higher is more relevant) */
+  score: number;
+  /** Match information with snippets and positions */
+  matches: SearchMatch[];
+  /** File metadata */
+  metadata?: {
+    /** File extension */
+    extension: string;
+    /** Detected programming language */
+    language: string;
+    /** File size in bytes */
+    size: number;
+    /** Last modified timestamp */
+    lastModified: number;
+  };
+}
+
+/**
+ * Search match information
+ */
+export interface SearchMatch {
+  /** Field where match occurred */
+  field:
+    | 'filename'
+    | 'path'
+    | 'definitions'
+    | 'imports'
+    | 'docstrings'
+    | 'tags';
+  /** Matching snippet with highlighting */
+  snippet: string;
+  /** Start position of match in original text */
+  startPosition: number;
+  /** End position of match in original text */
+  endPosition: number;
+  /** Matched terms */
+  terms: string[];
+}
+
+/**
+ * Search options interface
+ */
+export interface SearchOptions {
+  /** Maximum number of results to return */
+  limit?: number;
+  /** Number of results to skip for pagination */
+  offset?: number;
+  /** Search filters */
+  filters?: {
+    /** Filter by programming language */
+    language?: string;
+    /** Filter by file extension */
+    fileType?: string;
+    /** Filter by path pattern (LIKE) */
+    path?: string;
+    /** Filter by file size range */
+    sizeRange?: {
+      min?: number;
+      max?: number;
+    };
+    /** Filter by modification date range */
+    dateRange?: {
+      after?: number;
+      before?: number;
+    };
+  };
+  /** Whether to include snippets in results */
+  includeSnippets?: boolean;
+  /** Maximum length of snippets */
+  snippetLength?: number;
+  /** Search timeout in milliseconds */
+  timeout?: number;
+  /** Whether to use over-retrieval for QueryEngine */
+  overRetrieve?: boolean;
+  /** Minimum score threshold */
+  minScore?: number;
+}
+
+/**
+ * Search suggestion interface
+ */
+export interface SearchSuggestion {
+  /** Suggested text */
+  text: string;
+  /** Suggestion type */
+  type: 'tag' | 'filename' | 'definition' | 'import';
+  /** Frequency/importance score */
+  score: number;
+  /** Context information */
+  context?: string;
+}
+
+/**
+ * Search statistics interface
+ */
+export interface SearchStats {
+  /** Total number of searches performed */
+  totalSearches: number;
+  /** Average search time in milliseconds */
+  avgSearchTime: number;
+  /** Cache hit rate */
+  cacheHitRate: number;
+  /** FTS5 index size */
+  indexSize: number;
+  /** Number of indexed documents */
+  documentCount: number;
+  /** Last index update timestamp */
+  lastIndexUpdate: number;
+}
+
+/**
+ * Index maintenance options
+ */
+export interface IndexMaintenanceOptions {
+  /** Whether to rebuild the entire index */
+  rebuild?: boolean;
+  /** Whether to optimize the index */
+  optimize?: boolean;
+  /** Whether to analyze the index */
+  analyze?: boolean;
+  /** Whether to check index integrity */
+  checkIntegrity?: boolean;
+  /** Progress callback for long operations */
+  onProgress?: (progress: number, message: string) => void;
+}
+
+/**
+ * Index maintenance result
+ */
+export interface IndexMaintenanceResult {
+  /** Whether the operation was successful */
+  success: boolean;
+  /** Operation type performed */
+  operation: 'rebuild' | 'optimize' | 'analyze' | 'check';
+  /** Duration in milliseconds */
+  duration: number;
+  /** Number of documents processed */
+  documentsProcessed?: number;
+  /** Index size before operation */
+  sizeBefore?: number;
+  /** Index size after operation */
+  sizeAfter?: number;
+  /** Error message if failed */
+  error?: string;
+  /** Warnings generated */
+  warnings?: string[];
+}
+
+/**
  * Database error class
  */
 export class DatabaseError extends Error {

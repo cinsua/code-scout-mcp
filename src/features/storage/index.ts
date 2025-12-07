@@ -1,6 +1,7 @@
 // Main exports
 export { DatabaseService } from './services/DatabaseService';
 export { FileRepository } from './services/FileRepository';
+export { SearchRepository } from './services/SearchRepository';
 
 // Types
 export type {
@@ -18,6 +19,13 @@ export type {
   FileMetadata,
   ListOptions,
   BatchResult,
+  SearchCandidate,
+  SearchOptions,
+  SearchSuggestion,
+  SearchStats,
+  IndexMaintenanceOptions,
+  IndexMaintenanceResult,
+  SearchMatch,
 } from './types/StorageTypes';
 
 // Utilities
@@ -29,6 +37,7 @@ export {
   DeleteBuilder,
   FTSQueryBuilder,
   QueryUtils,
+  SearchQueryBuilder,
 } from './utils/queryBuilder';
 export { DatabaseMaintenance } from './utils/databaseMaintenance';
 
