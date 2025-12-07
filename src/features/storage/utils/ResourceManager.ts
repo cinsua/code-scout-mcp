@@ -6,13 +6,13 @@ import type {
 } from '../types/StorageTypes';
 import { PERFORMANCE_THRESHOLDS } from '../config/PerformanceConstants';
 
+import { memoryUtils } from './MemoryUtils';
+
 /**
  * Resource management and leak detection for database operations
  */
 export class ResourceManager {
   private resources: Map<string, ResourceInfo> = new Map();
-  private memoryUsageHistory: number[] = [];
-  private maxHistorySize = 100;
   private cleanupInterval?: NodeJS.Timeout;
   private resourceStats: ResourceStats = {
     activeConnections: 0,
@@ -137,21 +137,13 @@ export class ResourceManager {
     average: number;
     trend: 'increasing' | 'decreasing' | 'stable';
   } {
-    const current = this.getCurrentMemoryUsage();
-    this.memoryUsageHistory.push(current);
-
-    // Keep history size limited
-    if (this.memoryUsageHistory.length > this.maxHistorySize) {
-      this.memoryUsageHistory.shift();
-    }
-
-    const peak = Math.max(...this.memoryUsageHistory);
-    const average =
-      this.memoryUsageHistory.reduce((sum, usage) => sum + usage, 0) /
-      this.memoryUsageHistory.length;
-    const trend = this.calculateMemoryTrend();
-
-    return { current, peak, average, trend };
+    const stats = memoryUtils.getMemoryStats();
+    return {
+      current: stats.current,
+      peak: stats.peak,
+      average: stats.average,
+      trend: stats.trend,
+    };
   }
 
   /**
@@ -161,33 +153,20 @@ export class ResourceManager {
     freedMemory: number;
     optimizations: string[];
   } {
-    const optimizations: string[] = [];
-    let freedMemory = 0;
-
-    // Force garbage collection if available
-    if (typeof global !== 'undefined' && global.gc) {
-      const beforeGC = this.getCurrentMemoryUsage();
-      global.gc();
-      const afterGC = this.getCurrentMemoryUsage();
-      freedMemory += beforeGC - afterGC;
-      optimizations.push('Forced garbage collection');
-    }
+    const memoryOptimization = memoryUtils.optimizeMemory();
 
     // Clean up old resources
     const cleanedResources = this.cleanupLeakedResources();
     if (cleanedResources > 0) {
-      optimizations.push(`Cleaned up ${cleanedResources} leaked resources`);
-    }
-
-    // Clear old memory history
-    if (this.memoryUsageHistory.length > this.maxHistorySize / 2) {
-      this.memoryUsageHistory = this.memoryUsageHistory.slice(
-        -this.maxHistorySize / 2,
+      memoryOptimization.optimizations.push(
+        `Cleaned up ${cleanedResources} leaked resources`,
       );
-      optimizations.push('Trimmed memory usage history');
     }
 
-    return { freedMemory, optimizations };
+    return {
+      freedMemory: memoryOptimization.freedMemory,
+      optimizations: memoryOptimization.optimizations,
+    };
   }
 
   /**
@@ -243,7 +222,6 @@ export class ResourceManager {
   private startResourceMonitoring(): void {
     this.cleanupInterval = setInterval(() => {
       this.cleanupLeakedResources();
-      this.updateMemoryUsage();
     }, 60000); // Check every minute
   }
 
@@ -258,28 +236,10 @@ export class ResourceManager {
   }
 
   /**
-   * Update memory usage history
-   */
-  private updateMemoryUsage(): void {
-    const current = this.getCurrentMemoryUsage();
-    this.memoryUsageHistory.push(current);
-
-    if (this.memoryUsageHistory.length > this.maxHistorySize) {
-      this.memoryUsageHistory.shift();
-    }
-  }
-
-  /**
    * Get current memory usage
    */
   private getCurrentMemoryUsage(): number {
-    if (
-      typeof process !== 'undefined' &&
-      typeof process.memoryUsage === 'function'
-    ) {
-      return process.memoryUsage().heapUsed;
-    }
-    return 0;
+    return memoryUtils.getCurrentMemoryUsage();
   }
 
   /**
@@ -347,31 +307,6 @@ export class ResourceManager {
     }
 
     return Math.min(severity, 1.0);
-  }
-
-  /**
-   * Calculate memory trend
-   */
-  private calculateMemoryTrend(): 'increasing' | 'decreasing' | 'stable' {
-    if (this.memoryUsageHistory.length < 10) {
-      return 'stable';
-    }
-
-    const recent = this.memoryUsageHistory.slice(-5);
-    const older = this.memoryUsageHistory.slice(-10, -5);
-
-    const recentAvg = recent.reduce((sum, val) => sum + val, 0) / recent.length;
-    const olderAvg = older.reduce((sum, val) => sum + val, 0) / older.length;
-
-    const change = (recentAvg - olderAvg) / olderAvg;
-
-    if (change > 0.1) {
-      return 'increasing';
-    }
-    if (change < -0.1) {
-      return 'decreasing';
-    }
-    return 'stable';
   }
 
   /**
