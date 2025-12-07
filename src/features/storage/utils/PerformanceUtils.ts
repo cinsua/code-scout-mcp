@@ -67,6 +67,7 @@ export function formatBytes(bytes: number): string {
     unitIndex++;
   }
 
+  // eslint-disable-next-line security/detect-object-injection
   return `${size.toFixed(2)} ${units[unitIndex]}`;
 }
 

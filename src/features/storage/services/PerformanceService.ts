@@ -345,6 +345,7 @@ export class PerformanceService {
       }
 
       for (let i = 0; i < chunks.length; i++) {
+        // eslint-disable-next-line security/detect-object-injection
         const chunk = chunks[i];
         if (!chunk || chunk.length === 0) {
           continue;
@@ -364,6 +365,7 @@ export class PerformanceService {
             const stmt = this.db.prepare(query);
 
             for (const record of chunk) {
+              // eslint-disable-next-line security/detect-object-injection
               const values = columns.map(col => record[col]);
               stmt.run(...values);
               insertedCount++;

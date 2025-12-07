@@ -29,13 +29,6 @@ export interface MemoryOptimizationResult {
   success: boolean;
 }
 
-export interface MemoryPressureConfig {
-  lowThreshold: number;
-  mediumThreshold: number;
-  highThreshold: number;
-  criticalThreshold: number;
-}
-
 export interface MemoryMonitoringInterface {
   getCurrentMemoryUsage(): number;
   getMemoryStats(): MemoryStats;
@@ -282,6 +275,7 @@ export class MemoryUtils implements MemoryMonitoringInterface {
       unitIndex++;
     }
 
+    // eslint-disable-next-line security/detect-object-injection
     return `${size.toFixed(2)} ${units[unitIndex]}`;
   }
 
