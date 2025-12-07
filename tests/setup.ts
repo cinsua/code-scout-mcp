@@ -1,11 +1,25 @@
 // Global test setup
 import { expect } from '@jest/globals';
+import { LogManager } from '../src/shared/utils/LogManager';
+import { initializeLogging } from '../src/config/logging';
 
 export {};
 beforeAll(async () => {
   // Set test environment variables
   process.env.NODE_ENV = 'test';
   process.env.LOG_LEVEL = 'error';
+
+  // Initialize test logging (silent mode)
+  initializeLogging({
+    level: 'error', // Only log errors in tests
+    format: 'json',
+    file: { enabled: false },
+    console: { enabled: false },
+    structured: true,
+  });
+
+  const logger = LogManager.getLogger('test-setup');
+  logger.info('Test environment initialized');
 
   // Setup test database (will be implemented when database is added)
   // await setupTestDatabase();
@@ -15,11 +29,11 @@ beforeAll(async () => {
 
   // Initialize test fixtures
   // await initializeTestFixtures();
-
-  console.log('🧪 Test environment initialized');
 });
 
 afterAll(async () => {
+  const logger = LogManager.getLogger('test-setup');
+
   // Cleanup test database (will be implemented when database is added)
   // await cleanupTestDatabase();
 
@@ -30,7 +44,7 @@ afterAll(async () => {
   delete process.env.NODE_ENV;
   delete process.env.LOG_LEVEL;
 
-  console.log('🧹 Test environment cleaned up');
+  logger.info('Test environment cleaned up');
 });
 
 // Custom matchers for common validations
@@ -93,7 +107,7 @@ declare global {
 (global as any).testUtils = {
   // Helper to create test timeouts
   createTimeout: (ms: number = 5000) =>
-    new Promise((resolve) => setTimeout(resolve, ms)),
+    new Promise(resolve => setTimeout(resolve, ms)),
 
   // Helper to generate test data
   generateTestId: () =>
@@ -103,4 +117,5 @@ declare global {
   isTestEnvironment: () => process.env.NODE_ENV === 'test',
 };
 
-console.log('🔧 Global test configuration loaded');
+const logger = LogManager.getLogger('test-setup');
+logger.info('Global test configuration loaded');

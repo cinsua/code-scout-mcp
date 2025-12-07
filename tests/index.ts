@@ -6,5 +6,3 @@ export * from './integration';
 export * from './performance';
 export * from './fixtures';
 export * from './mocks';
-
-console.log('All test modules loaded');

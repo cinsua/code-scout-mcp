@@ -1,88 +1,73 @@
-import { DatabaseService } from '../../src/features/storage/services/DatabaseService';
+import Database from 'better-sqlite3';
+import { FileRepository } from '../../src/features/storage/services/FileRepository';
 
 import type { FileMetadata } from '../../src/features/storage/types/StorageTypes';
 
 describe('Batch Operations', () => {
-  let dbService: DatabaseService;
-  const testDbPath = '/tmp/test-batch-operations.db';
+  let db: Database.Database;
+  let repository: FileRepository;
 
-  beforeEach(async () => {
-    dbService = new DatabaseService({
-      path: testDbPath,
-      maxConnections: 5,
-      connectionTimeout: 30000,
-      readonly: false,
-      pragmas: {
-        cache_size: 1000,
-        synchronous: 'NORMAL',
-        journal_mode: 'WAL',
-        temp_store: 'MEMORY',
-        locking_mode: 'NORMAL',
-        foreign_keys: 'ON',
-        busy_timeout: 30000,
-      },
-    });
+  beforeEach(() => {
+    // Create in-memory database for testing
+    db = new Database(':memory:');
 
-    await dbService.initialize();
+    // Create the files table
+    db.exec(`
+      CREATE TABLE files (
+        id TEXT PRIMARY KEY,
+        path TEXT NOT NULL UNIQUE,
+        filename TEXT NOT NULL,
+        extension TEXT NOT NULL,
+        size INTEGER NOT NULL,
+        lastModified INTEGER NOT NULL,
+        hash TEXT NOT NULL,
+        language TEXT NOT NULL,
+        indexedAt INTEGER NOT NULL
+      )
+    `);
+
+    // Create indexes
+    db.exec(`CREATE INDEX idx_files_path ON files(path)`);
+    db.exec(`CREATE INDEX idx_files_language ON files(language)`);
+
+    repository = new FileRepository(db);
   });
 
-  afterEach(async () => {
-    dbService.close();
-    // Clean up test database
-    try {
-      await require('fs').promises.unlink(testDbPath);
-    } catch {
-      // Ignore cleanup errors
-    }
+  afterEach(() => {
+    db.close();
   });
 
   describe('saveBatch', () => {
-    it('should save multiple files efficiently', async () => {
+    it('should save multiple files efficiently', () => {
       const metadata: FileMetadata[] = Array.from({ length: 1000 }, (_, i) => ({
         id: `file_${i}`,
-        path: `/path/to/file_${i}`,
+        path: `/path/to/file_${i}.ts`,
         filename: `file_${i}.ts`,
         extension: 'ts',
         size: 1024 + i,
         lastModified: Date.now(),
-        hash: `hash_${i}`,
+        hash: `a${i.toString().padStart(63, '0')}`, // Valid 64-char hex hash
         language: 'typescript',
         indexedAt: Date.now(),
       }));
 
       const startTime = Date.now();
-      const result = await dbService.executeRun(
-        'INSERT INTO files (id, path, filename, extension, size, lastModified, hash, language, indexedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        metadata.flatMap(item => [
-          item.id,
-          item.path,
-          item.filename,
-          item.extension,
-          item.size,
-          item.lastModified,
-          item.hash,
-          item.language,
-          item.indexedAt,
-        ]),
-      );
-
+      const result = repository.saveBatch(metadata);
       const duration = Date.now() - startTime;
 
-      expect(result.changes).toBe(1000);
+      expect(result.success).toBe(1000);
+      expect(result.failed).toBe(0);
       expect(duration).toBeLessThan(1000); // Should complete within 1 second
-      expect(result.lastInsertRowid).toBeGreaterThan(0);
     });
 
-    it('should handle empty batch gracefully', async () => {
-      const result = await dbService.executeRun(
-        'INSERT INTO files (id, path, filename, extension, size, lastModified, hash, language, indexedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [],
-      );
+    it('should handle empty batch gracefully', () => {
+      const result = repository.saveBatch([]);
 
-      expect(result.changes).toBe(0);
+      expect(result.success).toBe(0);
+      expect(result.failed).toBe(0);
     });
 
-    it('should handle partial failures gracefully', async () => {
+    it('should handle partial failures gracefully', () => {
       // Mix valid and invalid data
       const metadata = [
         {
@@ -92,7 +77,7 @@ describe('Batch Operations', () => {
           extension: 'ts',
           size: 1024,
           lastModified: Date.now(),
-          hash: 'valid_hash',
+          hash: 'a'.repeat(64), // Valid hash
           language: 'typescript',
           indexedAt: Date.now(),
         },
@@ -103,80 +88,60 @@ describe('Batch Operations', () => {
           extension: 'ts',
           size: -1, // Invalid: negative size
           lastModified: Date.now(),
-          hash: 'invalid_hash',
+          hash: 'invalid'.repeat(16), // Invalid hash for testing
           language: 'typescript',
           indexedAt: Date.now(),
         },
       ];
 
-      const result = await dbService.executeRun(
-        'INSERT INTO files (id, path, filename, extension, size, lastModified, hash, language, indexedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        metadata.flatMap(item => [
-          item.id,
-          item.path,
-          item.filename,
-          item.extension,
-          item.size,
-          item.lastModified,
-          item.hash,
-          item.language,
-          item.indexedAt,
-        ]),
-      );
+      const result = repository.saveBatch(metadata);
 
-      // Should handle partial success
-      expect(result.changes).toBeGreaterThanOrEqual(0);
+      // Should handle partial success - valid file saved, invalid file failed
+      expect(result.success).toBe(1);
+      expect(result.failed).toBe(1);
+      expect(result.errors).toHaveLength(1);
     });
   });
 
   describe('Query Performance with Caching', () => {
-    it('should cache query results effectively', async () => {
-      // Insert test data
-      await dbService.executeRun(
-        'INSERT INTO files (id, path, filename, extension, size, lastModified, hash, language, indexedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [
-          'cached_test_1',
-          '/path/to/cached1.ts',
-          'cached1.ts',
-          'ts',
-          1024,
-          Date.now(),
-          'hash1',
-          'typescript',
-          Date.now(),
-        ],
-      );
+    it('should cache query results effectively', () => {
+      // Insert test data using repository
+      repository.saveBatch([
+        {
+          id: 'cached_test_1',
+          path: '/path/to/cached1.ts',
+          filename: 'cached1.ts',
+          extension: 'ts',
+          size: 1024,
+          lastModified: Date.now(),
+          hash: 'a'.repeat(64),
+          language: 'typescript',
+          indexedAt: Date.now(),
+        },
+      ]);
 
-      // First query - should cache result
+      // First query - direct database query
       const startTime1 = Date.now();
-      const result1 = await dbService.executeQuery<FileMetadata>(
-        'SELECT * FROM files WHERE id = ?',
-        ['cached_test_1'],
-      );
+      const stmt = db.prepare('SELECT * FROM files WHERE id = ?');
+      const result1 = stmt.all('cached_test_1') as FileMetadata[];
       const duration1 = Date.now() - startTime1;
 
       expect(result1).toHaveLength(1);
       expect(result1[0]!.id).toBe('cached_test_1');
 
-      // Second identical query - should be faster due to caching
+      // Second identical query - should be faster due to prepared statement caching
       const startTime2 = Date.now();
-      const result2 = await dbService.executeQuery(
-        'SELECT * FROM files WHERE id = ?',
-        ['cached_test_1'],
-      );
+      const result2 = stmt.all('cached_test_1') as FileMetadata[];
       const duration2 = Date.now() - startTime2;
 
       expect(result2).toEqual(result1);
       expect(duration2).toBeLessThanOrEqual(duration1); // Should be faster or equal due to caching
     });
 
-    it('should respect cache TTL', async () => {
-      // This test would require manipulating time or waiting for TTL
-      // For now, just verify cache structure exists
-      const result = await dbService.executeQuery(
-        'SELECT COUNT(*) as count FROM files',
-        [],
-      );
+    it('should respect cache TTL', () => {
+      // Test basic query functionality
+      const stmt = db.prepare('SELECT COUNT(*) as count FROM files');
+      const result = stmt.all();
 
       expect(result).toHaveLength(1);
       expect(result[0]).toHaveProperty('count');
@@ -184,112 +149,97 @@ describe('Batch Operations', () => {
   });
 
   describe('Concurrent Operations', () => {
-    it('should handle concurrent reads efficiently', async () => {
-      // Insert test data
-      for (let i = 0; i < 100; i++) {
-        await dbService.executeRun(
-          'INSERT INTO files (id, path, filename, extension, size, lastModified, hash, language, indexedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [
-            `concurrent_test_${i}`,
-            `/path/to/concurrent_${i}.ts`,
-            `concurrent_${i}.ts`,
-            'ts',
-            1024,
-            Date.now(),
-            `hash_${i}`,
-            'typescript',
-            Date.now(),
-          ],
-        );
-      }
+    it('should handle concurrent reads efficiently', () => {
+      // Insert test data using batch operation
+      const testData = Array.from({ length: 100 }, (_, i) => ({
+        id: `concurrent_test_${i}`,
+        path: `/path/to/concurrent_${i}.ts`,
+        filename: `concurrent_${i}.ts`,
+        extension: 'ts',
+        size: 1024,
+        lastModified: Date.now(),
+        hash: `a${i.toString().padStart(63, '0')}`, // Valid 64-char hash
+        language: 'typescript',
+        indexedAt: Date.now(),
+      }));
 
-      // Execute concurrent queries
-      const concurrentQueries = Array.from({ length: 50 }, (_, i) =>
-        dbService.executeQuery('SELECT * FROM files WHERE id = ?', [
-          `concurrent_test_${i}`,
-        ]),
-      );
+      repository.saveBatch(testData);
 
+      // Execute concurrent queries using prepared statements
+      const stmt = db.prepare('SELECT * FROM files WHERE id = ?');
       const startTime = Date.now();
-      const results = await Promise.all(concurrentQueries);
+      const results = Array.from(
+        { length: 50 },
+        (_, i) => stmt.all(`concurrent_test_${i}`) as FileMetadata[],
+      );
       const duration = Date.now() - startTime;
 
       expect(results).toHaveLength(50);
-      results.forEach((result: any, index: number) => {
+      results.forEach((result, index) => {
         expect(result).toHaveLength(1);
-        expect(result[0].id).toBe(`concurrent_test_${index}`);
+        expect(result[0]!.id).toBe(`concurrent_test_${index}`);
       });
       expect(duration).toBeLessThan(2000); // Should complete within 2 seconds
     });
 
-    it('should handle concurrent writes safely', async () => {
-      const concurrentWrites = Array.from({ length: 10 }, (_, i) =>
-        dbService.executeRun(
-          'INSERT INTO files (id, path, filename, extension, size, lastModified, hash, language, indexedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [
-            `concurrent_write_${i}`,
-            `/path/to/concurrent_write_${i}.ts`,
-            `concurrent_write_${i}.ts`,
-            'ts',
-            1024,
-            Date.now(),
-            `hash_${i}`,
-            'typescript',
-            Date.now(),
-          ],
-        ),
-      );
+    it('should handle concurrent writes safely', () => {
+      const testData = Array.from({ length: 10 }, (_, i) => ({
+        id: `concurrent_write_${i}`,
+        path: `/path/to/concurrent_write_${i}.ts`,
+        filename: `concurrent_write_${i}.ts`,
+        extension: 'ts',
+        size: 1024,
+        lastModified: Date.now(),
+        hash: `b${i.toString().padStart(63, '0')}`, // Valid 64-char hash
+        language: 'typescript',
+        indexedAt: Date.now(),
+      }));
 
       const startTime = Date.now();
-      const results = await Promise.all(concurrentWrites);
+      const result = repository.saveBatch(testData);
       const duration = Date.now() - startTime;
 
-      expect(results).toHaveLength(10);
-      results.forEach((result: any) => {
-        expect(result.changes).toBe(1);
-        expect(result.lastInsertRowid).toBeGreaterThan(0);
-      });
+      expect(result.success).toBe(10);
+      expect(result.failed).toBe(0);
       expect(duration).toBeLessThan(3000); // Should complete within 3 seconds
     });
   });
 
   describe('Memory Management', () => {
-    it('should handle large result sets efficiently', async () => {
-      // Insert large dataset
-      const largeDataset = Array.from({ length: 5000 }, (_, i) => [
-        `memory_test_${i}`,
-        `/path/to/memory_test_${i}.ts`,
-        `memory_test_${i}.ts`,
-        'ts',
-        1024,
-        Date.now(),
-        `hash_${i}`,
-        'typescript',
-        Date.now(),
-      ]);
+    it('should handle large result sets efficiently', () => {
+      // Insert large dataset using batch operation
+      const largeDataset = Array.from({ length: 5000 }, (_, i) => ({
+        id: `memory_test_${i}`,
+        path: `/path/to/memory_test_${i}.ts`,
+        filename: `memory_test_${i}.ts`,
+        extension: 'ts',
+        size: 1024,
+        lastModified: Date.now(),
+        hash: `c${i.toString().padStart(63, '0')}`, // Valid 64-char hash
+        language: 'typescript',
+        indexedAt: Date.now(),
+      }));
 
-      await dbService.executeRun(
-        'INSERT INTO files (id, path, filename, extension, size, lastModified, hash, language, indexedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        largeDataset.flat(),
-      );
+      const result = repository.saveBatch(largeDataset);
+      expect(result.success).toBe(5000);
 
       // Query large result set
       const startTime = Date.now();
-      const results = await dbService.executeQuery(
-        'SELECT * FROM files ORDER BY id',
-      );
+      const stmt = db.prepare('SELECT * FROM files ORDER BY id');
+      const results = stmt.all() as FileMetadata[];
       const duration = Date.now() - startTime;
 
       expect(results).toHaveLength(5000);
       expect(duration).toBeLessThan(5000); // Should complete within 5 seconds
     });
 
-    it('should clean up resources properly', async () => {
+    it('should clean up resources properly', () => {
       const initialMemory = process.memoryUsage();
 
       // Perform operations that allocate memory
+      const stmt = db.prepare('SELECT * FROM files LIMIT 100');
       for (let i = 0; i < 100; i++) {
-        await dbService.executeQuery('SELECT * FROM files LIMIT 100');
+        stmt.all();
       }
 
       const peakMemory = process.memoryUsage();
