@@ -7,12 +7,12 @@ import type {
   DatabaseConfig,
   DatabaseStats,
   DatabaseHealth,
-  PerformanceReport,
   QueryOptions,
   TransactionCallback,
   MigrationResult,
   BackupOptions,
 } from '../types/StorageTypes';
+import type { PerformanceReport } from '../types/PerformanceTypes';
 import { DatabaseError } from '../types/StorageTypes';
 import { DatabaseErrorType } from '../types/StorageTypes';
 import { EnhancedConnectionPool } from '../utils/EnhancedConnectionPool';

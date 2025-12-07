@@ -1,4 +1,4 @@
-import type { PerformanceConfig } from '../types/StorageTypes';
+import type { PerformanceConfig } from '../types/PerformanceTypes';
 
 import {
   CONNECTION_POOL_DEFAULTS,

@@ -1,11 +1,11 @@
 import type Database from 'better-sqlite3';
 
+import type { DatabaseConfig } from '../types/StorageTypes';
 import type {
-  DatabaseConfig,
   ConnectionHealth,
   EnhancedConnectionPoolStats,
   PerformanceConfig,
-} from '../types/StorageTypes';
+} from '../types/PerformanceTypes';
 import {
   DEFAULT_PERFORMANCE_CONFIG,
   CONNECTION_POOL_DEFAULTS,
