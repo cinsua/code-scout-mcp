@@ -18,6 +18,7 @@ export const ERROR_AGGREGATION = {
   MAX_SAMPLE_ERRORS: 5,
   AGGREGATION_WINDOW_MS: 300000, // 5 minutes
   CLEANUP_INTERVAL_MS: 3600000, // 1 hour
+  CRITICAL_THRESHOLD: 10, // Critical error count threshold
 } as const;
 
 /**
