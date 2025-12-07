@@ -248,7 +248,7 @@ src/features/parsing/
 ### Creating Detailed Tasks
 1. Select a roadmap item (e.g., "2.2")
 2. Invoke: "Create detailed implementation task for {roadmap_name} item 2.2"
-3. The planner will generate `tasks/task_{roadmap_name}_2.2.md` with complete implementation details
+3. The planner will read ALL documentation and generate `tasks/task_{roadmap_name}_2.2.md` with complete implementation details
 4. The generated task will be self-contained for immediate implementation
 
 ### Updating Existing Tasks

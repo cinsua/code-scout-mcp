@@ -18,7 +18,7 @@ export default tool({
     const tags = args.query.join(', ');
     //console.log(tags);
     const encodedTags = encodeURIComponent(tags);
-    const url = `http://localhost:8000/api/query?tags=${encodedTags}&limit=20&compact=false&format=md`;
+    const url = `http://localhost:8000/api/query?tags=${encodedTags}&limit=10&compact=false&format=md`;
     const response = await fetch(url);
     const result = await response.text();
     return result;

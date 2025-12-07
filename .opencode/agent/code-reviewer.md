@@ -1,5 +1,6 @@
 ---
 description: Expert code review specialist for quality, security, and maintainability. Use PROACTIVELY after writing or modifying code to ensure high development standards.
+model: opencode/grok-code
 tools:
   write: false
   edit: false
