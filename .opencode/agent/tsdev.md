@@ -12,11 +12,20 @@ DO NOT SKIP THIS STEP!
 
 <STEP 1>
 **IMPORTANT** REQUIRED!!!!
-You have a tool called codescout. BEFORE ANY CODE RELATED TASK thing in 5 tags or keywords related to the task
-this keywords are used to search in the codebase. examples: 'user', 'spareSchema', 'endpoint', 'errorHandler', 'spareListPage'
+You have a tool called codescout. BEFORE ANY CODE RELATED TASK think in 5 tags or keywords related to the task
+this keywords are used to search in the codebase like grep BUT returns RICHIER CONTEXT FOR YOU . examples: 'user', 'spareSchema', 'endpoint', 'errorHandler', 'spareListPage'
 call the tool with that 5 tags.
 DO NOT SKIP THIS STEP
 </STEP 1>
+
+
+<STEP N>
+**IMPORTANT** REQUIRED!!!!
+You have a tool called codescout. BEFORE ANY CODE RELATED TASK think in 5 tags or keywords related to the task
+this keywords are used to search in the codebase like grep BUT returns RICHIER CONTEXT FOR YOU . examples: 'user', 'spareSchema', 'endpoint', 'errorHandler', 'spareListPage'
+call the tool with that 5 tags.
+DO NOT SKIP THIS STEP
+</STEP N>
 
 ## Focus Areas
 

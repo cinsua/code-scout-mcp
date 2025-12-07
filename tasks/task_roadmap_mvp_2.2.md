@@ -54,60 +54,60 @@ Update the file after completing each sub-task, not just after completing an ent
 
 ### 2.2.1 Setup Database Infrastructure
 
-- [ ] Create `src/features/storage/migrations/` directory structure
-- [ ] Install better-sqlite3 dependency: `npm install better-sqlite3@^11.4.0`
-- [ ] Define migration types in `src/features/storage/migrations/types.ts`
-- [ ] Create MigrationManager in `src/features/storage/migrations/MigrationManager.ts`
-- [ ] Setup database configuration types in `src/features/storage/types/StorageTypes.ts`
+- [x] Create `src/features/storage/migrations/` directory structure
+- [x] Install better-sqlite3 dependency: `npm install better-sqlite3@^11.4.0`
+- [x] Define migration types in `src/features/storage/migrations/types.ts`
+- [x] Create MigrationManager in `src/features/storage/migrations/MigrationManager.ts`
+- [x] Setup database configuration types in `src/features/storage/types/StorageTypes.ts`
 
 ### 2.2.2 Implement Migration 001: Initial Schema
 
-- [ ] Create `src/features/storage/migrations/001_initial_schema.ts`
-- [ ] Implement files table with proper indexes
-- [ ] Implement definitions table with foreign key constraints
-- [ ] Implement imports table with type classification
-- [ ] Implement symbols table for local variables
-- [ ] Add proper indexes for query performance
-- [ ] Create migration table for version tracking
-- [ ] Implement down migration for rollback
+- [x] Create `src/features/storage/migrations/001_initial_schema.ts`
+- [x] Implement files table with proper indexes
+- [x] Implement definitions table with foreign key constraints
+- [x] Implement imports table with type classification
+- [x] Implement symbols table for local variables
+- [x] Add proper indexes for query performance
+- [x] Create migration table for version tracking
+- [x] Implement down migration for rollback
 
 ### 2.2.3 Implement Migration 002: Add FTS5 Support
 
-- [ ] Create `src/features/storage/migrations/002_add_fts_index.ts`
-- [ ] Implement FTS5 virtual table with optimized tokenizer
-- [ ] Create file_tags table for weighted tag storage
-- [ ] Implement FTS5 triggers for automatic index updates
-- [ ] Populate FTS5 index with existing data
-- [ ] Add FTS5 configuration and optimization
-- [ ] Implement down migration for FTS5 removal
+- [x] Create `src/features/storage/migrations/002_add_fts_index.ts`
+- [x] Implement FTS5 virtual table with optimized tokenizer
+- [x] Create file_tags table for weighted tag storage
+- [x] Implement FTS5 triggers for automatic index updates
+- [x] Populate FTS5 index with existing data
+- [x] Add FTS5 configuration and optimization
+- [x] Implement down migration for FTS5 removal
 
 ### 2.2.4 Create Migration Manager
 
-- [ ] Implement migration discovery and loading
-- [ ] Create version tracking and comparison logic
-- [ ] Implement forward migration execution
-- [ ] Create rollback functionality
-- [ ] Add migration validation and checksums
-- [ ] Implement transaction handling for atomic migrations
-- [ ] Add migration status reporting
+- [x] Implement migration discovery and loading
+- [x] Create version tracking and comparison logic
+- [x] Implement forward migration execution
+- [x] Create rollback functionality
+- [x] Add migration validation and checksums
+- [x] Implement transaction handling for atomic migrations
+- [x] Add migration status reporting
 
 ### 2.2.5 Implement Database Service Integration
 
-- [ ] Integrate migration manager into DatabaseService
-- [ ] Add automatic migration on database initialization
-- [ ] Implement migration error handling and recovery
-- [ ] Add database health checks and integrity validation
-- [ ] Create migration status monitoring
-- [ ] Implement backup creation before major migrations
+- [x] Integrate migration manager into DatabaseService
+- [x] Add automatic migration on database initialization
+- [x] Implement migration error handling and recovery
+- [x] Add database health checks and integrity validation
+- [x] Create migration status monitoring
+- [x] Implement backup creation before major migrations
 
 ### 2.2.6 Add Error Handling and Validation
 
-- [ ] Implement migration-specific error types
-- [ ] Add validation for migration scripts
-- [ ] Create rollback mechanisms for failed migrations
-- [ ] Implement retry logic for transient failures
-- [ ] Add comprehensive logging for migration operations
-- [ ] Create migration status reporting and monitoring
+- [x] Implement migration-specific error types
+- [x] Add validation for migration scripts
+- [x] Create rollback mechanisms for failed migrations
+- [x] Implement retry logic for transient failures
+- [x] Add comprehensive logging for migration operations
+- [x] Create migration status reporting and monitoring
 
 ## Code Templates
 

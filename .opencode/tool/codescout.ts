@@ -16,6 +16,7 @@ export default tool({
     // seems that should be comma separed and comma equals to %2C%20
     // http://localhost:8000/api/query?tags=database%2C%20sqlite&limit=20&compact=false&format=md
     const tags = args.query.join(', ');
+    //console.log(tags);
     const encodedTags = encodeURIComponent(tags);
     const url = `http://localhost:8000/api/query?tags=${encodedTags}&limit=20&compact=false&format=md`;
     const response = await fetch(url);

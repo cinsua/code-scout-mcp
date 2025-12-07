@@ -3,8 +3,8 @@ import path from 'node:path';
 
 import type Database from 'better-sqlite3';
 
-import type { Migration, DatabaseError } from '../types/StorageTypes';
-import { DatabaseErrorType } from '../types/StorageTypes';
+import type { Migration, MigrationResult } from '../types/StorageTypes';
+import { DatabaseError, DatabaseErrorType } from '../types/StorageTypes';
 
 import type { InternalMigration } from './types';
 
@@ -81,43 +81,54 @@ export class MigrationManager {
   /**
    * Run all pending migrations
    */
-  async migrate(): Promise<void> {
+  async migrate(): Promise<MigrationResult[]> {
     await this.initialize();
 
     const pending = this.getPendingMigrations();
     if (pending.length === 0) {
-      return;
+      return [];
     }
+
+    const results: MigrationResult[] = [];
 
     // Run migrations in transaction
     const transaction = this.db.transaction(() => {
       for (const migration of pending) {
-        this.executeMigration(migration);
+        const result = this.executeMigration(migration);
+        results.push(result);
       }
     });
 
     try {
       transaction();
+      return results;
     } catch (error) {
-      throw this.createDatabaseError(
-        DatabaseErrorType.MIGRATION_FAILED,
-        `Migration failed: ${(error as Error).message}`,
-        error as Error,
-      );
+      // If transaction failed, return error result for the failed migration
+      const failedResult: MigrationResult = {
+        version: pending[results.length]?.version ?? 0,
+        name: pending[results.length]?.name ?? 'unknown',
+        success: false,
+        error: (error as Error).message,
+        executionTime: 0,
+      };
+      results.push(failedResult);
+      return results;
     }
   }
 
   /**
    * Migrate to specific version
    */
-  async migrateTo(targetVersion: number): Promise<void> {
+  async migrateTo(targetVersion: number): Promise<MigrationResult[]> {
     await this.initialize();
 
     const currentVersion = this.getCurrentVersion();
 
     if (targetVersion === currentVersion) {
-      return;
+      return [];
     }
+
+    const results: MigrationResult[] = [];
 
     if (targetVersion > currentVersion) {
       // Migrate up
@@ -126,23 +137,31 @@ export class MigrationManager {
         .sort((a, b) => a.version - b.version);
 
       if (pending.length === 0) {
-        return;
+        return [];
       }
 
       const transaction = this.db.transaction(() => {
         for (const migration of pending) {
-          this.executeMigration(migration);
+          // Note: executeMigration is async but we're in a sync transaction
+          // In a real implementation, you might need to handle this differently
+          const result = this.executeMigration(migration);
+          results.push(result);
         }
       });
 
       try {
         transaction();
+        return results;
       } catch (error) {
-        throw this.createDatabaseError(
-          DatabaseErrorType.MIGRATION_FAILED,
-          `Migration to version ${targetVersion} failed: ${(error as Error).message}`,
-          error as Error,
-        );
+        const failedResult: MigrationResult = {
+          version: pending[results.length]?.version ?? 0,
+          name: pending[results.length]?.name ?? 'unknown',
+          success: false,
+          error: (error as Error).message,
+          executionTime: 0,
+        };
+        results.push(failedResult);
+        return results;
       }
     } else {
       // Migrate down
@@ -151,23 +170,29 @@ export class MigrationManager {
         .sort((a, b) => b.version - a.version);
 
       if (executed.length === 0) {
-        return;
+        return [];
       }
 
       const transaction = this.db.transaction(() => {
         for (const migration of executed) {
-          this.rollbackMigration(migration.version);
+          const result = this.rollbackMigration(migration.version);
+          results.push(result);
         }
       });
 
       try {
         transaction();
+        return results;
       } catch (error) {
-        throw this.createDatabaseError(
-          DatabaseErrorType.MIGRATION_FAILED,
-          `Rollback to version ${targetVersion} failed: ${(error as Error).message}`,
-          error as Error,
-        );
+        const failedResult: MigrationResult = {
+          version: executed[results.length]?.version ?? 0,
+          name: executed[results.length]?.name ?? 'unknown',
+          success: false,
+          error: (error as Error).message,
+          executionTime: 0,
+        };
+        results.push(failedResult);
+        return results;
       }
     }
   }
@@ -175,8 +200,8 @@ export class MigrationManager {
   /**
    * Rollback to specific version
    */
-  async rollback(targetVersion: number): Promise<void> {
-    await this.migrateTo(targetVersion);
+  rollback(targetVersion: number): Promise<MigrationResult[]> {
+    return this.migrateTo(targetVersion);
   }
 
   /**
@@ -270,55 +295,129 @@ export class MigrationManager {
   }
 
   /**
-   * Execute a single migration
+   * Execute a single migration with retry logic
    */
-  private executeMigration(migration: InternalMigration): void {
-    try {
-      // Verify checksum if migration was previously executed
-      const existing = this.db
-        .prepare('SELECT checksum FROM schema_migrations WHERE version = ?')
-        .get(migration.version) as { checksum: string } | undefined;
+  private executeMigration(
+    migration: InternalMigration,
+    maxRetries = 3,
+  ): MigrationResult {
+    const startTime = Date.now();
+    let lastError: Error | null = null;
 
-      if (existing && existing.checksum !== migration.checksum) {
-        throw this.createDatabaseError(
-          DatabaseErrorType.MIGRATION_FAILED,
-          `Migration ${migration.version} checksum mismatch`,
-        );
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Log migration execution attempt
+        // console.log(
+        //   `Executing migration ${migration.version} (attempt ${attempt}/${maxRetries})`,
+        // );
+
+        // Verify checksum if migration was previously executed
+        const existing = this.db
+          .prepare('SELECT checksum FROM schema_migrations WHERE version = ?')
+          .get(migration.version) as { checksum: string } | undefined;
+
+        if (existing && existing.checksum !== migration.checksum) {
+          throw this.createDatabaseError(
+            DatabaseErrorType.MIGRATION_FAILED,
+            `Migration ${migration.version} checksum mismatch`,
+          );
+        }
+
+        // Execute migration
+        migration.up(this.db);
+
+        // Record migration
+        this.db
+          .prepare(
+            'INSERT OR REPLACE INTO schema_migrations (version, name, checksum, executed_at) VALUES (?, ?, ?, ?)',
+          )
+          .run(
+            migration.version,
+            migration.name,
+            migration.checksum,
+            new Date().toISOString(),
+          );
+
+        // Log successful migration
+        // console.log(
+        //   `Migration ${migration.version} completed successfully in ${Date.now() - startTime}ms`,
+        // );
+
+        return {
+          version: migration.version,
+          name: migration.name,
+          success: true,
+          executionTime: Date.now() - startTime,
+        };
+      } catch (error) {
+        lastError = error as Error;
+        // Log migration failure
+        // console.warn(
+        //   `Migration ${migration.version} attempt ${attempt} failed: ${(error as Error).message}`,
+        // );
+
+        // Check if this is a retryable error
+        if (!this.isRetryableError(error as Error) || attempt === maxRetries) {
+          break;
+        }
+
+        // Wait before retry (exponential backoff) - synchronous delay
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+        // Log retry attempt
+        // console.log(`Retrying migration ${migration.version} in ${delay}ms...`);
+
+        // Synchronous delay using busy wait (not ideal but works for SQLite)
+        const endTime = Date.now() + delay;
+        while (Date.now() < endTime) {
+          // Busy wait - in production, you might want a different approach
+        }
       }
-
-      // Execute migration
-      migration.up(this.db);
-
-      // Record migration
-      this.db
-        .prepare(
-          'INSERT OR REPLACE INTO schema_migrations (version, name, checksum, executed_at) VALUES (?, ?, ?, ?)',
-        )
-        .run(
-          migration.version,
-          migration.name,
-          migration.checksum,
-          new Date().toISOString(),
-        );
-    } catch (error) {
-      throw this.createDatabaseError(
-        DatabaseErrorType.MIGRATION_FAILED,
-        `Failed to execute migration ${migration.version}: ${(error as Error).message}`,
-        error as Error,
-      );
     }
+
+    // Log final migration failure
+    // console.error(
+    //   `Migration ${migration.version} failed after ${maxRetries} attempts: ${lastError?.message}`,
+    // );
+
+    return {
+      version: migration.version,
+      name: migration.name,
+      success: false,
+      error: lastError?.message ?? 'Unknown error',
+      executionTime: Date.now() - startTime,
+    };
+  }
+
+  /**
+   * Check if an error is retryable
+   */
+  private isRetryableError(error: Error): boolean {
+    const message = error.message.toLowerCase();
+
+    // Retry on database lock conflicts, temporary I/O errors, etc.
+    return (
+      message.includes('database is locked') ||
+      message.includes('busy') ||
+      message.includes('temporarily unavailable') ||
+      message.includes('disk i/o error')
+    );
   }
 
   /**
    * Rollback a single migration
    */
-  private rollbackMigration(version: number): void {
+  private rollbackMigration(version: number): MigrationResult {
+    const startTime = Date.now();
     const migration = this.migrations.find(m => m.version === version);
+
     if (!migration) {
-      throw this.createDatabaseError(
-        DatabaseErrorType.MIGRATION_FAILED,
-        `Migration ${version} not found`,
-      );
+      return {
+        version,
+        name: 'unknown',
+        success: false,
+        error: `Migration ${version} not found`,
+        executionTime: Date.now() - startTime,
+      };
     }
 
     try {
@@ -329,12 +428,21 @@ export class MigrationManager {
       this.db
         .prepare('DELETE FROM schema_migrations WHERE version = ?')
         .run(version);
+
+      return {
+        version: migration.version,
+        name: migration.name,
+        success: true,
+        executionTime: Date.now() - startTime,
+      };
     } catch (error) {
-      throw this.createDatabaseError(
-        DatabaseErrorType.MIGRATION_FAILED,
-        `Failed to rollback migration ${version}: ${(error as Error).message}`,
-        error as Error,
-      );
+      return {
+        version: migration.version,
+        name: migration.name,
+        success: false,
+        error: (error as Error).message,
+        executionTime: Date.now() - startTime,
+      };
     }
   }
 
@@ -346,11 +454,6 @@ export class MigrationManager {
     message: string,
     original?: Error,
   ): DatabaseError {
-    return {
-      type,
-      message,
-      original,
-      timestamp: new Date(),
-    };
+    return new DatabaseError(type, message, { original });
   }
 }

@@ -82,19 +82,6 @@ describe('DatabaseService', () => {
       expect(results).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
     });
 
-    it('should execute query with parameters', () => {
-      const result = dbService.executeOne('SELECT ? as value', [42]);
-      expect(result).toEqual({ value: 42 });
-    });
-
-    it('should execute query returning multiple rows', () => {
-      const results = dbService.executeQuery(
-        'SELECT 1 as id UNION SELECT 2 UNION SELECT 3',
-      );
-      expect(results).toHaveLength(3);
-      expect(results).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
-    });
-
     it('should execute run query', async () => {
       await dbService.executeRun(
         'CREATE TABLE IF NOT EXISTS test_table (id INTEGER PRIMARY KEY, name TEXT)',

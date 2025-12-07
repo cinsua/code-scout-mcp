@@ -105,6 +105,22 @@ export interface Migration {
 }
 
 /**
+ * Migration result interface
+ */
+export interface MigrationResult {
+  /** Migration version */
+  version: number;
+  /** Migration name */
+  name: string;
+  /** Whether execution was successful */
+  success: boolean;
+  /** Error message if failed */
+  error?: string;
+  /** Execution time in milliseconds */
+  executionTime: number;
+}
+
+/**
  * Query execution options
  */
 export interface QueryOptions {
@@ -183,21 +199,49 @@ export enum DatabaseErrorType {
 }
 
 /**
- * Database error interface
+ * Database error class
  */
-export interface DatabaseError {
+export class DatabaseError extends Error {
   /** Error type */
-  type: DatabaseErrorType;
-  /** Error message */
-  message: string;
+  public readonly type: DatabaseErrorType;
+
   /** Original error if available */
-  original?: Error;
+  public readonly original?: Error;
+
   /** Query that caused the error */
-  query?: string;
+  public readonly query?: string;
+
   /** Query parameters */
-  params?: unknown[];
+  public readonly params?: unknown[];
+
   /** Error timestamp */
-  timestamp: Date;
+  public readonly timestamp: Date;
+
   /** Error context */
-  context?: Record<string, unknown>;
+  public readonly context?: Record<string, unknown>;
+
+  constructor(
+    type: DatabaseErrorType,
+    message: string,
+    options: {
+      original?: Error;
+      query?: string;
+      params?: unknown[];
+      context?: Record<string, unknown>;
+    } = {},
+  ) {
+    super(message);
+    this.name = 'DatabaseError';
+    this.type = type;
+    this.original = options.original;
+    this.query = options.query;
+    this.params = options.params;
+    this.timestamp = new Date();
+    this.context = options.context;
+
+    // Maintains proper stack trace for where our error was thrown (only available on V8)
+    if (typeof Error.captureStackTrace === 'function') {
+      Error.captureStackTrace(this, DatabaseError);
+    }
+  }
 }

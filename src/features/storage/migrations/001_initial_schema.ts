@@ -8,79 +8,85 @@ import type { InternalMigration } from './types';
 export const migration: InternalMigration = {
   version: 1,
   name: 'initial_schema',
-  checksum: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', // SHA256 of 'initial_schema'
+  checksum: '7fd4756c23f40d75a735259027845249ee368c74c11f8c498303ad28746e9521', // SHA256 of 'initial_schema'
   up: (db: Database.Database): void => {
     // Create files table
     db.exec(`
-      CREATE TABLE IF NOT EXISTS files (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        path TEXT UNIQUE NOT NULL,
-        hash TEXT NOT NULL,
+      CREATE TABLE files (
+        id TEXT PRIMARY KEY,
+        path TEXT NOT NULL UNIQUE,
+        filename TEXT NOT NULL,
+        extension TEXT NOT NULL,
         size INTEGER NOT NULL,
-        modified_time DATETIME NOT NULL,
-        indexed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        lastModified INTEGER NOT NULL,
+        hash TEXT NOT NULL,
+        language TEXT NOT NULL,
+        indexedAt INTEGER NOT NULL
       )
     `);
 
-    // Create symbols table
+    // Create definitions table
     db.exec(`
-      CREATE TABLE IF NOT EXISTS symbols (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        file_id INTEGER NOT NULL,
+      CREATE TABLE definitions (
+        id TEXT PRIMARY KEY,
+        fileId TEXT NOT NULL,
         name TEXT NOT NULL,
         type TEXT NOT NULL,
-        line_number INTEGER NOT NULL,
-        column_number INTEGER NOT NULL,
-        parent_id INTEGER,
-        metadata TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (file_id) REFERENCES files (id) ON DELETE CASCADE,
-        FOREIGN KEY (parent_id) REFERENCES symbols (id) ON DELETE SET NULL
+        line INTEGER NOT NULL,
+        column INTEGER NOT NULL,
+        exported BOOLEAN NOT NULL,
+        docstring TEXT,
+        decorators TEXT,
+        signature TEXT,
+        FOREIGN KEY (fileId) REFERENCES files(id) ON DELETE CASCADE
       )
     `);
 
-    // Create FTS5 virtual table for file content
+    // Create imports table
     db.exec(`
-      CREATE VIRTUAL TABLE IF NOT EXISTS file_content USING fts5(
-        file_id,
-        content,
-        content='files',
-        content_rowid='id'
+      CREATE TABLE imports (
+        id TEXT PRIMARY KEY,
+        fileId TEXT NOT NULL,
+        module TEXT NOT NULL,
+        type TEXT NOT NULL,
+        alias TEXT,
+        line INTEGER NOT NULL,
+        column INTEGER NOT NULL,
+        FOREIGN KEY (fileId) REFERENCES files(id) ON DELETE CASCADE
       )
     `);
 
-    // Create FTS5 virtual table for symbol search
+    // Create symbols table for local variables
     db.exec(`
-      CREATE VIRTUAL TABLE IF NOT EXISTS symbol_search USING fts5(
-        symbol_id,
-        name,
-        type,
-        context,
-        content='symbols',
-        content_rowid='id'
+      CREATE TABLE symbols (
+        id TEXT PRIMARY KEY,
+        fileId TEXT NOT NULL,
+        definitionId TEXT,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        line INTEGER NOT NULL,
+        column INTEGER NOT NULL,
+        scope TEXT NOT NULL,
+        FOREIGN KEY (fileId) REFERENCES files(id) ON DELETE CASCADE,
+        FOREIGN KEY (definitionId) REFERENCES definitions(id) ON DELETE CASCADE
       )
     `);
 
-    // Create indexes for better performance
-    db.exec('CREATE INDEX IF NOT EXISTS idx_files_path ON files(path)');
-    db.exec('CREATE INDEX IF NOT EXISTS idx_files_hash ON files(hash)');
-    db.exec(
-      'CREATE INDEX IF NOT EXISTS idx_symbols_file_id ON symbols(file_id)',
-    );
-    db.exec('CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name)');
-    db.exec('CREATE INDEX IF NOT EXISTS idx_symbols_type ON symbols(type)');
-    db.exec(
-      'CREATE INDEX IF NOT EXISTS idx_symbols_parent_id ON symbols(parent_id)',
-    );
+    // Create indexes for query performance
+    db.exec(`CREATE INDEX idx_files_path ON files(path)`);
+    db.exec(`CREATE INDEX idx_files_language ON files(language)`);
+    db.exec(`CREATE INDEX idx_definitions_file_id ON definitions(fileId)`);
+    db.exec(`CREATE INDEX idx_definitions_type ON definitions(type)`);
+    db.exec(`CREATE INDEX idx_imports_file_id ON imports(fileId)`);
+    db.exec(`CREATE INDEX idx_imports_module ON imports(module)`);
+    db.exec(`CREATE INDEX idx_symbols_file_id ON symbols(fileId)`);
+    db.exec(`CREATE INDEX idx_symbols_definition_id ON symbols(definitionId)`);
+    db.exec(`CREATE INDEX idx_symbols_name ON symbols(name)`);
   },
   down: (db: Database.Database): void => {
-    // Drop FTS5 tables first (they depend on the main tables)
-    db.exec('DROP TABLE IF EXISTS symbol_search');
-    db.exec('DROP TABLE IF EXISTS file_content');
-
-    // Drop main tables
-    db.exec('DROP TABLE IF EXISTS symbols');
-    db.exec('DROP TABLE IF EXISTS files');
+    db.exec(`DROP TABLE IF EXISTS symbols`);
+    db.exec(`DROP TABLE IF EXISTS imports`);
+    db.exec(`DROP TABLE IF EXISTS definitions`);
+    db.exec(`DROP TABLE IF EXISTS files`);
   },
 };

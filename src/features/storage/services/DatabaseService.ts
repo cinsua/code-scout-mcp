@@ -9,11 +9,14 @@ import type {
   DatabaseHealth,
   QueryOptions,
   TransactionCallback,
-  DatabaseError,
+  MigrationResult,
+  BackupOptions,
 } from '../types/StorageTypes';
+import { DatabaseError } from '../types/StorageTypes';
 import { DatabaseErrorType } from '../types/StorageTypes';
 import { ConnectionPool } from '../utils/connectionPool';
 import { MigrationManager } from '../migrations/MigrationManager';
+import { DatabaseMaintenance } from '../utils/databaseMaintenance';
 
 // Constants for database service
 const SLOW_QUERY_THRESHOLD_MS = 100;
@@ -24,6 +27,7 @@ const SLOW_QUERY_THRESHOLD_MS = 100;
 export class DatabaseService {
   private pool: ConnectionPool;
   private migrationManager!: MigrationManager;
+  private maintenance!: DatabaseMaintenance;
   private stats: DatabaseStats;
   private isInitialized = false;
   private isClosing = false;
@@ -53,8 +57,21 @@ export class DatabaseService {
         this.migrationManager = new MigrationManager(db);
         await this.migrationManager.initialize();
 
+        // Initialize maintenance utilities
+        this.maintenance = new DatabaseMaintenance(db, this.config);
+
         // Run migrations
-        await this.migrationManager.migrate();
+        const migrationResults = await this.migrationManager.migrate();
+
+        // Log any migration failures
+        const failedMigrations = migrationResults.filter(r => !r.success);
+        if (failedMigrations.length > 0) {
+          throw this.createDatabaseError(
+            DatabaseErrorType.MIGRATION_FAILED,
+            `Migration failed: ${failedMigrations.map(r => `${r.name}: ${r.error}`).join(', ')}`,
+            { context: { migrationResults: failedMigrations } },
+          );
+        }
 
         this.isInitialized = true;
       } finally {
@@ -246,9 +263,44 @@ export class DatabaseService {
   /**
    * Run database migrations
    */
-  async migrate(): Promise<void> {
+  async migrate(): Promise<MigrationResult[]> {
     this.ensureInitialized();
-    await this.migrationManager.migrate();
+
+    // Create backup before major migrations (more than 1 pending migration)
+    const pendingCount = this.getPendingMigrationsCount();
+    if (pendingCount > 1) {
+      const backupPath = `${this.config.path}.backup.${Date.now()}`;
+      try {
+        await this.backup({ destination: backupPath });
+      } catch {
+        // Log backup failure but don't fail migration
+        // console.warn(
+        //   `Failed to create backup before migration: ${(error as Error).message}`,
+        // );
+      }
+    }
+
+    return this.migrationManager.migrate();
+  }
+
+  /**
+   * Create database backup
+   */
+  async backup(options: BackupOptions): Promise<{
+    success: boolean;
+    size: number;
+    duration: number;
+    error?: string;
+  }> {
+    this.ensureInitialized();
+
+    const db = await this.pool.getConnection();
+    try {
+      const maintenance = new DatabaseMaintenance(db, this.config);
+      return await maintenance.backup(options);
+    } finally {
+      this.pool.releaseConnection(db);
+    }
   }
 
   /**
@@ -302,6 +354,14 @@ export class DatabaseService {
   getMigrationManager(): MigrationManager {
     this.ensureInitialized();
     return this.migrationManager;
+  }
+
+  /**
+   * Get pending migrations count
+   */
+  getPendingMigrationsCount(): number {
+    this.ensureInitialized();
+    return this.migrationManager.getPendingMigrations().length;
   }
 
   /**
@@ -385,15 +445,27 @@ export class DatabaseService {
       original?: Error;
       query?: string;
       params?: unknown[];
+      context?: Record<string, unknown>;
     } = {},
   ): DatabaseError {
-    return {
-      type,
-      message,
-      original: options.original,
-      query: options.query,
-      params: options.params,
-      timestamp: new Date(),
-    };
+    return new DatabaseError(type, message, options);
+  }
+
+  /**
+   * Close the database service and cleanup resources
+   */
+  close(): void {
+    if (this.isClosing) {
+      return;
+    }
+
+    this.isClosing = true;
+
+    try {
+      // Close connection pool
+      this.pool.closeAll();
+    } catch {
+      // Error during cleanup - ignore
+    }
   }
 }

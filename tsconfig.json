@@ -22,7 +22,6 @@
     "declarationMap": true,
     "sourceMap": true,
     "outDir": "dist",
-    "rootDir": "src",
     "removeComments": false,
     "importHelpers": false,
     "baseUrl": ".",
