@@ -16,6 +16,8 @@ import type {
 } from '../types/StorageTypes';
 import { DatabaseError, DatabaseErrorType } from '../types/StorageTypes';
 import { TIME_INTERVALS } from '../config/PerformanceConstants';
+import { LogManager } from '../../../shared/utils/LogManager';
+import { SERVICE_CONTEXTS } from '../../../shared/utils/LoggingConstants';
 
 import type { DatabaseService } from './DatabaseService';
 
@@ -29,6 +31,7 @@ export class SearchRepository {
     { results: SearchCandidate[]; timestamp: number }
   >();
   private readonly cacheTimeout = TIME_INTERVALS.FIVE_MINUTES_MS;
+  private readonly logger = LogManager.getLogger(SERVICE_CONTEXTS.QUERYING);
   private stats: SearchStats = {
     totalSearches: 0,
     avgSearchTime: 0,

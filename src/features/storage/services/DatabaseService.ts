@@ -20,6 +20,9 @@ import { MigrationManager } from '../migrations/MigrationManager';
 import { DatabaseMaintenance } from '../utils/databaseMaintenance';
 import { PerformanceConfigManager } from '../config/PerformanceConfig';
 import { MONITORING_DEFAULTS } from '../config/PerformanceConstants';
+import { LogManager } from '../../../shared/utils/LogManager';
+import { createQueryPerformanceContext } from '../../../shared/utils/PerformanceLogger';
+import { logDatabaseError } from '../../../shared/utils/ErrorLogger';
 
 import { PerformanceService } from './PerformanceService';
 
@@ -34,6 +37,7 @@ export class DatabaseService {
   private migrationManager!: MigrationManager;
   private maintenance!: DatabaseMaintenance;
   private performanceService?: PerformanceService;
+  private logger = LogManager.getLogger('database-service');
   private stats: DatabaseStats;
   private isInitialized = false;
   private isClosing = false;
@@ -48,8 +52,15 @@ export class DatabaseService {
    */
   async initialize(): Promise<void> {
     if (this.isInitialized) {
+      this.logger.debug('Database service already initialized');
       return;
     }
+
+    const startTime = Date.now();
+    this.logger.info('Initializing database service', {
+      operation: 'initialize',
+      databasePath: this.config.path,
+    });
 
     try {
       // Ensure database directory exists
@@ -81,6 +92,14 @@ export class DatabaseService {
         // Log any migration failures
         const failedMigrations = migrationResults.filter(r => !r.success);
         if (failedMigrations.length > 0) {
+          this.logger.error('Database migrations failed', undefined, {
+            operation: 'initialize',
+            failedMigrations: failedMigrations.length,
+            migrationErrors: failedMigrations.map(r => ({
+              name: r.name,
+              error: r.error,
+            })),
+          });
           throw this.createDatabaseError(
             DatabaseErrorType.MIGRATION_FAILED,
             `Migration failed: ${failedMigrations.map(r => `${r.name}: ${r.error}`).join(', ')}`,
@@ -89,10 +108,21 @@ export class DatabaseService {
         }
 
         this.isInitialized = true;
+        const duration = Date.now() - startTime;
+        this.logger.info('Database service initialized successfully', {
+          operation: 'initialize',
+          duration,
+          migrationsRun: migrationResults.length,
+        });
       } finally {
         this.pool.releaseConnection(db);
       }
     } catch (error) {
+      const duration = Date.now() - startTime;
+      logDatabaseError(this.logger, error as Error, undefined, {
+        operation: 'initialize',
+        duration,
+      });
       throw this.createDatabaseError(
         DatabaseErrorType.QUERY_FAILED,
         `Query failed: ${(error as Error).message}`,
@@ -154,10 +184,36 @@ export class DatabaseService {
         result = stmt.run(...params);
       }
 
-      this.updateQueryStats(Date.now() - startTime, false);
+      const duration = Date.now() - startTime;
+      this.updateQueryStats(duration, false);
+
+      // Log mutation performance
+      const context = createQueryPerformanceContext(
+        query,
+        duration,
+        result.changes,
+      );
+      if (duration > SLOW_QUERY_THRESHOLD_MS) {
+        this.logger.warn('Slow mutation executed', context);
+      } else {
+        this.logger.debug('Mutation executed successfully', {
+          ...context,
+          changes: result.changes,
+          lastInsertRowid: result.lastInsertRowid,
+        });
+      }
+
       return result;
     } catch (error) {
-      this.updateQueryStats(Date.now() - startTime, true);
+      const duration = Date.now() - startTime;
+      this.updateQueryStats(duration, true);
+
+      logDatabaseError(this.logger, error as Error, query, {
+        operation: 'execute-run',
+        duration,
+        params: params.length,
+      });
+
       throw this.createDatabaseError(
         DatabaseErrorType.QUERY_FAILED,
         `Query failed: ${(error as Error).message}`,
@@ -203,10 +259,32 @@ export class DatabaseService {
         results = stmt.all(...params) as T[];
       }
 
-      this.updateQueryStats(Date.now() - startTime, false);
+      const duration = Date.now() - startTime;
+      this.updateQueryStats(duration, false);
+
+      // Log query performance
+      const context = createQueryPerformanceContext(
+        query,
+        duration,
+        results.length,
+      );
+      if (duration > SLOW_QUERY_THRESHOLD_MS) {
+        this.logger.warn('Slow query executed', context);
+      } else {
+        this.logger.debug('Query executed successfully', context);
+      }
+
       return results;
     } catch (error) {
-      this.updateQueryStats(Date.now() - startTime, true);
+      const duration = Date.now() - startTime;
+      this.updateQueryStats(duration, true);
+
+      logDatabaseError(this.logger, error as Error, query, {
+        operation: 'execute-query',
+        duration,
+        params: params.length,
+      });
+
       throw this.createDatabaseError(
         DatabaseErrorType.QUERY_FAILED,
         `Query failed: ${(error as Error).message}`,

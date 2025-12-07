@@ -7,6 +7,8 @@ import type {
   BatchResult,
 } from '../types/StorageTypes';
 import { PERFORMANCE_LIMITS } from '../config/PerformanceConstants';
+import { LogManager } from '../../../shared/utils/LogManager';
+import { SERVICE_CONTEXTS } from '../../../shared/utils/LoggingConstants';
 
 /**
  * Repository class for handling CRUD operations on file metadata
@@ -18,6 +20,7 @@ export class FileRepository {
   private readonly findByIdStatement: Database.Statement;
   private readonly deleteStatement: Database.Statement;
   private readonly countStatement: Database.Statement;
+  private readonly logger = LogManager.getLogger(SERVICE_CONTEXTS.STORAGE);
 
   constructor(database: Database.Database) {
     this.db = database;

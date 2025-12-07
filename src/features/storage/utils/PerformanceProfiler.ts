@@ -1,6 +1,8 @@
 /**
  * Performance profiling tools for monitoring and analysis
  */
+
+import { PERFORMANCE_THRESHOLDS } from '../../../shared/utils/LoggingConstants';
 export class PerformanceProfiler {
   private profiles: Map<string, ProfileSession> = new Map();
   private activeProfile?: ProfileSession;
@@ -116,7 +118,9 @@ export class PerformanceProfiler {
       0,
     );
     const avgQueryTime = totalQueries > 0 ? totalDuration / totalQueries : 0;
-    const slowQueries = session.queries.filter(q => q.duration > 100); // 100ms threshold
+    const slowQueries = session.queries.filter(
+      q => q.duration > PERFORMANCE_THRESHOLDS.ANALYSIS_SLOW_QUERY_THRESHOLD_MS,
+    );
 
     // Memory analysis
     const memoryAnalysis = this.analyzeMemoryUsage(session.memorySnapshots);
@@ -281,7 +285,8 @@ export class PerformanceProfiler {
    */
   private compareWithBaseline(result: ProfileResult): PerformanceComparison {
     // Simple baseline comparison (in real implementation, this would use historical data)
-    const baselineAvgTime = 100; // 100ms baseline
+    const baselineAvgTime =
+      PERFORMANCE_THRESHOLDS.ANALYSIS_SLOW_QUERY_THRESHOLD_MS;
     const baselineMemoryGrowth = 10 * 1024 * 1024; // 10MB baseline
 
     return {

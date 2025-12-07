@@ -15,6 +15,7 @@ import { PerformanceConfigManager } from '../config/PerformanceConfig';
 import { PERFORMANCE_THRESHOLDS } from '../config/PerformanceConstants';
 import { generateQueryCacheKey } from '../utils/PerformanceUtils';
 import type { EnhancedConnectionPool } from '../utils/EnhancedConnectionPool';
+import { LogManager } from '../../../shared/utils/LogManager';
 
 /**
  * Performance service that integrates all performance monitoring and optimization components
@@ -31,6 +32,7 @@ export class PerformanceService {
   private queryCache: Map<string, { result: unknown[]; timestamp: number }> =
     new Map();
   private profiler: PerformanceProfiler;
+  private logger = LogManager.getLogger('performance-service');
   private isShuttingDown = false;
 
   constructor(
@@ -38,6 +40,12 @@ export class PerformanceService {
     config: PerformanceConfig,
     connectionPool: EnhancedConnectionPool,
   ) {
+    this.logger.info('Initializing performance service', {
+      operation: 'initialize',
+      monitoringEnabled: config.monitoring.enabled,
+      memoryOptimizationEnabled: config.memory.optimizationEnabled,
+    });
+
     this.db = db;
     this.config = config;
     this.connectionPool = connectionPool;
@@ -48,6 +56,8 @@ export class PerformanceService {
 
     // Start background tasks
     this.startBackgroundTasks();
+
+    this.logger.info('Performance service initialized successfully');
   }
 
   /**
@@ -59,6 +69,7 @@ export class PerformanceService {
     let result: T[] = [];
     let rowCount = 0;
     let error: string | undefined;
+    let cacheHit = false;
 
     try {
       // Check query cache first if enabled
@@ -66,6 +77,12 @@ export class PerformanceService {
         const cacheKey = generateQueryCacheKey(query, params);
         const cached = this.getFromQueryCache<T>(cacheKey);
         if (cached !== null) {
+          cacheHit = true;
+          this.logger.debug('Query cache hit', {
+            operation: 'execute-query',
+            cacheKey: cacheKey.substring(0, 50), // Truncate for security
+            duration: Date.now() - startTime,
+          });
           return cached;
         }
       }
@@ -136,8 +153,32 @@ export class PerformanceService {
           rowCount,
           error,
         );
-      } catch {
+
+        // Log query execution
+        if (success) {
+          this.logger.debug('Query executed successfully', {
+            operation: 'execute-query',
+            duration,
+            rowCount,
+            cacheHit,
+            queryOptimized: this.config.monitoring.enabled,
+          });
+        } else {
+          this.logger.error('Query execution failed', new Error(error), {
+            operation: 'execute-query',
+            duration,
+            cacheHit,
+          });
+        }
+      } catch (monitoringError) {
         // Don't let monitoring errors fail the main operation
+        this.logger.warn('Performance monitoring failed', {
+          operation: 'execute-query',
+          monitoringError:
+            monitoringError instanceof Error
+              ? monitoringError.message
+              : String(monitoringError),
+        });
       }
     }
   }

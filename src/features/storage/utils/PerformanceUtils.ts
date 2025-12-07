@@ -3,6 +3,8 @@
  * Centralized to eliminate code duplication across the codebase
  */
 
+import { sanitizeQueryForLogging as sanitizeQuery } from '../../../shared/utils/QuerySanitizer';
+
 /**
  * Hash a query string for identification and caching purposes
  * Uses a consistent hash algorithm across all components
@@ -39,13 +41,7 @@ export function isValidSqlIdentifier(identifier: string): boolean {
 /**
  * Sanitize a query string for logging (remove sensitive data)
  */
-export function sanitizeQueryForLogging(query: string): string {
-  return query
-    .replace(/'[^']*'/g, "'***'") // Replace string literals
-    .replace(/\d+/g, '***') // Replace numbers
-    .replace(/\s+/g, ' ') // Normalize whitespace
-    .trim();
-}
+export const sanitizeQueryForLogging = sanitizeQuery;
 
 /**
  * Calculate percentage with proper bounds checking
