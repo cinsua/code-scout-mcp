@@ -52,6 +52,7 @@
     "ajv-formats": "^3.0.1",
     "better-sqlite3": "^12.5.0",
     "chokidar": "^3.5.0",
+    "pino": "^10.1.0",
     "tree-sitter": "^0.21.1",
     "tree-sitter-python": "^0.21.0",
     "tree-sitter-typescript": "^0.21.2"
