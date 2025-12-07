@@ -27,9 +27,9 @@ This project is currently under active development. We're working towards a comp
 
 ## 🗺️ Development Roadmap
 
-### 📊 Overall Progress: 40% Complete
+### 📊 Overall Progress: 50% Complete
 
-The project is structured in 7 phases, with Phase 1 (Infrastructure) and Phase 2 (Data Layer) fully completed.
+The project is structured in 8 phases, with Phase 1 (Infrastructure), Phase 2 (Data Layer), Phase 3 (Logging), and Phase 4 (Core Error Handling) fully completed.
 
 ### Phase 1: Project Setup and Infrastructure (Priority: Critical)
 
@@ -55,62 +55,112 @@ The project is structured in 7 phases, with Phase 1 (Infrastructure) and Phase 2
 
 ✅ 2.5 Add connection pooling and performance optimizations
 
-### Phase 3: Language Parsing System (Priority: Critical)
+### Phase 3: Logging Framework (Priority: Critical)
 
-3.1 Setup tree-sitter infrastructure and language parsers
+✅ 3.1 Setup Pino logging infrastructure and configuration
 
-3.2 Implement ParserManager for language detection and routing
+✅ 3.2 Implement Logger class with structured logging and child loggers
 
-3.3 Develop TypeScript/JavaScript parser with unified handling
+✅ 3.3 Create LogManager for global access and dynamic configuration
 
-3.4 Implement Python parser with tree-sitter-python
+✅ 3.4 Integrate with configuration management and environment variables
 
-3.5 Create metadata extraction and validation system
+✅ 3.5 Add performance monitoring and error handling integration
 
-### Phase 4: Repository Indexing (Priority: Critical)
+✅ 3.6 Implement migration from console.log statements
 
-4.1 Build RepositoryScanner for file discovery and filtering
+✅ 3.7 Add testing integration and production deployment configuration
 
-4.2 Implement IndexerService for orchestration
+### Phase 4: Core Error Handling Infrastructure (Priority: Critical)
 
-4.3 Create change detection with SHA256 hashing
+✅ 4.1 Implement core error types (ValidationError, ParsingError, FileSystemError, etc.)
 
-4.4 Implement tag derivation system with weighted scoring
+✅ 4.2 Create retry logic infrastructure with exponential backoff
 
-4.5 Add concurrent processing and performance optimizations
+✅ 4.3 Build timeout management system for operations
 
-### Phase 5: Query Engine and Search (Priority: High)
+✅ 4.4 Implement circuit breaker pattern for service protection
 
-5.1 Implement QueryEngine for search orchestration
+✅ 4.5 Create standardized error patterns with BaseService
 
-5.2 Create relevance scoring algorithm with weighted system
+✅ 4.6 Add error aggregation and monitoring capabilities
 
-5.3 Build ResultBuilder for LLM-optimized formatting
+✅ 4.7 Implement graceful degradation manager
 
-5.4 Implement tag expansion and query optimization
+### Phase 5: Error Handling Integration (Priority: Critical)
 
-5.5 Add query caching and performance monitoring
+🔄 5.1 Create error constants centralization and configuration
 
-### Phase 6: File Watching System (Priority: High)
+🔄 5.2 Refactor ConfigurationError to extend ServiceError
 
-6.1 Implement FileWatcher with chokidar integration
+🔄 5.3 Refactor DatabaseError to extend ServiceError
 
-6.2 Create Debouncer for individual file change handling
+🔄 5.4 Enhance ErrorFactory integration with legacy errors
 
-6.3 Build BatchProcessor for multi-file change aggregation
+🔄 5.5 Update service integration points with new error patterns
 
-6.4 Add event system and integration with indexing
+🔄 5.6 Create migration utilities for backward compatibility
 
-6.5 Implement ignore patterns and file filtering
+🔄 5.7 Update configuration management with error handling
 
-### Phase 7: MCP Protocol Integration (Priority: Critical)
+🔄 5.8 Add comprehensive testing strategy for error handling
 
-7.1 Setup MCP server with JSON-RPC 2.0 over stdio
+### Phase 6: Language Parsing System (Priority: Critical)
 
-7.2 Implement code-scout_search tool with validation
+6.1 Setup tree-sitter infrastructure and language parsers
 
-7.3 Create code-scout_index tool with background support
+6.2 Implement ParserManager for language detection and routing
 
-7.4 Add code-scout_status tool for monitoring
+6.3 Develop TypeScript/JavaScript parser with unified handling
 
-7.5 Implement error handling and response formatting
+6.4 Implement Python parser with tree-sitter-python
+
+6.5 Create metadata extraction and validation system
+
+### Phase 7: Repository Indexing (Priority: Critical)
+
+7.1 Build RepositoryScanner for file discovery and filtering
+
+7.2 Implement IndexerService for orchestration
+
+7.3 Create change detection with SHA256 hashing
+
+7.4 Implement tag derivation system with weighted scoring
+
+7.5 Add concurrent processing and performance optimizations
+
+### Phase 8: Query Engine and Search (Priority: High)
+
+8.1 Implement QueryEngine for search orchestration
+
+8.2 Create relevance scoring algorithm with weighted system
+
+8.3 Build ResultBuilder for LLM-optimized formatting
+
+8.4 Implement tag expansion and query optimization
+
+8.5 Add query caching and performance monitoring
+
+### Phase 9: File Watching System (Priority: High)
+
+9.1 Implement FileWatcher with chokidar integration
+
+9.2 Create Debouncer for individual file change handling
+
+9.3 Build BatchProcessor for multi-file change aggregation
+
+9.4 Add event system and integration with indexing
+
+9.5 Implement ignore patterns and file filtering
+
+### Phase 10: MCP Protocol Integration (Priority: Critical)
+
+10.1 Setup MCP server with JSON-RPC 2.0 over stdio
+
+10.2 Implement code-scout_search tool with validation
+
+10.3 Create code-scout_index tool with background support
+
+10.4 Add code-scout_status tool for monitoring
+
+10.5 Implement error handling and response formatting
