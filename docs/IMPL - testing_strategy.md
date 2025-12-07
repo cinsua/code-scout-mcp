@@ -28,7 +28,7 @@ Unit Tests (70%)
 {
   "devDependencies": {
     "@types/jest": "^30.0.0",
-    "@types/node": "^18.0.0",
+    "@types/node": "^20.0.0",
     "jest": "^30.2.0",
     "ts-jest": "^29.4.6",
     "supertest": "^6.3.3",
@@ -85,7 +85,7 @@ import { jest } from '@jest/globals';
 // Global test setup
 beforeAll(async () => {
   // Setup test database
-  // Configure test logging
+  // Configure Pino logger for tests (see IMPL - logging.md)
   // Initialize test fixtures
 });
 
@@ -168,7 +168,7 @@ describe('pathUtils', () => {
 
     it('should handle UNC paths on Windows', () => {
       expect(normalizePath('\\\\server\\share\\file.ts')).toBe(
-        '//server/share/file.ts'
+        '//server/share/file.ts',
       );
     });
   });
@@ -223,7 +223,7 @@ describe('FileMetadata', () => {
       };
 
       expect(() => validateFileMetadata(invalidMetadata)).toThrow(
-        ValidationError
+        ValidationError,
       );
     });
   });
@@ -251,7 +251,7 @@ describe('Indexing Workflow', () => {
     indexer = new IndexerService(
       new RepositoryScanner(),
       new ParserManager(),
-      storage
+      storage,
     );
   });
 
@@ -286,7 +286,7 @@ describe('Indexing Workflow', () => {
       const files = await storage.getAllFiles();
       expect(files).toHaveLength(2);
 
-      const mainFile = files.find((f) => f.filename === 'main.ts');
+      const mainFile = files.find(f => f.filename === 'main.ts');
       expect(mainFile?.definitions).toHaveLength(1);
       expect(mainFile?.imports).toHaveLength(1);
     });
@@ -307,7 +307,7 @@ describe('Indexing Workflow', () => {
           run(): void {}
           log(): void {}
         }
-      `
+      `,
       );
 
       const result2 = await indexer.indexRepository(testRepo.path);
@@ -420,12 +420,12 @@ describe('Indexing Performance', () => {
 
     const startTime = Date.now();
     const results = await Promise.all(
-      repos.map((repo) => indexer.indexRepository(repo.path))
+      repos.map(repo => indexer.indexRepository(repo.path)),
     );
     const duration = Date.now() - startTime;
 
     expect(duration).toBeLessThan(60000); // 1 minute max for concurrent
-    results.forEach((result) => expect(result.totalFiles).toBe(100));
+    results.forEach(result => expect(result.totalFiles).toBe(100));
   });
 });
 ```
@@ -471,15 +471,11 @@ describe('Query Performance', () => {
       }));
 
     const startTime = process.hrtime.bigint();
-    const results = await Promise.all(
-      queries.map((q) => queryEngine.search(q))
-    );
+    const results = await Promise.all(queries.map(q => queryEngine.search(q)));
     const duration = Number(process.hrtime.bigint() - startTime) / 1e6;
 
     expect(duration).toBeLessThan(500); // 500ms max for 10 concurrent queries
-    results.forEach((result) =>
-      expect(result.results.length).toBeGreaterThan(0)
-    );
+    results.forEach(result => expect(result.results.length).toBeGreaterThan(0));
   });
 });
 ```
@@ -513,10 +509,10 @@ export const testRepositories = {
 
 export function createTestRepository(
   name: string,
-  files: Record<string, string>
+  files: Record<string, string>,
 ): TestRepo {
   const tempDir = fs.mkdtempSync(
-    path.join(os.tmpdir(), `code-scout-test-${name}-`)
+    path.join(os.tmpdir(), `code-scout-test-${name}-`),
   );
 
   for (const [filePath, content] of Object.entries(files)) {
@@ -584,7 +580,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18, 20]
+        node-version: [20, 22]
 
     steps:
       - uses: actions/checkout@v4

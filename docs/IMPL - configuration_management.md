@@ -3,6 +3,7 @@
 ## Configuration Architecture
 
 ### Configuration Sources (Priority Order)
+
 1. **Command Line Arguments**: Highest priority, runtime overrides
 2. **Environment Variables**: Container and deployment configuration
 3. **Project Configuration**: `.code-scout/config.json` in project root
@@ -10,6 +11,7 @@
 5. **Default Values**: Built-in sensible defaults (lowest priority)
 
 ### Configuration File Format
+
 ```json
 {
   "indexing": {
@@ -62,6 +64,7 @@
 ## Configuration Loading
 
 ### Configuration Manager
+
 ```typescript
 class ConfigurationManager {
   async loadConfiguration(): Promise<AppConfig> {
@@ -70,7 +73,7 @@ class ConfigurationManager {
       await this.loadGlobalConfig(),
       await this.loadProjectConfig(),
       this.loadEnvironmentVariables(),
-      this.parseCommandLineArgs()
+      this.parseCommandLineArgs(),
     ];
 
     return this.mergeConfigurations(sources);
@@ -83,6 +86,7 @@ class ConfigurationManager {
 ```
 
 ### File Discovery
+
 - **Project Root Detection**: Search upwards from current directory for project markers
 - **Configuration File Resolution**: Resolve relative paths and environment variables
 - **Fallback Handling**: Graceful fallback when configuration files are missing
@@ -90,11 +94,13 @@ class ConfigurationManager {
 ## Environment Variables
 
 ### Naming Convention
+
 - **Prefix**: `CODE_SCOUT_` for all environment variables
 - **Hierarchy**: Use underscores for nested properties
 - **Types**: Support string, number, boolean, and JSON values
 
 ### Supported Variables
+
 ```bash
 # Database Configuration
 CODE_SCOUT_DB_PATH=./.code-scout/database.db
@@ -123,11 +129,13 @@ CODE_SCOUT_LANGUAGES='{"typescript":{"extensions":[".js",".jsx",".ts",".tsx"],"p
 ## Validation and Error Handling
 
 ### Schema Validation
+
 - **JSON Schema**: Validate configuration structure and types
 - **Semantic Validation**: Check value ranges and relationships
 - **Dependency Validation**: Ensure required dependencies are met
 
 ### Error Reporting
+
 - **Clear Messages**: Descriptive error messages for validation failures
 - **Suggestions**: Provide correction suggestions for common mistakes
 - **Partial Loading**: Load valid parts of configuration when possible
@@ -135,12 +143,14 @@ CODE_SCOUT_LANGUAGES='{"typescript":{"extensions":[".js",".jsx",".ts",".tsx"],"p
 ## Dynamic Configuration
 
 ### Hot Reloading
+
 - **File Watching**: Monitor configuration files for changes
 - **Graceful Updates**: Apply changes without restarting services
 - **Validation**: Validate new configuration before applying
 - **Rollback**: Revert to previous configuration on failure
 
 ### Runtime Overrides
+
 - **Command Line**: Allow runtime parameter overrides
 - **Environment**: Support dynamic environment variable changes
 - **API Endpoints**: Future configuration management API
@@ -148,6 +158,7 @@ CODE_SCOUT_LANGUAGES='{"typescript":{"extensions":[".js",".jsx",".ts",".tsx"],"p
 ## Configuration Profiles
 
 ### Development Profile
+
 ```json
 {
   "indexing": {
@@ -164,6 +175,7 @@ CODE_SCOUT_LANGUAGES='{"typescript":{"extensions":[".js",".jsx",".ts",".tsx"],"p
 ```
 
 ### Production Profile
+
 ```json
 {
   "indexing": {
@@ -180,6 +192,7 @@ CODE_SCOUT_LANGUAGES='{"typescript":{"extensions":[".js",".jsx",".ts",".tsx"],"p
 ```
 
 ### CI/CD Profile
+
 ```json
 {
   "indexing": {
@@ -195,12 +208,14 @@ CODE_SCOUT_LANGUAGES='{"typescript":{"extensions":[".js",".jsx",".ts",".tsx"],"p
 ## Configuration Migration
 
 ### Version Management
+
 - **Version Tracking**: Track configuration schema versions
 - **Automatic Migration**: Migrate old configurations to new format
 - **Backward Compatibility**: Support multiple configuration versions
 - **Migration Scripts**: Automated configuration updates
 
 ### Deprecation Handling
+
 - **Deprecation Warnings**: Warn about deprecated configuration options
 - **Migration Guides**: Provide migration documentation
 - **Graceful Degradation**: Support old options with warnings
@@ -208,12 +223,14 @@ CODE_SCOUT_LANGUAGES='{"typescript":{"extensions":[".js",".jsx",".ts",".tsx"],"p
 ## Security Considerations
 
 ### Sensitive Data Handling
+
 - **No Secrets**: Configuration does not contain passwords or API keys
 - **File Permissions**: Restrictive permissions on configuration files
 - **Environment Isolation**: Secure environment variable handling
-- **Audit Logging**: Log configuration changes for security
+- **Audit Logging**: Pino-based audit logging for configuration changes (see [IMPL - logging.md](IMPL%20-%20logging.md))
 
 ### Access Control
+
 - **File Access**: Control who can read/write configuration files
 - **Runtime Access**: Limit configuration modification at runtime
 - **Validation**: Prevent malicious configuration values
@@ -221,11 +238,13 @@ CODE_SCOUT_LANGUAGES='{"typescript":{"extensions":[".js",".jsx",".ts",".tsx"],"p
 ## Testing Configuration
 
 ### Configuration Testing
+
 - **Unit Tests**: Test configuration loading and validation
 - **Integration Tests**: Test configuration in different environments
 - **Migration Tests**: Test configuration migration scripts
 
 ### Environment Testing
+
 - **Development**: Test with development configuration
 - **Production**: Test with production-like configuration
 - **Edge Cases**: Test with invalid and edge-case configurations

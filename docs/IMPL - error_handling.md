@@ -3,6 +3,7 @@
 ## Error Classification
 
 ### Error Types
+
 - **ValidationError**: Invalid input parameters or configuration
 - **ParsingError**: File parsing failures or syntax errors
 - **DatabaseError**: Database operation failures
@@ -12,6 +13,7 @@
 - **ResourceError**: Resource exhaustion (memory, CPU, disk)
 
 ### Error Severity Levels
+
 - **Fatal**: System cannot continue operation
 - **Error**: Operation failed but system can continue
 - **Warning**: Operation succeeded with issues
@@ -21,30 +23,33 @@
 ## Error Response Format
 
 ### Structured Error Response
+
 ```typescript
 interface ErrorResponse {
   error: {
-    type: string;           // Error classification
-    code: string;           // Specific error code
-    message: string;        // User-friendly message
-    details?: any;          // Additional error details
-    timestamp: number;      // Error occurrence time
-    operation: string;      // Operation that failed
-    context?: {             // Operation context
+    type: string; // Error classification
+    code: string; // Specific error code
+    message: string; // User-friendly message
+    details?: any; // Additional error details
+    timestamp: number; // Error occurrence time
+    operation: string; // Operation that failed
+    context?: {
+      // Operation context
       filePath?: string;
       query?: string;
       parameters?: any;
     };
   };
-  retryable?: boolean;      // Whether operation can be retried
-  retryAfter?: number;      // Suggested retry delay in ms
+  retryable?: boolean; // Whether operation can be retried
+  retryAfter?: number; // Suggested retry delay in ms
 }
 ```
 
 ### MCP Error Response
+
 ```typescript
 interface MCPError {
-  jsonrpc: "2.0";
+  jsonrpc: '2.0';
   id: number | string | null;
   error: {
     code: number;
@@ -61,11 +66,12 @@ interface MCPError {
 ## Error Handling Patterns
 
 ### Try-Catch with Context
+
 ```typescript
 class BaseService {
   protected async executeOperation<T>(
     operation: () => Promise<T>,
-    context: ErrorContext
+    context: ErrorContext,
   ): Promise<T> {
     try {
       return await operation();
@@ -83,6 +89,7 @@ class BaseService {
 ```
 
 ### Error Classification
+
 ```typescript
 private classifyError(error: unknown): ServiceError {
   if (error instanceof ValidationError) {
@@ -111,11 +118,12 @@ private classifyError(error: unknown): ServiceError {
 ## Recovery Strategies
 
 ### Retry Logic
+
 ```typescript
 class RetryHandler {
   async executeWithRetry<T>(
     operation: () => Promise<T>,
-    options: RetryOptions
+    options: RetryOptions,
   ): Promise<T> {
     let lastError: Error;
 
@@ -147,6 +155,7 @@ class RetryHandler {
 ```
 
 ### Circuit Breaker Pattern
+
 ```typescript
 class CircuitBreaker {
   private state: 'closed' | 'open' | 'half-open' = 'closed';
@@ -190,18 +199,20 @@ class CircuitBreaker {
 ## Graceful Degradation
 
 ### Fallback Strategies
+
 - **Partial Results**: Return partial results when some operations fail
 - **Default Values**: Use sensible defaults for missing data
 - **Simplified Mode**: Fall back to basic functionality when advanced features fail
 - **Offline Mode**: Continue operation with cached data when services are unavailable
 
 ### Service Degradation Levels
+
 ```typescript
 enum DegradationLevel {
   FULL_FUNCTIONALITY = 'full',
   LIMITED_FUNCTIONALITY = 'limited',
   BASIC_FUNCTIONALITY = 'basic',
-  EMERGENCY_MODE = 'emergency'
+  EMERGENCY_MODE = 'emergency',
 }
 
 class DegradationManager {
@@ -234,30 +245,34 @@ class DegradationManager {
 ## Logging and Monitoring
 
 ### Structured Logging
+
+Code-Scout uses **Pino** for high-performance structured logging. See [IMPL - logging.md](IMPL%20-%20logging.md) for complete implementation details.
+
+**Key Features:**
+
+- JSON-first structured logging
+- Child loggers for contextual logging
+- Performance-optimized for high-throughput scenarios
+- Environment-based configuration
+- Production-ready log aggregation support
+
+**Integration with Error Handling:**
+
 ```typescript
-interface LogEntry {
-  timestamp: number;
-  level: 'debug' | 'info' | 'warn' | 'error' | 'fatal';
-  service: string;
-  operation: string;
-  message: string;
-  error?: {
-    type: string;
-    stack?: string;
-    context?: any;
-  };
-  performance?: {
-    duration: number;
-    memoryUsage: number;
-  };
-  userContext?: {
-    sessionId?: string;
-    userId?: string;
-  };
-}
+// Error logging with full context
+this.logger.error('Service error occurred', serviceError, {
+  operation: context.operation,
+  userId: context.userId,
+  sessionId: context.sessionId,
+  performance: {
+    duration: context.duration,
+    memoryUsage: context.memoryUsage,
+  },
+});
 ```
 
 ### Error Aggregation
+
 ```typescript
 class ErrorAggregator {
   private errors = new Map<string, ErrorStats>();
@@ -268,7 +283,7 @@ class ErrorAggregator {
       count: 0,
       firstSeen: Date.now(),
       lastSeen: Date.now(),
-      samples: []
+      samples: [],
     };
 
     stats.count++;
@@ -279,7 +294,7 @@ class ErrorAggregator {
       stats.samples.push({
         timestamp: Date.now(),
         message: error.message,
-        context
+        context,
       });
     }
 
@@ -295,24 +310,26 @@ class ErrorAggregator {
 ## Timeout Management
 
 ### Operation Timeouts
+
 ```typescript
 class TimeoutManager {
   async executeWithTimeout<T>(
     operation: () => Promise<T>,
     timeoutMs: number,
-    timeoutError: Error = new TimeoutError('Operation timed out')
+    timeoutError: Error = new TimeoutError('Operation timed out'),
   ): Promise<T> {
     return Promise.race([
       operation(),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(timeoutError), timeoutMs)
-      )
+        setTimeout(() => reject(timeoutError), timeoutMs),
+      ),
     ]);
   }
 }
 ```
 
 ### Resource Timeouts
+
 - **Database Queries**: 30-second timeout for database operations
 - **File Parsing**: 10-second timeout per file
 - **Network Requests**: 5-second timeout for external calls
@@ -321,6 +338,7 @@ class TimeoutManager {
 ## Testing Error Scenarios
 
 ### Error Injection Testing
+
 ```typescript
 class ErrorInjector {
   injectError(operation: string, errorType: string, probability: number) {
@@ -332,6 +350,7 @@ class ErrorInjector {
 ```
 
 ### Chaos Engineering
+
 - **Random Failures**: Inject random errors to test resilience
 - **Resource Exhaustion**: Simulate memory and CPU pressure
 - **Network Failures**: Simulate network connectivity issues
@@ -340,12 +359,14 @@ class ErrorInjector {
 ## Recovery Procedures
 
 ### Automatic Recovery
+
 - **Service Restart**: Automatic restart of failed services
 - **Data Repair**: Automatic repair of corrupted data
 - **Index Rebuild**: Automatic index rebuilding on corruption
 - **Configuration Reload**: Automatic configuration reloading
 
 ### Manual Recovery
+
 - **Data Backup**: Restore from backup on data corruption
 - **Index Reset**: Full reindexing when incremental updates fail
 - **Configuration Reset**: Reset to default configuration

@@ -1,168 +1,88 @@
 # Code Scout MCP Server
 
-A Model Context Protocol (MCP) server for code indexing and Tag-based search.
+A Model Context Protocol (MCP) server that provides intelligent code indexing and tag-based search capabilities for LLM coding agents.
 
 ## 🚀 Features
 
-- **Code Indexing**: Fast indexing of TypeScript, JavaScript, and Python codebases
-- **Semantic Search**: Advanced search Tag-based
-- **File Watching**: Real-time codebase monitoring and updates
-- **MCP Protocol**: Full compliance with Model Context Protocol standards
-- **Performance Optimized**: Built for speed and efficiency
+- **Smart Code Indexing**: Fast indexing of TypeScript, JavaScript, and Python codebases with comprehensive metadata extraction
+- **Tag-Based Search**: Intuitive search without complex vectorization or intent analysis - your LLM agent knows exactly what to look for
+- **Real-Time File Watching**: Continuous monitoring and automatic updates as your codebase evolves
+- **MCP Protocol Compliant**: Full compatibility with Model Context Protocol standards for seamless integration
+- **Performance Optimized**: Built for speed and efficiency with local-only processing
+- **Privacy First**: Runs entirely locally without external APIs, subscriptions, or data transmission
+- **Context-Rich Summaries**: Delivers structured metadata including imports, exports, functions, components, classes, and top-level symbols - no raw code noise
 
-## 📦 Installation
+## 🎯 Why Code Scout?
 
-```bash
-npm install @code-scout/mcp-server
-```
+When LLM agents need to refactor, debug, or understand complex codebases, they typically perform extensive tool calls and repository traversals. Code Scout eliminates this overhead by providing:
 
-## 🛠️ Development
+- **Clean Context**: Structured metadata without code noise, enabling agents to quickly identify patterns and relationships
+- **Duplicate Detection**: Easy identification of repeated methods, functions, and patterns across the codebase
+- **Efficient Exploration**: Reduced tool usage and faster decision-making for coding tasks
+- **Focused Understanding**: High-level overviews that help agents grasp codebase architecture without getting lost in implementation details
 
-### Prerequisites
+## 🚧 Development Status
 
-- Node.js >= 18.0.0
-- npm >= 8.0.0
+This project is currently under active development. We're working towards a complete MVP with all core features implemented.
 
-### Setup
+## 🗺️ Development Roadmap
 
-```bash
-# Clone the repository
-git clone https://github.com/your-org/code-scout-mcp.git
-cd code-scout-mcp
+### 📊 Overall Progress: 40% Complete
 
-# Install dependencies
-npm install
+The project is structured in 7 phases, with Phase 1 (Infrastructure) and Phase 2 (Data Layer) fully completed.
 
-# Build the project
-npm run build
-```
+### Phase 1: Project Setup and Infrastructure (Priority: Critical)
 
-### Development Commands
+[x] 1.1 Initialize project structure and package.json [Complexity: Low]
+[x] 1.2 Configure TypeScript and build system with esbuild [Complexity: Low] → Depends: 1.1
+[x] 1.3 Setup testing framework with Jest and CI/CD pipeline [Complexity: Medium] → Depends: 1.1
+[x] 1.4 Implement configuration management system [Complexity: Medium] → Depends: 1.1
+[x] 1.5 Setup code quality tools (ESLint, Prettier) [Complexity: Low] → Depends: 1.1
 
-```bash
-# Development mode with hot reload
-npm run dev
+### Phase 2: Core Data Layer (Priority: Critical)
 
-# Build for production
-npm run build:prod
+[x] 2.1 Implement database service with SQLite and better-sqlite3 [Complexity: High] → Depends: 1.2, 1.4
+[x] 2.2 Create database schema and migration system [Complexity: High] → Depends: 2.1
+[x] 2.3 Build file repository for CRUD operations [Complexity: Medium] → Depends: 2.2
+[x] 2.4 Implement search repository with FTS5 integration [Complexity: High] → Depends: 2.2
+[x] 2.5 Add connection pooling and performance optimizations [Complexity: Medium] → Depends: 2.1
 
-# Run type checking
-npm run typecheck
+### Phase 3: Language Parsing System (Priority: Critical)
 
-# Run linting
-npm run lint
+[ ] 3.1 Setup tree-sitter infrastructure and language parsers [Complexity: High] → Depends: 1.2
+[ ] 3.2 Implement ParserManager for language detection and routing [Complexity: High] → Depends: 3.1
+[ ] 3.3 Develop TypeScript/JavaScript parser with unified handling [Complexity: High] → Depends: 3.2
+[ ] 3.4 Implement Python parser with tree-sitter-python [Complexity: High] → Depends: 3.2
+[ ] 3.5 Create metadata extraction and validation system [Complexity: Medium] → Depends: 3.3, 3.4
 
-# Format code
-npm run format
-```
+### Phase 4: Repository Indexing (Priority: Critical)
 
-## 🧪 Testing
+[ ] 4.1 Build RepositoryScanner for file discovery and filtering [Complexity: Medium] → Depends: 2.3
+[ ] 4.2 Implement IndexerService for orchestration [Complexity: High] → Depends: 3.5, 4.1
+[ ] 4.3 Create change detection with SHA256 hashing [Complexity: Medium] → Depends: 4.2
+[ ] 4.4 Implement tag derivation system with weighted scoring [Complexity: High] → Depends: 4.2
+[ ] 4.5 Add concurrent processing and performance optimizations [Complexity: Medium] → Depends: 4.2
 
-This project uses Jest for testing with a comprehensive testing strategy:
+### Phase 5: Query Engine and Search (Priority: High)
 
-### Running Tests
+[ ] 5.1 Implement QueryEngine for search orchestration [Complexity: High] → Depends: 2.4, 4.4
+[ ] 5.2 Create relevance scoring algorithm with weighted system [Complexity: High] → Depends: 5.1
+[ ] 5.3 Build ResultBuilder for LLM-optimized formatting [Complexity: Medium] → Depends: 5.1
+[ ] 5.4 Implement tag expansion and query optimization [Complexity: Medium] → Depends: 5.2
+[ ] 5.5 Add query caching and performance monitoring [Complexity: Medium] → Depends: 5.1
 
-```bash
-# Run all tests
-npm test
+### Phase 6: File Watching System (Priority: High)
 
-# Run specific test categories
-npm run test:unit          # Unit tests (70%)
-npm run test:integration    # Integration tests (20%)
-npm run test:performance   # Performance tests (10%)
+[ ] 6.1 Implement FileWatcher with chokidar integration [Complexity: Medium] → Depends: 4.3
+[ ] 6.2 Create Debouncer for individual file change handling [Complexity: Medium] → Depends: 6.1
+[ ] 6.3 Build BatchProcessor for multi-file change aggregation [Complexity: Medium] → Depends: 6.2
+[ ] 6.4 Add event system and integration with indexing [Complexity: Medium] → Depends: 6.3, 4.2
+[ ] 6.5 Implement ignore patterns and file filtering [Complexity: Low] → Depends: 6.1
 
-# Run tests with coverage
-npm run test:coverage
+### Phase 7: MCP Protocol Integration (Priority: Critical)
 
-# Run tests in watch mode
-npm run test:watch
-```
-
-### Test Structure
-
-```
-tests/
-├── unit/                   # Unit tests
-├── integration/            # Integration tests
-├── performance/           # Performance tests
-├── fixtures/              # Test utilities
-└── mocks/                 # Test mocks
-```
-
-### Coverage Requirements
-
-- **Statements**: 80% minimum
-- **Branches**: 80% minimum
-- **Functions**: 80% minimum
-- **Lines**: 80% minimum
-
-For detailed testing guidelines, see [docs/TESTING.md](./docs/TESTING.md).
-
-## 🔄 CI/CD
-
-[![Test](https://github.com/your-org/code-scout-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/your-org/code-scout-mcp/actions/workflows/test.yml)
-[![codecov](https://codecov.io/gh/your-org/code-scout-mcp/branch/main/graph/badge.svg)](https://codecov.io/gh/your-org/code-scout-mcp)
-
-This project uses GitHub Actions for continuous integration and deployment:
-
-- **Automated Testing**: Runs on every push and pull request
-- **Matrix Testing**: Tests on Node.js 18 and 20
-- **Quality Gates**: Linting, type checking, and test coverage
-- **Coverage Reporting**: Upload to Codecov for tracking
-
-## 📚 Documentation
-
-- [Technical Specifications](./docs/CORE%20-%20technical_specifications.md)
-- [Technology Stack](./docs/CORE%20-%20technology_stack.md)
-- [Testing Guide](./docs/TESTING.md)
-- [Implementation Notes](./docs/IMPL%20-%20*)
-
-## 🗺️ Roadmap
-
-See the [tasks directory](./tasks/) for detailed implementation roadmap:
-
-- [Task 1.1: Project Structure](./tasks/task_roadmap_mvp_1.1.md) ✅
-- [Task 1.2: TypeScript Configuration](./tasks/task_roadmap_mvp_1.2.md) ✅
-- [Task 1.3: Testing Framework](./tasks/task_roadmap_mvp_1.3.md) ✅
-- [Task 1.4: Core Features](./tasks/task_roadmap_mvp_1.4.md) 🚧
-- [Task 1.5: Advanced Features](./tasks/task_roadmap_mvp_1.5.md) 📋
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Run tests (`npm test`)
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
-
-### Development Guidelines
-
-- Follow the existing code style
-- Write tests for new features
-- Update documentation as needed
-- Ensure all tests pass before submitting
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- [Model Context Protocol](https://modelcontextprotocol.io/) for the protocol specification
-- [Tree-sitter](https://tree-sitter.github.io/) for parsing support
-- [Jest](https://jestjs.io/) for testing framework
-- [TypeScript](https://www.typescriptlang.org/) for type safety
-
-## 📞 Support
-
-For support and questions:
-
-- Create an [Issue](https://github.com/your-org/code-scout-mcp/issues)
-- Check the [Documentation](./docs/)
-- Review the [Testing Guide](./docs/TESTING.md)
-
----
-
-**Built with ❤️ by the Code-Scout Team**
+[ ] 7.1 Setup MCP server with JSON-RPC 2.0 over stdio [Complexity: High] → Depends: 5.3
+[ ] 7.2 Implement code-scout_search tool with validation [Complexity: High] → Depends: 7.1
+[ ] 7.3 Create code-scout_index tool with background support [Complexity: High] → Depends: 7.1, 4.2
+[ ] 7.4 Add code-scout_status tool for monitoring [Complexity: Medium] → Depends: 7.1, 4.2
+[ ] 7.5 Implement error handling and response formatting [Complexity: Medium] → Depends: 7.2

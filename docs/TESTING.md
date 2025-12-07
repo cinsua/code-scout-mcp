@@ -223,7 +223,7 @@ describe('Performance Benchmarks', () => {
 The project includes automated testing via GitHub Actions:
 
 - **Triggers**: Push and pull requests to main/develop branches
-- **Node.js Versions**: 18 and 20 (matrix testing)
+- **Node.js Versions**: 20 and 22 (matrix testing)
 - **Quality Gates**: Linting, type checking, all test categories
 - **Coverage**: Upload to Codecov for tracking
 
@@ -276,7 +276,7 @@ npm run test:coverage
 
 ### Debugging Tools
 
-- **Console Logging**: Use `console.log` for debugging (removed in production)
+- **Structured Logging**: Use Pino logger for debugging (see [IMPL - logging.md](IMPL%20-%20logging.md))
 - **Jest Debugging**: Run with `--detectOpenHandles` to detect unclosed handles
 - **VS Code Debugging**: Use Jest extension for step-through debugging
 

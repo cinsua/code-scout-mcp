@@ -498,7 +498,7 @@ interface ErrorResponse {
 - **Retry Logic**: Exponential backoff for transient failures
 - **Graceful Degradation**: Continue processing other files on individual failures
 - **Fallback Values**: Use defaults for missing optional configuration
-- **Logging**: Comprehensive error logging with context
+- **Logging**: Pino-based structured logging (see [IMPL - logging.md](IMPL%20-%20logging.md))
 
 ## Testing Strategy
 

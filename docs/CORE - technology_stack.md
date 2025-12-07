@@ -4,7 +4,7 @@
 
 ### Runtime Environment
 
-- **Node.js 18+**: Required for modern TypeScript features and tree-sitter compatibility
+- **Node.js 20+**: Required for modern TypeScript features, tree-sitter compatibility, and Pino v10 support
 - **TypeScript 5.0+**: Latest stable version for type safety and LLM understanding
 
 ### Database Layer
@@ -58,6 +58,11 @@
 - **@typescript-eslint/parser**: ^8.30.1 - TypeScript parser for ESLint
 - **@eslint/js**: ^9.39.1 - ESLint JavaScript configuration
 
+### Logging Framework
+
+- **pino**: ^10.1.0 - High-performance structured logging
+- **@types/node**: ^20.0.0 - Node.js type definitions
+
 ### Development Tools
 
 - **nodemon**: ^3.1.11 - Auto-restart during development
@@ -65,7 +70,6 @@
 - **rimraf**: ^6.0.1 - Cross-platform rm -rf
 - **ts-jest**: ^29.4.6 - Jest TypeScript preprocessor
 - **@types/jest**: ^30.0.0 - Jest type definitions
-- **@types/node**: ^18.0.0 - Node.js type definitions
 
 ## Package Structure
 
@@ -190,7 +194,7 @@ code-scout-node/
 
 ## Compatibility
 
-- **Node.js 18+**: Ensures modern JavaScript features
+- **Node.js 20+**: Ensures modern JavaScript features and Pino v10 compatibility
 - **TypeScript 5.0+**: Latest type system features
 - **Cross-platform**: All dependencies support Windows, macOS, Linux
 
