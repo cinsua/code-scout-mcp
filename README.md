@@ -24,7 +24,8 @@ When LLM agents need to refactor, debug, or understand complex codebases, they t
 ## 🚧 Development Status
 
 This project is currently under active development. We're working towards a complete MVP with all core features implemented.
-Note: Code Scout is being developed with help of an older (non-MCP Python-based) Code Scout.
+
+_Note: Code Scout is being developed with help of an older (non-MCP Python-based) Code Scout._
 
 ## 🗺️ Development Roadmap
 
