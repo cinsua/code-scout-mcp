@@ -1,5 +1,5 @@
 import { ServiceError } from '../errors/ServiceError';
-import { ErrorFactory } from '../errors/ErrorFactory';
+import { ErrorMigration } from '../errors/ErrorMigration';
 import { RetryHandler } from '../utils/RetryHandler';
 import { TimeoutManager } from '../utils/TimeoutManager';
 import { CircuitBreaker } from '../utils/CircuitBreaker';
@@ -132,8 +132,12 @@ export abstract class BaseService {
       return error;
     }
 
-    // Convert to ServiceError with context
-    const serviceError = ErrorFactory.fromError(error, context.operation);
+    // Use ErrorMigration to convert legacy errors to ServiceError
+    const migrationResult = ErrorMigration.migrateError(
+      error,
+      context.operation,
+    );
+    const serviceError = migrationResult.migrated;
 
     // Add additional context
     serviceError.setOperation(context.operation);

@@ -1,5 +1,6 @@
 // import { ServiceError } from '../errors/ServiceError';
 // import { ErrorType } from '../errors/ErrorTypes';
+import { getDegradationThreshold } from '../errors/ErrorConstants';
 
 export enum DegradationLevel {
   FULL = 'full',
@@ -410,7 +411,7 @@ export class DegradationManager {
     // Memory usage trigger
     this.registerTrigger('memory_high', {
       type: 'resource_usage',
-      threshold: 80,
+      threshold: getDegradationThreshold('MEMORY_USAGE_THRESHOLD') * 100,
       metric: 'memory',
       enabled: true,
     });
@@ -418,7 +419,7 @@ export class DegradationManager {
     // CPU usage trigger
     this.registerTrigger('cpu_high', {
       type: 'resource_usage',
-      threshold: 85,
+      threshold: getDegradationThreshold('CPU_USAGE_THRESHOLD') * 100,
       metric: 'cpu',
       enabled: true,
     });
@@ -426,21 +427,21 @@ export class DegradationManager {
     // Error rate trigger
     this.registerTrigger('error_rate_high', {
       type: 'error_rate',
-      threshold: 10, // 10% error rate
+      threshold: getDegradationThreshold('ERROR_RATE_THRESHOLD') * 100,
       enabled: true,
     });
 
     // Response time trigger
     this.registerTrigger('response_time_high', {
       type: 'response_time',
-      threshold: 5000, // 5 seconds
+      threshold: getDegradationThreshold('RESPONSE_TIME_THRESHOLD'),
       enabled: true,
     });
 
     // Critical memory usage
     this.registerTrigger('memory_critical', {
       type: 'resource_usage',
-      threshold: 95,
+      threshold: 95, // Keep critical threshold as hardcoded for safety
       metric: 'memory',
       enabled: true,
     });
@@ -448,7 +449,7 @@ export class DegradationManager {
     // Critical error rate
     this.registerTrigger('error_rate_critical', {
       type: 'error_rate',
-      threshold: 25, // 25% error rate
+      threshold: 25, // Keep critical threshold as hardcoded for safety
       enabled: true,
     });
   }

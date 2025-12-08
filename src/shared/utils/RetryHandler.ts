@@ -1,5 +1,9 @@
 import { ServiceError } from '../errors/ServiceError';
 import { ErrorTypeUtils } from '../errors/ErrorTypes';
+import {
+  getRetryHandlerConstant,
+  getRetryHandlerFloatConstant,
+} from '../errors/ErrorConstants';
 
 export interface RetryOptions {
   maxAttempts: number;
@@ -34,12 +38,12 @@ export enum RetryPolicy {
  */
 export class RetryHandler {
   private static readonly DEFAULT_OPTIONS: Partial<RetryOptions> = {
-    maxAttempts: 3,
-    baseDelay: 1000,
-    maxDelay: 30000,
-    jitterFactor: 0.1,
-    exponentialBase: 2,
-    linearIncrement: 1000,
+    maxAttempts: getRetryHandlerConstant('MAX_ATTEMPTS'),
+    baseDelay: getRetryHandlerConstant('BASE_DELAY'),
+    maxDelay: getRetryHandlerConstant('MAX_DELAY'),
+    jitterFactor: 0.1, // TODO: Add to ERROR_CONSTANTS if needed
+    exponentialBase: 2, // TODO: Add to ERROR_CONSTANTS if needed
+    linearIncrement: getRetryHandlerConstant('LINEAR_INCREMENT'),
   };
 
   /**
@@ -323,7 +327,7 @@ export class RetryHandler {
     switch (policy) {
       case RetryPolicy.IMMEDIATE:
         return {
-          maxAttempts: 3,
+          maxAttempts: getRetryHandlerConstant('MAX_ATTEMPTS'),
           baseDelay: 0,
           maxDelay: 0,
           jitterFactor: 0,
@@ -332,29 +336,29 @@ export class RetryHandler {
 
       case RetryPolicy.LINEAR:
         return {
-          maxAttempts: 5,
-          baseDelay: 1000,
-          maxDelay: 10000,
-          jitterFactor: 0.1,
-          linearIncrement: 1000,
+          maxAttempts: getRetryHandlerConstant('MAX_ATTEMPTS'),
+          baseDelay: getRetryHandlerConstant('BASE_DELAY'),
+          maxDelay: getRetryHandlerConstant('MAX_DELAY'),
+          jitterFactor: getRetryHandlerFloatConstant('JITTER_FACTOR'),
+          linearIncrement: getRetryHandlerConstant('LINEAR_INCREMENT'),
           ...custom,
         };
 
       case RetryPolicy.EXPONENTIAL:
         return {
-          maxAttempts: 5,
-          baseDelay: 1000,
-          maxDelay: 30000,
-          jitterFactor: 0.1,
-          exponentialBase: 2,
+          maxAttempts: getRetryHandlerConstant('MAX_ATTEMPTS'),
+          baseDelay: getRetryHandlerConstant('BASE_DELAY'),
+          maxDelay: getRetryHandlerConstant('MAX_DELAY'),
+          jitterFactor: getRetryHandlerFloatConstant('JITTER_FACTOR'),
+          exponentialBase: getRetryHandlerFloatConstant('EXPONENTIAL_BASE'),
           ...custom,
         };
 
       case RetryPolicy.FIXED:
         return {
-          maxAttempts: 3,
-          baseDelay: 2000,
-          maxDelay: 2000,
+          maxAttempts: getRetryHandlerConstant('MAX_ATTEMPTS'),
+          baseDelay: getRetryHandlerConstant('FIXED_DELAY'),
+          maxDelay: getRetryHandlerConstant('FIXED_DELAY'),
           jitterFactor: 0,
           ...custom,
         };

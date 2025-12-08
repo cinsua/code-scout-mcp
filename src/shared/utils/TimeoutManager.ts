@@ -2,6 +2,7 @@
 /// <reference lib="dom" />
 /* global AbortSignal */
 import { TimeoutError } from '../errors/TimeoutError';
+import { getTimeout } from '../errors/ErrorConstants';
 
 export interface TimeoutOptions {
   timeoutMs?: number;
@@ -29,17 +30,17 @@ export class TimeoutManager {
   > = new Map();
 
   public static readonly DEFAULT_TIMEOUTS = {
-    database: 30000, // 30 seconds
-    parsing: 10000, // 10 seconds
-    network: 5000, // 5 seconds
-    filesystem: 5000, // 5 seconds
-    indexing: 300000, // 5 minutes
-    query: 30000, // 30 seconds
-    connection: 10000, // 10 seconds
-    read: 30000, // 30 seconds
-    write: 30000, // 30 seconds
-    lock: 5000, // 5 seconds
-    default: 10000, // 10 seconds
+    database: getTimeout('DATABASE'),
+    parsing: getTimeout('PARSING'),
+    network: getTimeout('NETWORK'),
+    filesystem: getTimeout('FILESYSTEM'),
+    indexing: getTimeout('INDEXING'),
+    query: getTimeout('QUERY'),
+    connection: getTimeout('CONNECTION'),
+    read: getTimeout('DATABASE'),
+    write: getTimeout('DATABASE'),
+    lock: getTimeout('DEFAULT'),
+    default: getTimeout('DEFAULT'),
   } as const;
 
   private static readonly VALID_OPERATION_TYPES = Object.keys(
@@ -54,27 +55,27 @@ export class TimeoutManager {
   ): number {
     switch (operationType) {
       case 'database':
-        return 30000;
+        return getTimeout('DATABASE');
       case 'parsing':
-        return 10000;
+        return getTimeout('PARSING');
       case 'network':
-        return 5000;
+        return getTimeout('NETWORK');
       case 'filesystem':
-        return 5000;
+        return getTimeout('FILESYSTEM');
       case 'indexing':
-        return 300000;
+        return getTimeout('INDEXING');
       case 'query':
-        return 30000;
+        return getTimeout('QUERY');
       case 'connection':
-        return 10000;
+        return getTimeout('CONNECTION');
       case 'read':
-        return 30000;
+        return getTimeout('DATABASE');
       case 'write':
-        return 30000;
+        return getTimeout('DATABASE');
       case 'lock':
-        return 5000;
+        return getTimeout('DEFAULT');
       case 'default':
-        return 10000;
+        return getTimeout('DEFAULT');
       default:
         throw new Error(`Invalid operation type: ${String(operationType)}`);
     }

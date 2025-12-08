@@ -1,4 +1,8 @@
 import { ServiceError } from '../errors/ServiceError';
+import {
+  getCircuitBreakerConstant,
+  getTimeout,
+} from '../errors/ErrorConstants';
 
 // Concrete implementation of ServiceError for circuit breaker use
 class ConcreteServiceError extends ServiceError {
@@ -293,11 +297,11 @@ export class CircuitBreaker {
    */
   static createDefault(): CircuitBreaker {
     return new CircuitBreaker({
-      failureThreshold: 5,
-      recoveryTimeout: 60000, // 1 minute
-      monitoringPeriod: 300000, // 5 minutes
-      successThreshold: 3,
-      timeout: 30000, // 30 seconds
+      failureThreshold: getCircuitBreakerConstant('FAILURE_THRESHOLD'),
+      recoveryTimeout: getCircuitBreakerConstant('RECOVERY_TIMEOUT'),
+      monitoringPeriod: getCircuitBreakerConstant('MONITORING_PERIOD'),
+      successThreshold: getCircuitBreakerConstant('SUCCESS_THRESHOLD'),
+      timeout: getTimeout('CONNECTION'),
       onStateChange: (_from, _to) => {
         // Use proper logging instead of console
       },
@@ -309,11 +313,11 @@ export class CircuitBreaker {
    */
   static createFastFailing(): CircuitBreaker {
     return new CircuitBreaker({
-      failureThreshold: 3,
-      recoveryTimeout: 30000, // 30 seconds
-      monitoringPeriod: 60000, // 1 minute
-      successThreshold: 2,
-      timeout: 10000, // 10 seconds
+      failureThreshold: 3, // Lower threshold for fast failing
+      recoveryTimeout: getCircuitBreakerConstant('RECOVERY_TIMEOUT') / 2, // Faster recovery
+      monitoringPeriod: getCircuitBreakerConstant('MONITORING_PERIOD') / 5, // Shorter monitoring
+      successThreshold: 2, // Lower success threshold
+      timeout: getTimeout('NETWORK'), // Shorter timeout
       onStateChange: (_from, _to) => {
         // State change logging removed - use proper logging in production
       },
@@ -325,11 +329,11 @@ export class CircuitBreaker {
    */
   static createResilient(): CircuitBreaker {
     return new CircuitBreaker({
-      failureThreshold: 10,
-      recoveryTimeout: 120000, // 2 minutes
-      monitoringPeriod: 600000, // 10 minutes
-      successThreshold: 5,
-      timeout: 60000, // 1 minute
+      failureThreshold: getCircuitBreakerConstant('FAILURE_THRESHOLD') * 2, // Higher threshold
+      recoveryTimeout: getCircuitBreakerConstant('RECOVERY_TIMEOUT') * 2, // Longer recovery
+      monitoringPeriod: getCircuitBreakerConstant('MONITORING_PERIOD') * 2, // Longer monitoring
+      successThreshold: getCircuitBreakerConstant('SUCCESS_THRESHOLD') * 2, // Higher success threshold
+      timeout: getTimeout('DATABASE'), // Longer timeout
       onStateChange: (_from, _to) => {
         // Use proper logging instead of console
       },
