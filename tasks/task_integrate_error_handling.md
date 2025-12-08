@@ -18,6 +18,18 @@ Based on the implementation review of the core error handling module, the follow
 3. **Code Duplication**: Factory method patterns and error context handling are duplicated
 4. **Missing Centralized Configuration**: Error handling thresholds not configurable through central config
 
+### ✅ Fixed Issues
+
+**Operation Property Inconsistency**:
+
+- **Issue**: DatabaseError constructor was overriding specific operations passed by factory methods with generic 'database_operation'
+- **Fix**: Removed the `this.setOperation('database_operation')` call that was overwriting the operation parameter
+- **Result**: Factory methods now preserve their specific operations:
+  - `connectionFailed()` → `'database_connection_failed'`
+  - `queryFailed()` → `'database_query_failed'`
+  - `timeout()` → `'database_timeout'`
+- **Tests Updated**: Modified test assertions to expect the correct specific operations instead of the generic one
+
 ### 🟢 Suggestions (Consider Improving)
 
 5. **Performance Considerations**: Optimize error aggregation for high-frequency scenarios
