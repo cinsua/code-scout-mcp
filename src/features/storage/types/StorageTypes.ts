@@ -3,7 +3,7 @@ import type Database from 'better-sqlite3';
 export {
   DatabaseError,
   DatabaseErrorType,
-} from '../../../shared/errors/DatabaseError';
+} from '@/shared/errors/DatabaseError';
 
 /**
  * Database configuration interface

@@ -1,8 +1,7 @@
 import {
   getRetryHandlerConstant,
   getRetryHandlerFloatConstant,
-} from '../errors/ErrorConstants';
-
+} from '@/shared/errors/ErrorConstants';
 import { ServiceError } from '@/shared/errors/ServiceError';
 import { ErrorTypeUtils } from '@/shared/errors/ErrorTypes';
 

@@ -1,12 +1,11 @@
 import {
   getCircuitBreakerConstant,
   getTimeout,
-} from '../errors/ErrorConstants';
+} from '@/shared/errors/ErrorConstants';
 import type {
   ErrorAggregatorOptions,
   AlertConfig,
-} from '../services/ErrorAggregator';
-
+} from '@/shared/services/ErrorAggregator';
 import { ServiceError } from '@/shared/errors/ServiceError';
 import { ErrorFactory } from '@/shared/errors/ErrorFactory';
 import { ErrorAggregator } from '@/shared/services/ErrorAggregator';
