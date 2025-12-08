@@ -1,5 +1,5 @@
-import { PerformanceConfigManager } from '../../../src/features/storage/config/PerformanceConfig';
-import type { PerformanceConfig } from '../../../src/features/storage/types/StorageTypes';
+import { PerformanceConfigManager } from '@/features/storage/config/PerformanceConfig';
+import type { PerformanceConfig } from '@/features/storage/types/StorageTypes';
 
 describe('PerformanceConfigManager', () => {
   describe('Profile Management', () => {

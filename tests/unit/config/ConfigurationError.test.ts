@@ -6,7 +6,7 @@ import {
   ConfigurationError,
   BatchValidationError,
   ValidationErrorDetail,
-} from '../../../src/config/errors/ConfigurationError';
+} from '@/config/errors/ConfigurationError';
 
 describe('ConfigurationError (Refactored)', () => {
   describe('ServiceError Integration', () => {
