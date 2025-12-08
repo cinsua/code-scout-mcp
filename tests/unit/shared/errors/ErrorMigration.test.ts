@@ -7,9 +7,9 @@ import {
   ErrorMigration,
   MigrationResult,
   BatchMigrationResult,
-} from '../../../../src/shared/errors/ErrorMigration';
-import { ServiceError } from '../../../../src/shared/errors/ServiceError';
-import { ErrorFactory } from '../../../../src/shared/errors/ErrorFactory';
+} from '@/shared/errors/ErrorMigration';
+import { ServiceError } from '@/shared/errors/ServiceError';
+import { ErrorFactory } from '@/shared/errors/ErrorFactory';
 
 describe('ErrorMigration', () => {
   beforeEach(() => {

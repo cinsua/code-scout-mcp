@@ -15,7 +15,7 @@ import {
   getLoggingConstant,
   getEffectiveErrorConstants,
   validateErrorConstantEnvironment,
-} from '../../../../src/shared/errors/ErrorConstants';
+} from '@/shared/errors/ErrorConstants';
 
 describe('ErrorConstants', () => {
   beforeEach(() => {
