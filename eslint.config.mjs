@@ -110,23 +110,37 @@ export default [
        'no-empty': 'warn',
        'no-extra-semi': 'error',
 
-       // Import/Export rules
-       'import/order': [
-         'error',
-         {
-           groups: [
-             'builtin',
-             'external',
-             'internal',
-             'parent',
-             'sibling',
-             'index',
-           ],
-           'newlines-between': 'always',
-         },
-       ],
-       'import/no-unused-modules': 'error',
-       'import/no-deprecated': 'warn',
+        // Import/Export rules
+        'import/order': [
+          'error',
+          {
+            groups: [
+              'builtin',
+              'external',
+              'internal',
+              'parent',
+              'sibling',
+              'index',
+            ],
+            'newlines-between': 'always',
+          },
+        ],
+        'import/no-unused-modules': 'error',
+        'import/no-deprecated': 'warn',
+        
+        // Enforce alias usage - prevent parent relative imports (../)
+        'no-restricted-imports': [
+          'error',
+          {
+            patterns: [
+              {
+                group: ['../*'],
+                message: 'Use path aliases instead of relative imports for parent directories. Use @/ for internal modules.'
+              }
+            ]
+          }
+        ],
+        'import/no-useless-path-segments': 'error',
 
        // Best practices
        'consistent-return': 'error',
