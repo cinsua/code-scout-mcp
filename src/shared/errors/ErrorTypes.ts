@@ -207,6 +207,7 @@ export const RETRYABLE_ERROR_CODES: Set<string> = new Set([
  */
 export const CRITICAL_ERROR_CODES: Set<string> = new Set([
   DatabaseErrorCodes.CORRUPTION,
+  DatabaseErrorCodes.CONNECTION_FAILED,
   ResourceErrorCodes.MEMORY_EXHAUSTED,
   ResourceErrorCodes.DISK_SPACE_EXHAUSTED,
   FileSystemErrorCodes.DISK_FULL,

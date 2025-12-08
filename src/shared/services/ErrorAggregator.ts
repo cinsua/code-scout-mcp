@@ -256,9 +256,13 @@ export class ErrorAggregator extends BaseService {
 
     // Count critical errors
     const criticalErrors = aggregated
-      .filter(agg =>
-        CRITICAL_ERROR_CODES.has(agg.errorType.split('_')[1] ?? ''),
-      )
+      .filter(agg => {
+        // Extract error code from type format "TYPE_CODE" or just use the type if no underscore
+        const errorCode = agg.errorType.includes('_')
+          ? agg.errorType.substring(agg.errorType.indexOf('_') + 1)
+          : agg.errorType;
+        return CRITICAL_ERROR_CODES.has(errorCode);
+      })
       .reduce((sum, agg) => sum + agg.count, 0);
 
     // Find most frequent error
@@ -294,6 +298,13 @@ export class ErrorAggregator extends BaseService {
       serviceBreakdown,
       patterns: [...this.patterns],
     };
+  }
+
+  /**
+   * Get raw error aggregation data for testing and analysis
+   */
+  getAggregatedErrors(): ErrorAggregation[] {
+    return Array.from(this.errors.values());
   }
 
   /**

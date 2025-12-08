@@ -3,7 +3,7 @@
  */
 
 import { PERFORMANCE_THRESHOLDS } from '../../../shared/utils/LoggingConstants';
-import { Logger } from '../../../shared/utils/Logger';
+import { LogManager } from '../../../shared/utils/LogManager';
 import { ErrorFactory } from '../../../shared/errors/ErrorFactory';
 import { ErrorMigration } from '../../../shared/errors/ErrorMigration';
 
@@ -11,11 +11,11 @@ export class PerformanceProfiler {
   private profiles: Map<string, ProfileSession> = new Map();
   private activeProfile?: ProfileSession;
   private metrics: ProfileMetrics;
-  private logger: Logger;
+  private logger: ReturnType<typeof LogManager.getLogger>;
 
   constructor() {
     this.metrics = this.initializeMetrics();
-    this.logger = new Logger().child({
+    this.logger = LogManager.getLogger().child({
       service: 'PerformanceProfiler',
       component: 'storage',
     });

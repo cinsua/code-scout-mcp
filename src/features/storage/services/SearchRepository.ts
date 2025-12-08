@@ -401,8 +401,8 @@ export class SearchRepository {
       if (typeof tag !== 'string' || tag.trim().length === 0) {
         const actualType = typeof tag;
         const error = ErrorFactory.validation(
-          `Field 'tags' at index ${i} has invalid type. Expected non-empty string, got ${actualType}`,
-          'tags',
+          `Field 'tags[${i}]' has invalid type. Expected non-empty string, got ${actualType}`,
+          `tags[${i}]`,
           tag,
         );
         this.logger.warn('Tag validation failed: invalid tag', {
@@ -417,8 +417,8 @@ export class SearchRepository {
 
       if (tag.length > 100) {
         const error = ErrorFactory.validation(
-          `Field 'tags' at index ${i} value ${tag.length} is out of range. Expected less than or equal to 100`,
-          'tags',
+          `Field 'tags[${i}]' value ${tag.length} is out of range. Expected less than or equal to 100`,
+          `tags[${i}]`,
           tag.length,
         );
         this.logger.warn('Tag validation failed: tag too long', {
@@ -443,8 +443,8 @@ export class SearchRepository {
       for (const pattern of dangerousPatterns) {
         if (pattern.test(tag)) {
           const error = ErrorFactory.validation(
-            `Field 'tags' at index ${i} violates constraint: contains potentially dangerous SQL patterns`,
-            'tags',
+            `Field 'tags[${i}]' violates constraint: contains potentially dangerous SQL patterns`,
+            `tags[${i}]`,
             tag,
           );
           this.logger.warn(
