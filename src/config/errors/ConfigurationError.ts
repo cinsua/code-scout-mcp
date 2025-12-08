@@ -5,8 +5,10 @@
  * with proper error codes and structured error information.
  */
 
-export class ConfigurationError extends Error {
-  public readonly code: string;
+import { ServiceError } from '../../shared/errors/ServiceError';
+import { getRetryDelay } from '../../shared/errors/ErrorConstants';
+
+export class ConfigurationError extends ServiceError {
   public readonly path?: string;
   public readonly source?: string;
   public readonly suggestions?: string[];
@@ -14,27 +16,38 @@ export class ConfigurationError extends Error {
   constructor(
     message: string,
     code: string,
-    options?: {
+    options: {
       path?: string;
       source?: string;
       suggestions?: string[];
+      retryable?: boolean;
+      retryAfter?: number;
+      operation?: string;
+      context?: Record<string, any>;
       cause?: Error;
-    },
+    } = {},
   ) {
-    super(message);
-    this.name = 'ConfigurationError';
-    this.code = code;
-    this.path = options?.path;
-    this.source = options?.source;
-    this.suggestions = options?.suggestions;
+    super('CONFIGURATION', code, message, {
+      retryable: options.retryable ?? false,
+      retryAfter: options.retryAfter ?? getRetryDelay('MEDIUM'),
+      context: {
+        ...options.context,
+        path: options.path,
+        source: options.source,
+      },
+      cause: options.cause,
+    });
 
-    // Maintain stack trace for proper error handling
-    Error.captureStackTrace(this, ConfigurationError);
-
-    // Set cause if provided (using non-standard property)
-    if (options?.cause) {
-      (this as Error & { cause: unknown }).cause = options.cause;
+    // Set operation using the setter method
+    if (options.operation) {
+      this.setOperation(options.operation);
+    } else {
+      this.setOperation('configuration');
     }
+
+    this.path = options.path;
+    this.source = options.source;
+    this.suggestions = options.suggestions;
   }
 
   /**
@@ -48,7 +61,13 @@ export class ConfigurationError extends Error {
     return new ConfigurationError(
       `Validation failed: ${message}`,
       'VALIDATION_ERROR',
-      { path, suggestions },
+      {
+        path,
+        suggestions,
+        retryable: true,
+        retryAfter: getRetryDelay('SHORT'),
+        operation: 'configuration_validation',
+      },
     );
   }
 
@@ -67,6 +86,9 @@ export class ConfigurationError extends Error {
         path,
         source,
         suggestions: ['Check file permissions', 'Verify file exists'],
+        retryable: true,
+        retryAfter: getRetryDelay('MEDIUM'),
+        operation: 'configuration_file_access',
       },
     );
   }
@@ -86,6 +108,9 @@ export class ConfigurationError extends Error {
         source,
         cause,
         suggestions: ['Check JSON syntax', 'Validate configuration format'],
+        retryable: true,
+        retryAfter: getRetryDelay('SHORT'),
+        operation: 'configuration_parsing',
       },
     );
   }
@@ -101,7 +126,13 @@ export class ConfigurationError extends Error {
     return new ConfigurationError(
       `Configuration source error: ${message}`,
       'SOURCE_ERROR',
-      { source, cause },
+      {
+        source,
+        cause,
+        retryable: true,
+        retryAfter: getRetryDelay('MEDIUM'),
+        operation: 'configuration_source',
+      },
     );
   }
 
@@ -124,6 +155,9 @@ export class ConfigurationError extends Error {
           'Verify configuration format',
           `Ensure migration from ${fromVersion} to ${toVersion} is supported`,
         ],
+        retryable: false,
+        operation: 'configuration_migration',
+        context: { fromVersion, toVersion },
       },
     );
   }
@@ -146,6 +180,8 @@ export class ConfigurationError extends Error {
           'Verify required fields are present',
           'Ensure field types are correct',
         ],
+        retryable: false,
+        operation: 'configuration_schema_validation',
       },
     );
   }
@@ -168,6 +204,8 @@ export class ConfigurationError extends Error {
           'Verify dependencies between settings',
           'Ensure configuration is consistent',
         ],
+        retryable: false,
+        operation: 'configuration_semantic_validation',
       },
     );
   }
@@ -191,6 +229,9 @@ export class ConfigurationError extends Error {
           'Verify file format',
           'Ensure configuration is valid',
         ],
+        retryable: true,
+        retryAfter: getRetryDelay('SHORT'),
+        operation: 'configuration_hot_reload',
       },
     );
   }
@@ -198,22 +239,19 @@ export class ConfigurationError extends Error {
   /**
    * Get error details as a plain object
    */
-  toJSON(): Record<string, unknown> {
+  override toJSON(): Record<string, unknown> {
     return {
-      name: this.name,
-      message: this.message,
-      code: this.code,
+      ...super.toJSON(),
       path: this.path,
       source: this.source,
       suggestions: this.suggestions,
-      stack: this.stack,
     };
   }
 
   /**
    * Format error for user display
    */
-  toUserString(): string {
+  override toUserString(): string {
     let result = `${this.code}: ${this.message}`;
 
     if (this.path) {
@@ -229,6 +267,10 @@ export class ConfigurationError extends Error {
       this.suggestions.forEach(suggestion => {
         result += `\n    - ${suggestion}`;
       });
+    }
+
+    if (this.retryable && this.retryAfter) {
+      result += `\n  Retry after ${Math.ceil(this.retryAfter / 1000)} seconds`;
     }
 
     return result;
@@ -303,6 +345,9 @@ export class BatchValidationError extends ConfigurationError {
         'Fix individual validation errors',
         'Check configuration format',
       ],
+      retryable: false,
+      operation: 'configuration_batch_validation',
+      context: { errorCount: errors.length },
     });
     this.name = 'BatchValidationError';
     this.errors = errors;

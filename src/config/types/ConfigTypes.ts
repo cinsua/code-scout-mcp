@@ -50,6 +50,11 @@ export interface AppConfig {
    * Security configuration
    */
   security: SecurityConfig;
+
+  /**
+   * Error handling configuration
+   */
+  errorHandling: ErrorHandlingConfig;
 }
 
 export type ProfileType = 'development' | 'production' | 'cicd';
@@ -341,6 +346,107 @@ export interface SecurityConfig {
     timeoutMs: number;
     memoryLimitMB: number;
     allowNetworkAccess: boolean;
+  };
+}
+
+export interface ErrorHandlingConfig {
+  /**
+   * Retry delay configuration in milliseconds
+   */
+  retryDelays: {
+    immediate: number;
+    short: number;
+    medium: number;
+    long: number;
+    extended: number;
+    maximum: number;
+  };
+
+  /**
+   * Timeout configuration in milliseconds
+   */
+  timeouts: {
+    database: number;
+    parsing: number;
+    network: number;
+    filesystem: number;
+    indexing: number;
+    query: number;
+    connection: number;
+    read: number;
+    write: number;
+    lock: number;
+    default: number;
+  };
+
+  /**
+   * Circuit breaker configuration
+   */
+  circuitBreaker: {
+    failureThreshold: number;
+    recoveryTimeout: number;
+    monitoringPeriod: number;
+    successThreshold: number;
+  };
+
+  /**
+   * Degradation thresholds
+   */
+  degradation: {
+    errorRateThreshold: number;
+    responseTimeThreshold: number;
+    memoryUsageThreshold: number;
+    cpuUsageThreshold: number;
+  };
+
+  /**
+   * Error aggregation settings
+   */
+  aggregation: {
+    windowMs: number;
+    cleanupIntervalMs: number;
+    maxErrorEntries: number;
+  };
+
+  /**
+   * Performance thresholds
+   */
+  performance: {
+    slowQueryMs: number;
+    connectionAcquisitionMs: number;
+    memoryUsageBytes: number;
+    poolUtilizationThreshold: number;
+    errorRateThreshold: number;
+  };
+
+  /**
+   * Resource management settings
+   */
+  resource: {
+    maxConnections: number;
+    maxMemoryUsage: number;
+    cleanupIntervalMs: number;
+    leakDetectionThreshold: number;
+  };
+
+  /**
+   * Retry handler settings
+   */
+  retryHandler: {
+    maxAttempts: number;
+    baseDelayMs: number;
+    maxDelayMs: number;
+    backoffMultiplier: number;
+  };
+
+  /**
+   * Error logging settings
+   */
+  logging: {
+    enableStackTrace: boolean;
+    enableContext: boolean;
+    maxLogEntries: number;
+    retentionMs: number;
   };
 }
 

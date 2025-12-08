@@ -12,6 +12,7 @@
     "watching",
     "languages",
     "logging",
+    "errorHandling",
     "security"
   ],
   "properties": {
@@ -409,6 +410,458 @@
           "type": "boolean",
           "description": "Enable structured logging",
           "default": false
+        }
+      }
+    },
+    "errorHandling": {
+      "type": "object",
+      "description": "Error handling configuration",
+      "required": [
+        "retryDelays",
+        "timeouts",
+        "circuitBreaker",
+        "degradation",
+        "aggregation",
+        "performance",
+        "resource",
+        "retryHandler",
+        "logging"
+      ],
+      "properties": {
+        "retryDelays": {
+          "type": "object",
+          "description": "Retry delay configuration in milliseconds",
+          "required": [
+            "immediate",
+            "short",
+            "medium",
+            "long",
+            "extended",
+            "maximum"
+          ],
+          "properties": {
+            "immediate": {
+              "type": "integer",
+              "description": "Immediate retry delay in milliseconds",
+              "minimum": 0,
+              "default": 0
+            },
+            "short": {
+              "type": "integer",
+              "description": "Short retry delay in milliseconds",
+              "minimum": 100,
+              "maximum": 5000,
+              "default": 1000
+            },
+            "medium": {
+              "type": "integer",
+              "description": "Medium retry delay in milliseconds",
+              "minimum": 1000,
+              "maximum": 10000,
+              "default": 2000
+            },
+            "long": {
+              "type": "integer",
+              "description": "Long retry delay in milliseconds",
+              "minimum": 2000,
+              "maximum": 30000,
+              "default": 5000
+            },
+            "extended": {
+              "type": "integer",
+              "description": "Extended retry delay in milliseconds",
+              "minimum": 5000,
+              "maximum": 60000,
+              "default": 10000
+            },
+            "maximum": {
+              "type": "integer",
+              "description": "Maximum retry delay in milliseconds",
+              "minimum": 10000,
+              "maximum": 300000,
+              "default": 60000
+            }
+          }
+        },
+        "timeouts": {
+          "type": "object",
+          "description": "Timeout configuration in milliseconds",
+          "required": [
+            "database",
+            "parsing",
+            "network",
+            "filesystem",
+            "indexing",
+            "query",
+            "connection",
+            "read",
+            "write",
+            "lock",
+            "default"
+          ],
+          "properties": {
+            "database": {
+              "type": "integer",
+              "description": "Database operation timeout in milliseconds",
+              "minimum": 5000,
+              "maximum": 300000,
+              "default": 30000
+            },
+            "parsing": {
+              "type": "integer",
+              "description": "Parsing operation timeout in milliseconds",
+              "minimum": 1000,
+              "maximum": 60000,
+              "default": 10000
+            },
+            "network": {
+              "type": "integer",
+              "description": "Network operation timeout in milliseconds",
+              "minimum": 1000,
+              "maximum": 60000,
+              "default": 5000
+            },
+            "filesystem": {
+              "type": "integer",
+              "description": "File system operation timeout in milliseconds",
+              "minimum": 1000,
+              "maximum": 60000,
+              "default": 5000
+            },
+            "indexing": {
+              "type": "integer",
+              "description": "Indexing operation timeout in milliseconds",
+              "minimum": 60000,
+              "maximum": 1800000,
+              "default": 300000
+            },
+            "query": {
+              "type": "integer",
+              "description": "Query execution timeout in milliseconds",
+              "minimum": 5000,
+              "maximum": 300000,
+              "default": 30000
+            },
+            "connection": {
+              "type": "integer",
+              "description": "Connection establishment timeout in milliseconds",
+              "minimum": 1000,
+              "maximum": 60000,
+              "default": 10000
+            },
+            "read": {
+              "type": "integer",
+              "description": "Read operation timeout in milliseconds",
+              "minimum": 5000,
+              "maximum": 300000,
+              "default": 30000
+            },
+            "write": {
+              "type": "integer",
+              "description": "Write operation timeout in milliseconds",
+              "minimum": 5000,
+              "maximum": 300000,
+              "default": 30000
+            },
+            "lock": {
+              "type": "integer",
+              "description": "Lock acquisition timeout in milliseconds",
+              "minimum": 1000,
+              "maximum": 30000,
+              "default": 5000
+            },
+            "default": {
+              "type": "integer",
+              "description": "Default timeout for unspecified operations in milliseconds",
+              "minimum": 1000,
+              "maximum": 60000,
+              "default": 10000
+            }
+          }
+        },
+        "circuitBreaker": {
+          "type": "object",
+          "description": "Circuit breaker configuration",
+          "required": [
+            "failureThreshold",
+            "recoveryTimeout",
+            "monitoringPeriod",
+            "successThreshold",
+            "timeout"
+          ],
+          "properties": {
+            "failureThreshold": {
+              "type": "integer",
+              "description": "Number of failures before circuit breaker opens",
+              "minimum": 1,
+              "maximum": 20,
+              "default": 5
+            },
+            "recoveryTimeout": {
+              "type": "integer",
+              "description": "Recovery timeout in milliseconds",
+              "minimum": 10000,
+              "maximum": 300000,
+              "default": 60000
+            },
+            "monitoringPeriod": {
+              "type": "integer",
+              "description": "Monitoring period in milliseconds",
+              "minimum": 60000,
+              "maximum": 1800000,
+              "default": 300000
+            },
+            "successThreshold": {
+              "type": "integer",
+              "description": "Number of successes to close circuit breaker",
+              "minimum": 1,
+              "maximum": 10,
+              "default": 3
+            },
+            "timeout": {
+              "type": "integer",
+              "description": "Operation timeout in milliseconds",
+              "minimum": 5000,
+              "maximum": 120000,
+              "default": 30000
+            }
+          }
+        },
+        "degradation": {
+          "type": "object",
+          "description": "Service degradation configuration",
+          "required": [
+            "errorRateThreshold",
+            "responseTimeThreshold",
+            "memoryUsageThreshold",
+            "cpuUsageThreshold",
+            "monitoringInterval"
+          ],
+          "properties": {
+            "errorRateThreshold": {
+              "type": "number",
+              "description": "Error rate threshold (0-1)",
+              "minimum": 0.01,
+              "maximum": 1,
+              "default": 0.1
+            },
+            "responseTimeThreshold": {
+              "type": "integer",
+              "description": "Response time threshold in milliseconds",
+              "minimum": 1000,
+              "maximum": 30000,
+              "default": 5000
+            },
+            "memoryUsageThreshold": {
+              "type": "number",
+              "description": "Memory usage threshold (0-1)",
+              "minimum": 0.1,
+              "maximum": 1,
+              "default": 0.8
+            },
+            "cpuUsageThreshold": {
+              "type": "number",
+              "description": "CPU usage threshold (0-1)",
+              "minimum": 0.1,
+              "maximum": 1,
+              "default": 0.9
+            },
+            "monitoringInterval": {
+              "type": "integer",
+              "description": "Monitoring interval in milliseconds",
+              "minimum": 5000,
+              "maximum": 300000,
+              "default": 30000
+            }
+          }
+        },
+        "aggregation": {
+          "type": "object",
+          "description": "Error aggregation configuration",
+          "required": ["windowMs", "cleanupIntervalMs", "maxErrorEntries"],
+          "properties": {
+            "windowMs": {
+              "type": "integer",
+              "description": "Aggregation window in milliseconds",
+              "minimum": 60000,
+              "maximum": 3600000,
+              "default": 300000
+            },
+            "cleanupIntervalMs": {
+              "type": "integer",
+              "description": "Cleanup interval in milliseconds",
+              "minimum": 300000,
+              "maximum": 86400000,
+              "default": 3600000
+            },
+            "maxErrorEntries": {
+              "type": "integer",
+              "description": "Maximum error entries to keep",
+              "minimum": 100,
+              "maximum": 100000,
+              "default": 10000
+            }
+          }
+        },
+        "performance": {
+          "type": "object",
+          "description": "Performance monitoring configuration",
+          "required": [
+            "slowQueryThresholdMs",
+            "verySlowQueryThresholdMs",
+            "connectionAcquisitionThresholdMs",
+            "memoryUsageBytes",
+            "poolUtilizationThreshold"
+          ],
+          "properties": {
+            "slowQueryThresholdMs": {
+              "type": "integer",
+              "description": "Slow query threshold in milliseconds",
+              "minimum": 100,
+              "maximum": 10000,
+              "default": 1000
+            },
+            "verySlowQueryThresholdMs": {
+              "type": "integer",
+              "description": "Very slow query threshold in milliseconds",
+              "minimum": 1000,
+              "maximum": 60000,
+              "default": 5000
+            },
+            "connectionAcquisitionThresholdMs": {
+              "type": "integer",
+              "description": "Connection acquisition threshold in milliseconds",
+              "minimum": 100,
+              "maximum": 10000,
+              "default": 1000
+            },
+            "memoryUsageBytes": {
+              "type": "integer",
+              "description": "Memory usage threshold in bytes",
+              "minimum": 1048576,
+              "maximum": 17179869184,
+              "default": 1073741824
+            },
+            "poolUtilizationThreshold": {
+              "type": "number",
+              "description": "Pool utilization threshold (0-1)",
+              "minimum": 0.1,
+              "maximum": 1,
+              "default": 0.8
+            }
+          }
+        },
+        "resource": {
+          "type": "object",
+          "description": "Resource management configuration",
+          "required": [
+            "maxAgeMs",
+            "idleTimeoutMs",
+            "cleanupIntervalMs",
+            "leakThresholdAgeMs"
+          ],
+          "properties": {
+            "maxAgeMs": {
+              "type": "integer",
+              "description": "Maximum resource age in milliseconds",
+              "minimum": 300000,
+              "maximum": 86400000,
+              "default": 3600000
+            },
+            "idleTimeoutMs": {
+              "type": "integer",
+              "description": "Resource idle timeout in milliseconds",
+              "minimum": 60000,
+              "maximum": 3600000,
+              "default": 300000
+            },
+            "cleanupIntervalMs": {
+              "type": "integer",
+              "description": "Cleanup interval in milliseconds",
+              "minimum": 10000,
+              "maximum": 600000,
+              "default": 60000
+            },
+            "leakThresholdAgeMs": {
+              "type": "integer",
+              "description": "Resource leak threshold age in milliseconds",
+              "minimum": 300000,
+              "maximum": 7200000,
+              "default": 1800000
+            }
+          }
+        },
+        "retryHandler": {
+          "type": "object",
+          "description": "Retry handler configuration",
+          "required": [
+            "baseDelay",
+            "maxDelay",
+            "maxAttempts",
+            "linearIncrement"
+          ],
+          "properties": {
+            "baseDelay": {
+              "type": "integer",
+              "description": "Base retry delay in milliseconds",
+              "minimum": 100,
+              "maximum": 10000,
+              "default": 1000
+            },
+            "maxDelay": {
+              "type": "integer",
+              "description": "Maximum retry delay in milliseconds",
+              "minimum": 5000,
+              "maximum": 300000,
+              "default": 30000
+            },
+            "maxAttempts": {
+              "type": "integer",
+              "description": "Maximum retry attempts",
+              "minimum": 1,
+              "maximum": 10,
+              "default": 3
+            },
+            "linearIncrement": {
+              "type": "integer",
+              "description": "Linear increment in milliseconds",
+              "minimum": 100,
+              "maximum": 10000,
+              "default": 1000
+            }
+          }
+        },
+        "logging": {
+          "type": "object",
+          "description": "Error logging configuration",
+          "required": [
+            "errorRetentionHours",
+            "trendAnalysisWindowHours",
+            "aggregationWindowMinutes"
+          ],
+          "properties": {
+            "errorRetentionHours": {
+              "type": "integer",
+              "description": "Error log retention period in hours",
+              "minimum": 1,
+              "maximum": 168,
+              "default": 24
+            },
+            "trendAnalysisWindowHours": {
+              "type": "integer",
+              "description": "Trend analysis window in hours",
+              "minimum": 1,
+              "maximum": 24,
+              "default": 2
+            },
+            "aggregationWindowMinutes": {
+              "type": "integer",
+              "description": "Aggregation window in minutes",
+              "minimum": 1,
+              "maximum": 60,
+              "default": 5
+            }
+          }
         }
       }
     },

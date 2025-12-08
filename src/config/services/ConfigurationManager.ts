@@ -13,7 +13,10 @@ import type {
   ConfigurationSource,
   ValidationResult,
   ConfigurationChangeEvent,
+  ErrorHandlingConfig,
 } from '../types/ConfigTypes';
+import { initializeErrorHandling } from '../../shared/errors/ErrorConstants';
+import { RetryHandler } from '../../shared/utils/RetryHandler';
 import {
   ConfigurationError,
   BatchValidationError,
@@ -120,7 +123,16 @@ export class ConfigurationManager extends EventEmitter {
     this.emit('config:loading:start');
 
     try {
-      this.loadPromise = this.performLoad();
+      this.loadPromise = RetryHandler.executeWithRetry(
+        (): Promise<AppConfig> => this.performLoad(),
+        {
+          maxAttempts: 3,
+          retryCondition: error => error instanceof ConfigurationError,
+          baseDelay: 1000,
+          maxDelay: 5000,
+          jitterFactor: 0.1,
+        },
+      );
       const config = await this.loadPromise;
 
       // Create snapshot before applying
@@ -230,6 +242,9 @@ export class ConfigurationManager extends EventEmitter {
     if (!validationResult.valid) {
       throw new BatchValidationError(validationResult.errors);
     }
+
+    // Initialize error handling with the validated configuration
+    initializeErrorHandling(mergedConfig);
 
     return mergedConfig as AppConfig;
   }
@@ -633,6 +648,14 @@ export class ConfigurationManager extends EventEmitter {
    */
   getLastValidation(): ValidationResult | null {
     return this.configuration.lastValidation;
+  }
+
+  /**
+   * Get error handling configuration
+   */
+  getErrorHandlingConfig(): ErrorHandlingConfig {
+    const config = this.getConfiguration();
+    return config.errorHandling;
   }
 
   /**
