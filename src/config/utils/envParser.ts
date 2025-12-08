@@ -5,11 +5,11 @@
  * CODE_SCOUT prefix and converting them to configuration objects.
  */
 
-import { ConfigurationError } from '../errors/ConfigurationError';
+import { ConfigurationError } from '@/config/errors/ConfigurationError';
 import type {
   PartialAppConfig,
   EnvironmentVariableMapping,
-} from '../types/ConfigTypes';
+} from '@/config/types/ConfigTypes';
 
 /**
  * Environment variable prefix for Code-Scout configuration

@@ -9,7 +9,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { Stats } from 'fs';
 
-import { ConfigurationError } from '../errors/ConfigurationError';
+import { ConfigurationError } from '@/config/errors/ConfigurationError';
 
 /**
  * File resolution options

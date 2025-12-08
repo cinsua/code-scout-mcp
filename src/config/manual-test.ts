@@ -5,10 +5,9 @@
  * is working correctly.
  */
 
-import { LogManager } from '../shared/utils/LogManager';
-
-import { ConfigurationManager } from './services/ConfigurationManager';
-import { ConfigurationError } from './errors/ConfigurationError';
+import { LogManager } from '@/shared/utils/LogManager';
+import { ConfigurationManager } from '@/config/services/ConfigurationManager';
+import { ConfigurationError } from '@/config/errors/ConfigurationError';
 
 // Constants for manual testing
 const TEST_MAX_WORKERS = 8;

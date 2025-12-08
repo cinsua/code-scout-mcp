@@ -8,7 +8,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
-import { ConfigurationError } from '../errors/ConfigurationError';
+import { ConfigurationError } from '@/config/errors/ConfigurationError';
 import type {
   PartialAppConfig,
   ProfileType,
@@ -19,10 +19,10 @@ import type {
   LanguagesConfig,
   LoggingConfig,
   SecurityConfig,
-} from '../types/ConfigTypes';
-import { SchemaValidator } from '../validators/SchemaValidator';
-import { SemanticValidator } from '../validators/SemanticValidator';
-import { LOG_FILE_CONFIG } from '../../shared/utils/LoggingConstants';
+} from '@/config/types/ConfigTypes';
+import { SchemaValidator } from '@/config/validators/SchemaValidator';
+import { SemanticValidator } from '@/config/validators/SemanticValidator';
+import { LOG_FILE_CONFIG } from '@/shared/utils/LoggingConstants';
 
 /**
  * Profile information

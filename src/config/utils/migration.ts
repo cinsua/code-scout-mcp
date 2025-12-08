@@ -17,7 +17,7 @@ import type {
   DatabaseConfig,
   ValidationResult,
   ScoringWeights,
-} from '../types/ConfigTypes';
+} from '@/config/types/ConfigTypes';
 
 /**
  * Default filename scoring weight
@@ -558,9 +558,10 @@ export class MigrationManager {
     config: PartialAppConfig,
   ): Promise<ValidationResult> {
     // Import validators dynamically to avoid circular dependencies
-    const { SchemaValidator } = await import('../validators/SchemaValidator');
+    const { SchemaValidator } =
+      await import('@/config/validators/SchemaValidator');
     const { SemanticValidator } =
-      await import('../validators/SemanticValidator');
+      await import('@/config/validators/SemanticValidator');
 
     const schemaValidator = new SchemaValidator();
     const semanticValidator = new SemanticValidator();
