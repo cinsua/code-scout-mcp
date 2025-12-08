@@ -44,6 +44,7 @@ export class DatabaseError extends ServiceError {
       context?: Record<string, unknown>;
       retryable?: boolean;
       retryAfter?: number;
+      operation?: string;
     } = {},
   ) {
     const isRetryable =
@@ -54,6 +55,7 @@ export class DatabaseError extends ServiceError {
     super('DATABASE', type, message, {
       retryable: isRetryable,
       retryAfter,
+      operation: options.operation ?? 'database_operation',
       context: {
         ...options.context,
         query: options.query,
@@ -62,9 +64,6 @@ export class DatabaseError extends ServiceError {
       },
       cause: options.original,
     });
-
-    // Set the operation after calling super()
-    this.setOperation('database_operation');
 
     this.databaseType = type;
     this.original = options.original;
@@ -127,6 +126,7 @@ export class DatabaseError extends ServiceError {
       ...options,
       retryable: true,
       retryAfter: getRetryDelay('EXTENDED'),
+      operation: 'database_connection_failed',
     });
   }
 
@@ -145,6 +145,7 @@ export class DatabaseError extends ServiceError {
       original,
       retryable: true,
       retryAfter: getRetryDelay('MEDIUM'),
+      operation: 'database_query_failed',
     });
   }
 
@@ -163,6 +164,7 @@ export class DatabaseError extends ServiceError {
       original,
       retryable: true,
       retryAfter: getTimeout('DATABASE'),
+      operation: 'database_timeout',
     });
   }
 

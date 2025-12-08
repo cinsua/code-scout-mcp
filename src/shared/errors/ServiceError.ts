@@ -8,6 +8,7 @@ export interface ServiceErrorOptions {
   retryAfter?: number;
   context?: Record<string, any>;
   cause?: Error;
+  operation?: string;
 }
 
 export interface ErrorResponse {
@@ -48,7 +49,7 @@ export abstract class ServiceError extends Error {
     this.type = type;
     this.code = code;
     this.timestamp = Date.now();
-    this.operation = 'unknown'; // Set by service
+    this.operation = options.operation ?? 'unknown'; // Set by service or option
     this.retryable = options.retryable ?? false;
     this.retryAfter = options.retryAfter;
     this.context = options.context;

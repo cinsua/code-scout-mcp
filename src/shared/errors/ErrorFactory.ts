@@ -387,7 +387,7 @@ export class ErrorFactory {
    * Create DatabaseError using factory pattern
    */
   static database(
-    type: any,
+    type: DatabaseErrorType,
     message: string,
     options: {
       original?: Error;
@@ -397,7 +397,7 @@ export class ErrorFactory {
       retryable?: boolean;
       retryAfter?: number;
     } = {},
-  ): ServiceError {
+  ): DatabaseError {
     // DatabaseError already extends ServiceError, so return it directly
     return new DatabaseError(type, message, {
       original: options.original,
