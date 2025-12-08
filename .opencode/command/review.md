@@ -4,4 +4,13 @@ agent: code-reviewer
 model: opencode/grok-code
 ---
 
-we already implemented the tasks described in $ARGUMENTS . read the file, and check if all of these are implemented. do a propper review. check code duplication, hardcoded numbers etc. DONT FIX ANYTHING. do the report, and a section with **INMEDIATE ACTIONS** with problems and solution proposal
+we already implemented the tasks described in $ARGUMENTS . read the tasks file. 
+
+
+Provide feedback organized by priority:
+- tasks implemented (show what tasks of the file are implemented)
+- Suggestions (consider improving)
+- Warnings (should fix)
+- tasks missings (show what tasks of the file are NOT implemented)
+- Critical issues (must fix) (step by step by priority)
+Include specific examples of how to fix issues.
