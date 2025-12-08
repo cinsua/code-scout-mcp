@@ -1,12 +1,11 @@
-import { ServiceError } from '../errors/ServiceError';
-import { LogManager } from '../utils/LogManager';
-import type { Logger } from '../utils/Logger';
-import { ErrorMigration } from '../errors/ErrorMigration';
-import { RetryHandler } from '../utils/RetryHandler';
-import { TimeoutManager } from '../utils/TimeoutManager';
-import { CircuitBreaker } from '../utils/CircuitBreaker';
-
-import type { IErrorAggregator } from './types';
+import { ServiceError } from '@/shared/errors/ServiceError';
+import { LogManager } from '@/shared/utils/LogManager';
+import type { Logger } from '@/shared/utils/Logger';
+import { ErrorMigration } from '@/shared/errors/ErrorMigration';
+import { RetryHandler } from '@/shared/utils/RetryHandler';
+import { TimeoutManager } from '@/shared/utils/TimeoutManager';
+import { CircuitBreaker } from '@/shared/utils/CircuitBreaker';
+import type { IErrorAggregator } from '@/shared/services/types';
 
 export interface ServiceOptions {
   name: string;

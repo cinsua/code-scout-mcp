@@ -1,12 +1,17 @@
-import { ServiceError } from '../errors/ServiceError';
-import { ErrorSeverity, CRITICAL_ERROR_CODES } from '../errors/ErrorTypes';
-import { LogManager } from '../utils/LogManager';
-import type { Logger } from '../utils/Logger';
-import { ERROR_AGGREGATION } from '../utils/LoggingConstants';
-
-import { BaseService } from './BaseService';
-import type { ServiceOptions, OperationContext } from './BaseService';
-import type { ErrorAlert, ErrorPattern } from './types';
+import { ServiceError } from '@/shared/errors/ServiceError';
+import {
+  ErrorSeverity,
+  CRITICAL_ERROR_CODES,
+} from '@/shared/errors/ErrorTypes';
+import { LogManager } from '@/shared/utils/LogManager';
+import type { Logger } from '@/shared/utils/Logger';
+import { ERROR_AGGREGATION } from '@/shared/utils/LoggingConstants';
+import { BaseService } from '@/shared/services/BaseService';
+import type {
+  ServiceOptions,
+  OperationContext,
+} from '@/shared/services/BaseService';
+import type { ErrorAlert, ErrorPattern } from '@/shared/services/types';
 
 /**
  * Alert configuration for error monitoring
