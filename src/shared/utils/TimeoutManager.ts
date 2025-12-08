@@ -3,6 +3,17 @@
 /* global AbortSignal */
 import { TimeoutError } from '../errors/TimeoutError';
 import { getTimeout } from '../errors/ErrorConstants';
+import { ErrorFactory } from '../errors/ErrorFactory';
+import { ErrorMigration } from '../errors/ErrorMigration';
+import type { IErrorAggregator } from '../services/types';
+import { ErrorSeverity } from '../errors/ErrorTypes';
+
+import { Logger } from './Logger';
+
+// Create a logger instance for timeout operations
+const logger = new Logger().child({
+  service: 'TimeoutManager',
+});
 
 export interface TimeoutOptions {
   timeoutMs?: number;
@@ -28,6 +39,16 @@ export class TimeoutManager {
     keyof typeof TimeoutManager.DEFAULT_TIMEOUTS,
     number
   > = new Map();
+
+  // Optional error aggregator for timeout monitoring (injected externally)
+  private static errorAggregator?: IErrorAggregator;
+
+  /**
+   * Set the error aggregator for timeout monitoring
+   */
+  static setErrorAggregator(aggregator: IErrorAggregator): void {
+    TimeoutManager.errorAggregator = aggregator;
+  }
 
   public static readonly DEFAULT_TIMEOUTS = {
     database: getTimeout('DATABASE'),
@@ -77,7 +98,11 @@ export class TimeoutManager {
       case 'default':
         return getTimeout('DEFAULT');
       default:
-        throw new Error(`Invalid operation type: ${String(operationType)}`);
+        throw ErrorFactory.validation(
+          `Invalid input for field 'operationType'. Expected valid operation type`,
+          'operationType',
+          operationType,
+        );
     }
   }
 
@@ -90,11 +115,24 @@ export class TimeoutManager {
   ): Promise<T> {
     const result = await this.executeWithMetrics(operation, options);
 
-    if (!result.success || !result.result) {
-      throw result.error ?? new Error('Operation failed');
+    if (!result.success) {
+      logger.error('Operation failed with timeout or error', result.error, {
+        operationType: options.operationType,
+        timeoutMs: result.duration,
+        timedOut: result.timedOut,
+      });
+      throw (
+        result.error ??
+        ErrorFactory.service('Operation failed', 'OPERATION_FAILED', false)
+      );
     }
 
-    return result.result;
+    logger.debug('Operation completed successfully', {
+      operationType: options.operationType,
+      duration: result.duration,
+    });
+
+    return result.result as T;
   }
 
   /**
@@ -127,7 +165,16 @@ export class TimeoutManager {
       if (options.signal) {
         const handleAbort = () => {
           clearTimeout(timeoutId);
-          reject(new Error('Operation aborted'));
+          logger.info('Operation aborted via signal', {
+            operationType: options.operationType,
+          });
+          reject(
+            ErrorFactory.service(
+              'Operation aborted',
+              'OPERATION_ABORTED',
+              false,
+            ),
+          );
         };
 
         if (options.signal.aborted) {
@@ -142,6 +189,14 @@ export class TimeoutManager {
       const result = await Promise.race([operation(), timeoutPromise]);
       const duration = Date.now() - startTime;
 
+      // Record successful operation
+      if (TimeoutManager.errorAggregator) {
+        await TimeoutManager.errorAggregator.recordSuccess(
+          'timeout-manager',
+          options.operationType ?? 'unknown',
+        );
+      }
+
       return {
         success: true,
         result,
@@ -152,9 +207,46 @@ export class TimeoutManager {
       const duration = Date.now() - startTime;
       const isTimeout = error instanceof TimeoutError;
 
+      // Migrate legacy errors to ServiceError format
+      const migratedError = ErrorMigration.migrateError(
+        error as Error,
+        options.operationType ?? 'unknown',
+      );
+
+      // Record error with aggregator
+      if (TimeoutManager.errorAggregator) {
+        await TimeoutManager.errorAggregator.recordError(
+          migratedError.migrated,
+          {
+            service: 'timeout-manager',
+            operation: options.operationType ?? 'unknown',
+            metadata: {
+              timeoutMs,
+              actualDuration: duration,
+              isTimeout,
+            },
+          },
+        );
+      }
+
+      if (isTimeout) {
+        logger.warn('Operation timed out', {
+          operationType: options.operationType,
+          timeoutMs,
+          actualDuration: duration,
+        });
+      } else {
+        logger.error('Operation failed with error', migratedError.migrated, {
+          operationType: options.operationType,
+          duration,
+          wasLegacy: migratedError.wasLegacy,
+          originalType: migratedError.originalType,
+        });
+      }
+
       return {
         success: false,
-        error: error as Error,
+        error: migratedError.migrated,
         timedOut: isTimeout,
         duration,
       };
@@ -259,6 +351,12 @@ export class TimeoutManager {
     operations: Array<() => Promise<T>>,
     options: TimeoutOptions = {},
   ): Promise<Array<TimeoutResult<T>>> {
+    logger.debug('Executing multiple operations with timeout', {
+      operationCount: operations.length,
+      operationType: options.operationType,
+      timeoutMs: options.timeoutMs,
+    });
+
     return Promise.all(
       operations.map(op => this.executeWithMetrics(op, options)),
     );
@@ -271,7 +369,14 @@ export class TimeoutManager {
     operations: Array<() => Promise<T>>,
     options: TimeoutOptions = {},
   ): Promise<Array<TimeoutResult<T>>> {
+    logger.debug('Executing operations in sequence with timeout', {
+      operationCount: operations.length,
+      operationType: options.operationType,
+      timeoutMs: options.timeoutMs,
+    });
+
     const results: Array<TimeoutResult<T>> = [];
+    let operationIndex = 0;
 
     for (const operation of operations) {
       const result = await this.executeWithMetrics(operation, options);
@@ -279,8 +384,14 @@ export class TimeoutManager {
 
       // Stop sequence if operation timed out
       if (result.timedOut) {
+        logger.warn('Sequence stopped due to timeout', {
+          operationIndex,
+          totalOperations: operations.length,
+          operationType: options.operationType,
+        });
         break;
       }
+      operationIndex++;
     }
 
     return results;
@@ -306,23 +417,57 @@ export class TimeoutManager {
     multiplier: number = 2,
     maxAttempts: number = 3,
   ): Promise<T> {
-    let lastError: Error = new Error('Max attempts reached');
+    let lastError: Error = ErrorFactory.service(
+      'Max attempts reached',
+      'MAX_ATTEMPTS_EXCEEDED',
+      false,
+    );
     let currentTimeout = baseTimeout;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        return await this.executeWithTimeout(operation, {
+        const result = await this.executeWithTimeout(operation, {
           timeoutMs: Math.min(currentTimeout, maxTimeout),
         });
+
+        if (attempt > 1) {
+          logger.info('Progressive timeout succeeded after retry', {
+            attempt,
+            finalTimeout: Math.min(currentTimeout, maxTimeout),
+          });
+        }
+
+        return result;
       } catch (error) {
-        lastError = error as Error;
+        const migratedError = ErrorMigration.migrateError(
+          error as Error,
+          'progressive_timeout',
+        );
+        lastError = migratedError.migrated;
 
         // Don't increase timeout for non-timeout errors
         if (!(error instanceof TimeoutError)) {
-          throw error;
+          logger.error(
+            'Operation failed with non-timeout error during progressive timeout',
+            migratedError.migrated,
+            {
+              attempt,
+              maxAttempts,
+              currentTimeout,
+              wasLegacy: migratedError.wasLegacy,
+              originalType: migratedError.originalType,
+            },
+          );
+          throw migratedError.migrated;
         }
 
         currentTimeout *= multiplier;
+        logger.warn('Progressive timeout retry', {
+          attempt,
+          maxAttempts,
+          currentTimeout,
+          operationType: 'progressive',
+        });
       }
     }
 
@@ -340,8 +485,15 @@ export class TimeoutManager {
     if (options.operationType) {
       // Validate that the operation type exists to prevent object injection
       if (!this.VALID_OPERATION_TYPES.includes(options.operationType)) {
-        throw new Error(
-          `Invalid operation type: ${String(options.operationType)}`,
+        logger.warn('Invalid operation type provided', {
+          operationType: options.operationType,
+          validTypes: this.VALID_OPERATION_TYPES,
+          context: 'timeout_options_validation',
+        });
+        throw ErrorFactory.validationConstraint(
+          'operationType',
+          `Must be one of: ${this.VALID_OPERATION_TYPES.join(', ')}`,
+          options.operationType,
         );
       }
       return (
@@ -361,7 +513,16 @@ export class TimeoutManager {
   ): number {
     // Validate that the operation type exists to prevent object injection
     if (!this.VALID_OPERATION_TYPES.includes(operationType)) {
-      throw new Error(`Invalid operation type: ${String(operationType)}`);
+      logger.warn('Invalid operation type provided for default timeout', {
+        operationType,
+        validTypes: this.VALID_OPERATION_TYPES,
+        context: 'default_timeout_validation',
+      });
+      throw ErrorFactory.validationConstraint(
+        'operationType',
+        `Must be one of: ${this.VALID_OPERATION_TYPES.join(', ')}`,
+        operationType,
+      );
     }
 
     return (
@@ -379,16 +540,41 @@ export class TimeoutManager {
   ): void {
     // Validate that the operation type exists in DEFAULT_TIMEOUTS
     if (!this.VALID_OPERATION_TYPES.includes(operationType)) {
-      throw new Error(`Invalid operation type: ${String(operationType)}`);
+      logger.warn(
+        'Invalid operation type provided for setting default timeout',
+        {
+          operationType,
+          validTypes: this.VALID_OPERATION_TYPES,
+          context: 'set_default_timeout_validation',
+        },
+      );
+      throw ErrorFactory.validationConstraint(
+        'operationType',
+        `Must be one of: ${this.VALID_OPERATION_TYPES.join(', ')}`,
+        operationType,
+      );
     }
 
     // Validate timeout is a positive number
     if (typeof timeoutMs !== 'number' || timeoutMs <= 0) {
-      throw new Error('Timeout must be a positive number');
+      logger.warn('Invalid timeout value provided', {
+        timeoutMs,
+        operationType,
+      });
+      throw ErrorFactory.validation(
+        `Field 'timeoutMs' value ${timeoutMs} is out of range. Expected greater than or equal to 1`,
+        'timeoutMs',
+        timeoutMs,
+      );
     }
 
     // Safe property assignment using customTimeouts
     this.customTimeouts.set(operationType, timeoutMs);
+
+    logger.info('Custom timeout set for operation type', {
+      operationType,
+      timeoutMs,
+    });
   }
 
   /**
@@ -430,7 +616,11 @@ export class TimeoutManager {
         .catch(error => {
           if (!isCancelled) {
             clearTimeout(timeoutId);
-            reject(error);
+            const migratedError = ErrorMigration.migrateError(
+              error as Error,
+              'cancellable_timeout',
+            );
+            reject(migratedError.migrated);
           }
         });
     });
@@ -464,6 +654,14 @@ export class TimeoutManager {
 
       // Cap at reasonable maximum
       timeoutMs = Math.min(timeoutMs, maxDuration * 2, baseTimeout * 5);
+
+      logger.debug('Adaptive timeout calculated', {
+        baseTimeout,
+        calculatedTimeout: timeoutMs,
+        avgDuration,
+        maxDuration,
+        historyLength: history.length,
+      });
     }
 
     return this.executeWithTimeout(operation, { timeoutMs });
@@ -499,5 +697,117 @@ export class TimeoutManager {
       minDuration: durations.length > 0 ? Math.min(...durations) : 0,
       maxDuration: durations.length > 0 ? Math.max(...durations) : 0,
     };
+  }
+
+  /**
+   * Get timeout error rate statistics from error aggregator
+   */
+  static getTimeoutErrorRate(
+    operationType?: string,
+    minutes: number = 5,
+  ): {
+    timeoutRate: number;
+    totalTimeouts: number;
+    totalOperations: number;
+    timeoutPercentage: number;
+  } {
+    if (!TimeoutManager.errorAggregator) {
+      return {
+        timeoutRate: 0,
+        totalTimeouts: 0,
+        totalOperations: 0,
+        timeoutPercentage: 0,
+      };
+    }
+
+    const rateData = TimeoutManager.errorAggregator.getErrorRate(
+      'timeout-manager',
+      operationType,
+      minutes,
+    );
+
+    return {
+      timeoutRate: rateData.errorRate,
+      totalTimeouts: rateData.totalErrors,
+      totalOperations: rateData.totalRequests,
+      timeoutPercentage: rateData.errorPercentage,
+    };
+  }
+
+  /**
+   * Check for critical timeout scenarios and trigger alerts
+   */
+  static checkCriticalTimeoutScenarios(): void {
+    if (!TimeoutManager.errorAggregator) {
+      return;
+    }
+
+    const stats = TimeoutManager.errorAggregator.getErrorStatistics();
+    const timeoutPatterns = TimeoutManager.errorAggregator
+      .getErrorPatterns()
+      .filter(pattern => pattern.pattern.includes('timeout'));
+
+    // Check for high timeout rate across all operations
+    const overallTimeoutRate = this.getTimeoutErrorRate();
+
+    if (overallTimeoutRate.timeoutRate > 10) {
+      // More than 10 timeouts per minute
+      logger.warn('Critical timeout rate detected', {
+        timeoutRate: overallTimeoutRate.timeoutRate,
+        totalTimeouts: overallTimeoutRate.totalTimeouts,
+        timeoutPercentage: overallTimeoutRate.timeoutPercentage,
+        context: 'critical_timeout_monitoring',
+      });
+    }
+
+    // Check for timeout patterns indicating systemic issues
+    if (timeoutPatterns.length > 0) {
+      const criticalPatterns = timeoutPatterns.filter(
+        pattern =>
+          pattern.severity === ErrorSeverity.CRITICAL || pattern.frequency > 20,
+      );
+
+      if (criticalPatterns.length > 0) {
+        logger.error('Critical timeout patterns detected', undefined, {
+          patternCount: criticalPatterns.length,
+          context: 'critical_timeout_pattern_alert',
+        });
+      }
+    }
+
+    // Check for service-specific timeout issues
+    const serviceBreakdown = stats.serviceBreakdown;
+    const timeoutServices = Object.entries(serviceBreakdown)
+      .filter(
+        ([service, count]) =>
+          service === 'timeout-manager' &&
+          typeof count === 'number' &&
+          count > 50,
+      )
+      .map(([service, count]) => ({ service, count: count as number }));
+
+    if (timeoutServices.length > 0) {
+      logger.warn('High timeout volume in timeout-manager service', {
+        services: timeoutServices,
+        context: 'service_timeout_volume_alert',
+      });
+    }
+  }
+
+  /**
+   * Get active timeout-related alerts
+   */
+  static getActiveTimeoutAlerts() {
+    if (!TimeoutManager.errorAggregator) {
+      return [];
+    }
+
+    return TimeoutManager.errorAggregator
+      .getActiveAlerts()
+      .filter(
+        alert =>
+          alert.message.toLowerCase().includes('timeout') ||
+          alert.details.services?.includes('timeout-manager'),
+      );
   }
 }

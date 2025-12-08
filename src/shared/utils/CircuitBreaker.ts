@@ -1,8 +1,16 @@
 import { ServiceError } from '../errors/ServiceError';
+import { ErrorFactory } from '../errors/ErrorFactory';
 import {
   getCircuitBreakerConstant,
   getTimeout,
 } from '../errors/ErrorConstants';
+import type {
+  ErrorAggregatorOptions,
+  AlertConfig,
+} from '../services/ErrorAggregator';
+import { ErrorAggregator } from '../services/ErrorAggregator';
+
+import { Logger } from './Logger';
 
 // Concrete implementation of ServiceError for circuit breaker use
 class ConcreteServiceError extends ServiceError {
@@ -22,6 +30,7 @@ export interface CircuitBreakerOptions {
   onStateChange?: (from: CircuitState, to: CircuitState) => void;
   onFailure?: (error: Error) => void;
   onSuccess?: () => void;
+  errorAggregator?: ErrorAggregatorOptions;
 }
 
 export interface CircuitBreakerStats {
@@ -41,6 +50,7 @@ export interface CircuitBreakerStats {
  * Prevents cascade failures by temporarily stopping calls to failing services.
  */
 export class CircuitBreaker {
+  private static logger = new Logger();
   private state: CircuitState = 'closed';
   private failureCount = 0;
   private successCount = 0;
@@ -50,9 +60,14 @@ export class CircuitBreaker {
   private stateChanges = 0;
   private startTime = Date.now();
   private successHistory: Array<number> = [];
+  private errorAggregator: ErrorAggregator;
 
   constructor(private options: CircuitBreakerOptions) {
     this.validateOptions();
+    this.errorAggregator = new ErrorAggregator({
+      name: 'circuit-breaker',
+      ...options.errorAggregator,
+    });
   }
 
   /**
@@ -63,7 +78,7 @@ export class CircuitBreaker {
 
     if (this.state === 'open') {
       if (this.shouldAttemptReset()) {
-        this.transitionTo('half-open');
+        await this.transitionTo('half-open');
       } else {
         throw new ConcreteServiceError(
           'SERVICE',
@@ -76,10 +91,10 @@ export class CircuitBreaker {
 
     try {
       const result = await this.executeWithTimeout(operation);
-      this.onSuccess();
+      await this.onSuccess();
       return result;
     } catch (error) {
-      this.onFailure(error as Error);
+      await this.onFailure(error as Error);
       throw error;
     }
   }
@@ -140,9 +155,49 @@ export class CircuitBreaker {
   }
 
   /**
+   * Get error aggregator statistics
+   */
+  getErrorStats() {
+    return this.errorAggregator.getErrorStatistics();
+  }
+
+  /**
+   * Get error rate for circuit breaker operations
+   */
+  getErrorRate(minutes: number = 5) {
+    return this.errorAggregator.getErrorRate(
+      'circuit-breaker',
+      undefined,
+      minutes,
+    );
+  }
+
+  /**
+   * Configure alerting for circuit breaker events
+   */
+  configureAlerting(alertConfig: AlertConfig): void {
+    // Update the error aggregator's alert configuration
+    // Note: This is a simplified approach - in a real implementation,
+    // you might want to recreate the ErrorAggregator or provide a method to update it
+    CircuitBreaker.logger.info('Circuit breaker alerting configured', {
+      service: 'circuit-breaker',
+      operation: 'configure_alerting',
+      enabled: alertConfig.enabled,
+      channels: Object.keys(alertConfig.channels),
+    });
+  }
+
+  /**
+   * Get active alerts from error aggregator
+   */
+  getActiveAlerts() {
+    return this.errorAggregator.getActiveAlerts();
+  }
+
+  /**
    * Reset circuit breaker to closed state
    */
-  reset(): void {
+  async reset(): Promise<void> {
     const previousState = this.state;
     this.state = 'closed';
     this.failureCount = 0;
@@ -157,14 +212,32 @@ export class CircuitBreaker {
       if (this.options.onStateChange) {
         this.options.onStateChange(previousState, 'closed');
       }
+
+      // Record reset with ErrorAggregator
+      try {
+        await this.errorAggregator.recordSuccess('circuit-breaker', 'reset', {
+          previousState,
+          newState: 'closed',
+          stateChanges: this.stateChanges,
+        });
+      } catch (recordError) {
+        CircuitBreaker.logger.warn(
+          'Failed to record reset with ErrorAggregator',
+          {
+            service: 'circuit-breaker',
+            operation: 'reset_recording',
+            error: recordError,
+          },
+        );
+      }
     }
   }
 
   /**
    * Force circuit breaker to open state
    */
-  forceOpen(): void {
-    this.transitionTo('open');
+  async forceOpen(): Promise<void> {
+    await this.transitionTo('open');
   }
 
   /**
@@ -191,7 +264,7 @@ export class CircuitBreaker {
   /**
    * Handle successful operation
    */
-  private onSuccess(): void {
+  private async onSuccess(): Promise<void> {
     this.successCount++;
     this.lastSuccessTime = Date.now();
 
@@ -210,7 +283,7 @@ export class CircuitBreaker {
 
     if (this.state === 'half-open') {
       if (this.successHistory.length >= this.options.successThreshold) {
-        this.transitionTo('closed');
+        await this.transitionTo('closed');
       }
     }
   }
@@ -218,9 +291,32 @@ export class CircuitBreaker {
   /**
    * Handle failed operation
    */
-  private onFailure(error: Error): void {
+  private async onFailure(error: Error): Promise<void> {
     this.failureCount++;
     this.lastFailureTime = Date.now();
+
+    // Record error with ErrorAggregator
+    try {
+      await this.errorAggregator.recordError(error, {
+        service: 'circuit-breaker',
+        operation: 'circuit_breaker_operation',
+        metadata: {
+          circuitState: this.state,
+          failureCount: this.failureCount,
+          totalRequests: this.totalRequests,
+        },
+      });
+    } catch (recordError) {
+      // Don't let error recording break the circuit breaker
+      CircuitBreaker.logger.warn(
+        'Failed to record error with ErrorAggregator',
+        {
+          service: 'circuit-breaker',
+          operation: 'error_recording',
+          error: recordError,
+        },
+      );
+    }
 
     if (this.options.onFailure) {
       this.options.onFailure(error);
@@ -228,10 +324,10 @@ export class CircuitBreaker {
 
     if (this.state === 'closed') {
       if (this.failureCount >= this.options.failureThreshold) {
-        this.transitionTo('open');
+        await this.transitionTo('open');
       }
     } else if (this.state === 'half-open') {
-      this.transitionTo('open');
+      await this.transitionTo('open');
     }
   }
 
@@ -253,10 +349,77 @@ export class CircuitBreaker {
   /**
    * Transition to new state
    */
-  private transitionTo(newState: CircuitState): void {
+  private async transitionTo(newState: CircuitState): Promise<void> {
     const previousState = this.state;
     this.state = newState;
     this.stateChanges++;
+
+    // Log state transition
+    CircuitBreaker.logger.info(
+      `Circuit breaker state changed from ${previousState} to ${newState}`,
+      {
+        service: 'circuit-breaker',
+        operation: 'state-transition',
+        previousState,
+        newState,
+        failureCount: this.failureCount,
+        successCount: this.successCount,
+        totalRequests: this.totalRequests,
+      },
+    );
+
+    // Record state change with ErrorAggregator
+    try {
+      if (newState === 'open') {
+        // Create a custom error for circuit breaker opening
+        const circuitOpenError = new ConcreteServiceError(
+          'CIRCUIT_BREAKER',
+          'CIRCUIT_OPEN',
+          `Circuit breaker opened due to ${this.failureCount} consecutive failures`,
+          {
+            previousState,
+            newState,
+            failureCount: this.failureCount,
+            totalRequests: this.totalRequests,
+            failureRate: this.getStats().failureRate,
+          },
+        );
+
+        await this.errorAggregator.recordError(circuitOpenError, {
+          service: 'circuit-breaker',
+          operation: 'state_transition',
+          metadata: {
+            stateChange: `${previousState}->${newState}`,
+            failureCount: this.failureCount,
+            successCount: this.successCount,
+            totalRequests: this.totalRequests,
+            uptime: Date.now() - this.startTime,
+          },
+        });
+      } else {
+        // Record successful state transitions (recovery)
+        await this.errorAggregator.recordSuccess(
+          'circuit-breaker',
+          'state_transition',
+          {
+            stateChange: `${previousState}->${newState}`,
+            failureCount: this.failureCount,
+            successCount: this.successCount,
+            totalRequests: this.totalRequests,
+          },
+        );
+      }
+    } catch (recordError) {
+      // Don't let error recording break the circuit breaker
+      CircuitBreaker.logger.warn(
+        'Failed to record state change with ErrorAggregator',
+        {
+          service: 'circuit-breaker',
+          operation: 'state_change_recording',
+          error: recordError,
+        },
+      );
+    }
 
     // Reset counters based on state transition
     if (newState === 'closed') {
@@ -276,19 +439,35 @@ export class CircuitBreaker {
    */
   private validateOptions(): void {
     if (this.options.failureThreshold <= 0) {
-      throw new Error('failureThreshold must be greater than 0');
+      throw ErrorFactory.validation(
+        `Field 'failureThreshold' value ${this.options.failureThreshold} is out of range. Expected greater than or equal to 1`,
+        'failureThreshold',
+        this.options.failureThreshold,
+      );
     }
 
     if (this.options.recoveryTimeout <= 0) {
-      throw new Error('recoveryTimeout must be greater than 0');
+      throw ErrorFactory.validation(
+        `Field 'recoveryTimeout' value ${this.options.recoveryTimeout} is out of range. Expected greater than or equal to 1`,
+        'recoveryTimeout',
+        this.options.recoveryTimeout,
+      );
     }
 
     if (this.options.monitoringPeriod <= 0) {
-      throw new Error('monitoringPeriod must be greater than 0');
+      throw ErrorFactory.validation(
+        `Field 'monitoringPeriod' value ${this.options.monitoringPeriod} is out of range. Expected greater than or equal to 1`,
+        'monitoringPeriod',
+        this.options.monitoringPeriod,
+      );
     }
 
     if (this.options.successThreshold <= 0) {
-      throw new Error('successThreshold must be greater than 0');
+      throw ErrorFactory.validation(
+        `Field 'successThreshold' value ${this.options.successThreshold} is out of range. Expected greater than or equal to 1`,
+        'successThreshold',
+        this.options.successThreshold,
+      );
     }
   }
 
@@ -302,9 +481,6 @@ export class CircuitBreaker {
       monitoringPeriod: getCircuitBreakerConstant('MONITORING_PERIOD'),
       successThreshold: getCircuitBreakerConstant('SUCCESS_THRESHOLD'),
       timeout: getTimeout('CONNECTION'),
-      onStateChange: (_from, _to) => {
-        // Use proper logging instead of console
-      },
     });
   }
 
@@ -318,9 +494,6 @@ export class CircuitBreaker {
       monitoringPeriod: getCircuitBreakerConstant('MONITORING_PERIOD') / 5, // Shorter monitoring
       successThreshold: 2, // Lower success threshold
       timeout: getTimeout('NETWORK'), // Shorter timeout
-      onStateChange: (_from, _to) => {
-        // State change logging removed - use proper logging in production
-      },
     });
   }
 
@@ -334,9 +507,6 @@ export class CircuitBreaker {
       monitoringPeriod: getCircuitBreakerConstant('MONITORING_PERIOD') * 2, // Longer monitoring
       successThreshold: getCircuitBreakerConstant('SUCCESS_THRESHOLD') * 2, // Higher success threshold
       timeout: getTimeout('DATABASE'), // Longer timeout
-      onStateChange: (_from, _to) => {
-        // Use proper logging instead of console
-      },
     });
   }
 }

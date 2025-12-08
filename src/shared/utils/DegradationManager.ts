@@ -1,6 +1,7 @@
-// import { ServiceError } from '../errors/ServiceError';
-// import { ErrorType } from '../errors/ErrorTypes';
 import { getDegradationThreshold } from '../errors/ErrorConstants';
+import { ErrorFactory } from '../errors/ErrorFactory';
+
+import { LogManager } from './LogManager';
 
 export enum DegradationLevel {
   FULL = 'full',
@@ -45,6 +46,11 @@ export interface DegradationMetrics {
 /**
  * Degradation manager for graceful service degradation.
  * Manages service capabilities under stress conditions to maintain availability.
+ *
+ * Error Handling:
+ * - Uses ErrorFactory for consistent error creation
+ * - Provides error migration utilities for legacy error compatibility
+ * - Automatically converts legacy errors to ServiceError instances
  */
 export class DegradationManager {
   private currentLevel: DegradationLevel = DegradationLevel.FULL;
@@ -54,6 +60,7 @@ export class DegradationManager {
   private metrics: DegradationMetrics;
   private evaluationInterval?: NodeJS.Timeout;
   private resourceUsageMap: Map<string, number> = new Map();
+  private logger = LogManager.getLogger('DegradationManager');
 
   constructor() {
     this.metrics = {
@@ -75,6 +82,14 @@ export class DegradationManager {
    */
   registerStrategy(strategy: DegradationStrategy): void {
     this.availableStrategies.set(strategy.name, strategy);
+
+    this.logger.debug('Registered degradation strategy', {
+      operation: 'register_strategy',
+      strategyName: strategy.name,
+      strategyLevel: strategy.level,
+      capabilities: strategy.capabilities,
+      limitations: strategy.limitations,
+    });
   }
 
   /**
@@ -82,6 +97,15 @@ export class DegradationManager {
    */
   registerTrigger(name: string, trigger: DegradationTrigger): void {
     this.triggers.set(name, trigger);
+
+    this.logger.debug('Registered degradation trigger', {
+      operation: 'register_trigger',
+      triggerName: name,
+      triggerType: trigger.type,
+      threshold: trigger.threshold,
+      metric: trigger.metric,
+      enabled: trigger.enabled,
+    });
   }
 
   /**
@@ -95,6 +119,13 @@ export class DegradationManager {
     this.evaluationInterval = setInterval(() => {
       this.evaluateDegradation();
     }, intervalMs);
+
+    this.logger.info('Started degradation monitoring', {
+      operation: 'start_monitoring',
+      intervalMs,
+      currentLevel: this.currentLevel,
+      activeStrategies: Array.from(this.activeStrategies.keys()),
+    });
   }
 
   /**
@@ -104,6 +135,12 @@ export class DegradationManager {
     if (this.evaluationInterval) {
       clearInterval(this.evaluationInterval);
       this.evaluationInterval = undefined;
+
+      this.logger.info('Stopped degradation monitoring', {
+        operation: 'stop_monitoring',
+        currentLevel: this.currentLevel,
+        activeStrategies: Array.from(this.activeStrategies.keys()),
+      });
     }
   }
 
@@ -160,12 +197,16 @@ export class DegradationManager {
   updateResourceUsage(resource: string, usage: number): void {
     // Validate resource name to prevent object injection
     if (!/^[\w-]+$/.test(resource)) {
-      throw new Error(`Invalid resource name: ${resource}`);
+      throw ErrorFactory.validationConstraint(
+        'resource',
+        'Resource name must contain only word characters and hyphens',
+        resource,
+      );
     }
 
     // Validate usage is a finite number
     if (!Number.isFinite(usage)) {
-      throw new Error(`Invalid usage value: ${usage}`);
+      throw ErrorFactory.validationType('usage', usage, 'finite number');
     }
 
     this.resourceUsageMap.set(resource, usage);
@@ -301,6 +342,7 @@ export class DegradationManager {
     trigger: string,
     reason: string,
   ): void {
+    const previousLevel = this.currentLevel;
     this.currentLevel = level;
 
     // Clear active strategies
@@ -328,10 +370,18 @@ export class DegradationManager {
       this.metrics.triggerHistory = this.metrics.triggerHistory.slice(-50);
     }
 
-    // Log degradation event - replace with proper logging
-    // console.log(
-    //   `Degradation: ${previousLevel} -> ${level} (${trigger}: ${reason})`,
-    // );
+    // Log degradation level change with context
+    this.logger.info('Degradation level changed', {
+      operation: 'degradation_level_change',
+      previousLevel,
+      newLevel: level,
+      trigger,
+      reason,
+      activeStrategies: Array.from(this.activeStrategies.keys()),
+      resourceUsage: Object.fromEntries(this.resourceUsageMap),
+      errorRate: this.metrics.errorRate,
+      averageResponseTime: this.metrics.averageResponseTime,
+    });
   }
 
   /**
@@ -525,5 +575,55 @@ export class DegradationManager {
       activeStrategies: this.metrics.activeStrategies,
       health,
     };
+  }
+
+  /**
+   * Handle and migrate legacy errors from external sources
+   * This method ensures consistent error handling when legacy errors
+   * are encountered from external components or integrations
+   */
+  handleLegacyError(error: Error, operation?: string): never {
+    const migratedError = ErrorFactory.convertToServiceError(error, {
+      operation: operation ?? 'degradation_manager_operation',
+      preserveOriginal: true,
+    });
+
+    this.logger.warn('Legacy error encountered and migrated', {
+      operation: operation ?? 'unknown',
+      originalType: error.constructor.name,
+      migratedType: migratedError.constructor.name,
+      message: migratedError.message,
+    });
+
+    throw migratedError;
+  }
+
+  /**
+   * Safely execute operations with automatic error migration
+   * Wraps operations that might throw legacy errors and ensures
+   * they are converted to ServiceError instances
+   */
+  async executeWithErrorMigration<T>(
+    operation: string,
+    fn: () => T | Promise<T>,
+  ): Promise<T> {
+    try {
+      const result = await fn();
+      return result;
+    } catch (error) {
+      const migratedError = ErrorFactory.convertToServiceError(error as Error, {
+        operation,
+        preserveOriginal: true,
+      });
+
+      this.logger.warn('Legacy error encountered and migrated', {
+        operation,
+        originalType: (error as Error).constructor.name,
+        migratedType: migratedError.constructor.name,
+        message: migratedError.message,
+      });
+
+      return Promise.reject(migratedError);
+    }
   }
 }
