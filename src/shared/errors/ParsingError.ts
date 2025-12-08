@@ -1,5 +1,8 @@
-import { ServiceError, type ServiceErrorOptions } from './ServiceError';
-import { ErrorType, ParsingErrorCodes } from './ErrorTypes';
+import {
+  ServiceError,
+  type ServiceErrorOptions,
+} from '@/shared/errors/ServiceError';
+import { ErrorType, ParsingErrorCodes } from '@/shared/errors/ErrorTypes';
 
 export interface ParsingErrorContext {
   filePath?: string;

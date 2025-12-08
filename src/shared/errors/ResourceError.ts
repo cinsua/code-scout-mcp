@@ -1,6 +1,9 @@
-import { ServiceError, type ServiceErrorOptions } from './ServiceError';
-import { ErrorType, ResourceErrorCodes } from './ErrorTypes';
-import { getRetryDelay } from './ErrorConstants';
+import {
+  ServiceError,
+  type ServiceErrorOptions,
+} from '@/shared/errors/ServiceError';
+import { ErrorType, ResourceErrorCodes } from '@/shared/errors/ErrorTypes';
+import { getRetryDelay } from '@/shared/errors/ErrorConstants';
 
 export interface ResourceErrorContext {
   resourceType?: string;

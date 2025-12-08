@@ -1,6 +1,9 @@
-import { ServiceError, type ServiceErrorOptions } from './ServiceError';
-import { ErrorType, TimeoutErrorCodes } from './ErrorTypes';
-import { getRetryDelay } from './ErrorConstants';
+import {
+  ServiceError,
+  type ServiceErrorOptions,
+} from '@/shared/errors/ServiceError';
+import { ErrorType, TimeoutErrorCodes } from '@/shared/errors/ErrorTypes';
+import { getRetryDelay } from '@/shared/errors/ErrorConstants';
 
 export interface TimeoutErrorContext {
   operation?: string;

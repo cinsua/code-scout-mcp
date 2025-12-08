@@ -3,7 +3,7 @@
  * Provides standardized error classification and codes.
  */
 
-import { getRetryDelay } from './ErrorConstants';
+import { getRetryDelay } from '@/shared/errors/ErrorConstants';
 
 /**
  * Main error type categories

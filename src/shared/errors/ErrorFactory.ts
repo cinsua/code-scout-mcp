@@ -1,5 +1,3 @@
-import { ConfigurationError } from '../../config/errors/ConfigurationError';
-
 import { ServiceError } from './ServiceError';
 import { FileSystemError } from './FileSystemError';
 import { ResourceError } from './ResourceError';
@@ -10,6 +8,8 @@ import { ErrorType, ErrorTypeUtils } from './ErrorTypes';
 import { ParsingError } from './ParsingError';
 import { getTimeout, getRetryDelay } from './ErrorConstants';
 import { DatabaseError, DatabaseErrorType } from './DatabaseError';
+
+import { ConfigurationError } from '@/config/errors/ConfigurationError';
 
 // Concrete implementation of ServiceError for factory use
 class ConcreteServiceError extends ServiceError {

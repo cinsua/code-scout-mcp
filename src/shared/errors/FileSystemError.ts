@@ -1,5 +1,8 @@
-import { ServiceError, type ServiceErrorOptions } from './ServiceError';
-import { ErrorType, FileSystemErrorCodes } from './ErrorTypes';
+import {
+  ServiceError,
+  type ServiceErrorOptions,
+} from '@/shared/errors/ServiceError';
+import { ErrorType, FileSystemErrorCodes } from '@/shared/errors/ErrorTypes';
 
 export interface FileSystemErrorContext {
   filePath?: string;

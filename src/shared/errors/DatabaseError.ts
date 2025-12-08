@@ -1,5 +1,5 @@
-import { ServiceError } from './ServiceError';
-import { getRetryDelay, getTimeout } from './ErrorConstants';
+import { ServiceError } from '@/shared/errors/ServiceError';
+import { getRetryDelay, getTimeout } from '@/shared/errors/ErrorConstants';
 
 /**
  * Error types for database operations

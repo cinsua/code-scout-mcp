@@ -6,10 +6,9 @@
  * and compatibility layers for gradual migration.
  */
 
-import { LogManager } from '../utils/LogManager';
-
-import { ServiceError } from './ServiceError';
-import { ErrorFactory } from './ErrorFactory';
+import { LogManager } from '@/shared/utils/LogManager';
+import { ServiceError } from '@/shared/errors/ServiceError';
+import { ErrorFactory } from '@/shared/errors/ErrorFactory';
 
 export interface MigrationResult {
   migrated: ServiceError;

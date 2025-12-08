@@ -1,5 +1,8 @@
-import { ServiceError, type ServiceErrorOptions } from './ServiceError';
-import { ErrorType, ValidationErrorCodes } from './ErrorTypes';
+import {
+  ServiceError,
+  type ServiceErrorOptions,
+} from '@/shared/errors/ServiceError';
+import { ErrorType, ValidationErrorCodes } from '@/shared/errors/ErrorTypes';
 
 export interface ValidationErrorContext {
   field?: string;
