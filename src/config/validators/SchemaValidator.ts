@@ -9,16 +9,16 @@ import type { ErrorObject, ValidateFunction, KeywordDefinition } from 'ajv';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 
-import { LogManager } from '../../shared/utils/LogManager';
-import { ErrorFactory } from '../../shared/errors/ErrorFactory';
-import type { ServiceError } from '../../shared/errors/ServiceError';
+import { LogManager } from '@/shared/utils/LogManager';
+import { ErrorFactory } from '@/shared/errors/ErrorFactory';
+import type { ServiceError } from '@/shared/errors/ServiceError';
 import type {
   PartialAppConfig,
   ValidationResult,
   ValidationError,
   ValidationWarning,
-} from '../types/ConfigTypes';
-import configSchema from '../schema/config-schema.json';
+} from '@/config/types/ConfigTypes';
+import configSchema from '@/config/schema/config-schema.json';
 
 /**
  * Schema validator options

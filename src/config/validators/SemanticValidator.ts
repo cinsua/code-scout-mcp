@@ -16,11 +16,11 @@ import type {
   SecurityConfig,
   WatchingConfig,
   LanguageConfig,
-} from '../types/ConfigTypes';
-import { ConfigurationError } from '../errors/ConfigurationError';
-import { ErrorFactory } from '../../shared/errors/ErrorFactory';
-import { ErrorMigration } from '../../shared/errors/ErrorMigration';
-import { LogManager } from '../../shared/utils/LogManager';
+} from '@/config/types/ConfigTypes';
+import { ConfigurationError } from '@/config/errors/ConfigurationError';
+import { ErrorFactory } from '@/shared/errors/ErrorFactory';
+import { ErrorMigration } from '@/shared/errors/ErrorMigration';
+import { LogManager } from '@/shared/utils/LogManager';
 
 /**
  * Maximum recommended database connections
