@@ -387,6 +387,27 @@ export function UserProfile({ userId }: Props) {
 - Provide context for failures
 
 ### Imports
+**MANDATORY: Use Path Aliases for Internal Imports**
+
+- **Always use aliases** instead of relative paths (`../`, `../../`) for internal modules
+- **Available aliases**:
+  - `@/*` → `src/*` (source root)
+  - `@/features/*` → `src/features/*` (feature modules)
+  - `@/shared/*` → `src/shared/*` (shared utilities)
+  - `@/config/*` → `src/config/*` (configuration modules)
+- **Only exception**: Same-directory relative imports (`./`, `../`) are acceptable
+
+```typescript
+// ✅ CORRECT
+import { DatabaseService } from "@/features/storage/services/DatabaseService";
+import { LogManager } from "@/shared/utils/LogManager";
+
+// ❌ WRONG - Never use these for internal modules
+import { DatabaseService } from "../../../features/storage/services/DatabaseService";
+```
+
+**Rationale**: Aliases prevent "import path hell" and provide consistent imports regardless of file location.
+
 - Use proper import paths (absolute vs relative)
 - Group imports logically (external, internal, local)
 - Use type-only imports when appropriate

@@ -11,7 +11,7 @@ Run all the jest test, ts checks, lint:all checks
 ```bash
 npm run typecheck
 npm run lint:all
-npm run test
+npm run test:minimal
 ```
 
 ### 2. Report

@@ -7,9 +7,11 @@
     "source.fixAll.eslint": "explicit",
     "source.organizeImports": "explicit"
   },
-  "typescript.preferences.importModuleSpecifier": "relative",
+  "typescript.preferences.importModuleSpecifier": "non-relative",
+  "typescript.preferences.importModuleSpecifierEnding": "minimal",
   "typescript.preferences.quoteStyle": "single",
   "typescript.suggest.autoImports": true,
+  "typescript.preferences.includePackageJsonAutoImports": "auto",
   "eslint.validate": ["typescript", "javascript"],
   "eslint.workingDirectories": ["."],
   "eslint.codeAction.showDocumentation": {
@@ -27,5 +29,12 @@
     "**/node_modules": true,
     "**/dist": true,
     "**/coverage": true
+  },
+  "path-intellisense.mappings": {
+    "@/*": "${workspaceFolder}/src/*",
+    "@/features/*": "${workspaceFolder}/src/features/*",
+    "@/shared/*": "${workspaceFolder}/src/shared/*",
+    "@/config/*": "${workspaceFolder}/src/config/*",
+    "@/api/*": "${workspaceFolder}/src/api/*"
   }
 }

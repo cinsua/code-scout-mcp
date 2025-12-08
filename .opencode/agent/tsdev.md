@@ -202,6 +202,35 @@ Code Intelligence & Context Gathering: Before implementing any code changes, new
 - Quality gates prevent merging unformatted or poorly linted code
 
 ### Coding Conventions
+**Import Path Aliases - REQUIRED:**
+
+- **MANDATORY**: Use path aliases instead of relative imports (`../`, `../../`) for internal modules
+- **Available aliases**:
+  - `@/*` → `src/*` (source root)
+  - `@/features/*` → `src/features/*` (feature modules)
+  - `@/shared/*` → `src/shared/*` (shared utilities)
+  - `@/config/*` → `src/config/*` (configuration modules)
+- **Exception**: Relative imports (`./`, `../`) are only allowed for files in the same directory
+
+```typescript
+// ✅ CORRECT - Use aliases for internal imports
+import { DatabaseService } from "@/features/storage/services/DatabaseService";
+import { LogManager } from "@/shared/utils/LogManager";
+import { ConfigurationManager } from "@/config/services/ConfigurationManager";
+
+// ❌ WRONG - Avoid relative imports for internal modules
+import { DatabaseService } from "../../../features/storage/services/DatabaseService";
+import { LogManager } from "../../../shared/utils/LogManager";
+import { ConfigurationManager } from "../../config/services/ConfigurationManager";
+
+// ✅ ACCEPTABLE - Relative imports for same directory
+import { Helper } from "./utils/helper";
+import type { Types } from "../types";
+```
+
+**Rationale**: Aliases provide consistent, readable imports regardless of file location and prevent the "import path hell" of deeply nested relative paths.
+
+
 
 **Import Style:**
 

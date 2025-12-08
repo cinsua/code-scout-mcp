@@ -5,10 +5,19 @@
 
 import esbuild from 'esbuild';
 import { copyFileSync, existsSync, mkdirSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 
 const isProduction = process.env.NODE_ENV === 'production';
 const isWatchMode = process.argv.includes('--watch');
+
+// Path aliases matching tsconfig.json
+const aliases = {
+  '@': resolve('./src'),
+  '@/features': resolve('./src/features'),
+  '@/shared': resolve('./src/shared'),
+  '@/config': resolve('./src/config'),
+  '@/api': resolve('./src/api'),
+};
 
 // Base configuration
 const baseConfig = {
@@ -45,6 +54,7 @@ const baseConfig = {
     'process.env.NODE_ENV': `"${process.env.NODE_ENV || 'development'}"`,
     global: 'globalThis',
   },
+  alias: aliases,
   logLevel: isProduction ? 'error' : 'info',
 };
 

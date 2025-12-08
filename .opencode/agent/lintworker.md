@@ -101,6 +101,7 @@ const unused = 5;  // ❌ remove entire line
 ```typescript
 // ❌ Wrong order
 import { helper } from './helper';
+**Path Alias Rule**: Always use aliases (@/shared/*, @/features/*, etc.) instead of relative paths (../../../shared/*) for internal modules. Only use relative paths for same-directory imports.
 import React from 'react';
 import { readFile } from 'node:fs';
 
@@ -113,6 +114,7 @@ import { externalLib } from 'external-package';
 import { utils } from '@/shared/utils';
 
 import { helper } from './helper';
+**Path Alias Rule**: Always use aliases (@/shared/*, @/features/*, etc.) instead of relative paths (../../../shared/*) for internal modules. Only use relative paths for same-directory imports.
 ```
 
 ### Code Quality Fixes
