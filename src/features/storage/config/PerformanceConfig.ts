@@ -1,5 +1,4 @@
-import type { PerformanceConfig } from '../types/PerformanceTypes';
-
+import type { PerformanceConfig } from '@/features/storage/types/PerformanceTypes';
 import {
   CONNECTION_POOL_DEFAULTS,
   QUERY_CACHE_DEFAULTS,
@@ -7,7 +6,7 @@ import {
   MONITORING_DEFAULTS,
   MEMORY_DEFAULTS,
   TIME_INTERVALS,
-} from './PerformanceConstants';
+} from '@/features/storage/config/PerformanceConstants';
 
 /**
  * Performance configuration profiles for different use cases

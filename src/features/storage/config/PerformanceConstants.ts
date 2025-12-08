@@ -1,6 +1,6 @@
-import type { PerformanceConfig } from '../types/StorageTypes';
-
 import { PERFORMANCE_THRESHOLDS } from './PerformanceThresholds';
+
+import type { PerformanceConfig } from '@/features/storage/types/StorageTypes';
 
 /**
  * Shared constants for performance configuration
