@@ -1,3 +1,5 @@
+import { Writable } from 'node:stream';
+
 import pino from 'pino';
 
 export interface LogContext {
@@ -38,8 +40,27 @@ export class Logger {
   private logger: pino.Logger;
 
   constructor(config?: LoggerConfig) {
+    const logLevel = config?.level ?? process.env.LOG_LEVEL ?? 'info';
+
+    // When level is 'silent', we need to ensure no output
+    // Pino's 'silent' level should prevent all output, but we'll ensure it with a proper null stream
+    const effectiveDestination =
+      logLevel === 'silent'
+        ? (() => {
+            const nullStream = new Writable({
+              write: (_chunk: any, _encoding: string, callback: () => void) => {
+                // Completely discard all log output
+                callback();
+              },
+            });
+            // Ensure the stream is never closed
+            nullStream.destroy = () => nullStream;
+            return nullStream;
+          })()
+        : config?.destination;
+
     this.logger = pino({
-      level: config?.level ?? process.env.LOG_LEVEL ?? 'info',
+      level: logLevel,
       formatters: {
         level: label => ({ level: label }),
       },
@@ -48,17 +69,18 @@ export class Logger {
         req: pino.stdSerializers.req,
         res: pino.stdSerializers.res,
       },
-      ...(config?.destination && { destination: config.destination }),
-      ...(config?.prettyPrint && {
-        transport: {
-          target: 'pino-pretty',
-          options: {
-            colorize: true,
-            translateTime: 'SYS:standard',
-            ignore: 'pid,hostname',
+      ...(effectiveDestination && { destination: effectiveDestination }),
+      ...(config?.prettyPrint &&
+        logLevel !== 'silent' && {
+          transport: {
+            target: 'pino-pretty',
+            options: {
+              colorize: true,
+              translateTime: 'SYS:standard',
+              ignore: 'pid,hostname',
+            },
           },
-        },
-      }),
+        }),
       ...(config?.redact && { redact: config.redact }),
     });
   }
