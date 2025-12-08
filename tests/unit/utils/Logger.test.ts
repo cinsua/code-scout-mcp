@@ -89,7 +89,11 @@ describe('Logging System', () => {
       const error = new Error('Test database error');
       const testLogger = LogManager.getLogger('test');
 
+      // Explicitly set logger to silent for this test to ensure no output
+      testLogger.setLevel('silent' as any);
+
       // This should not throw and should log appropriately
+      // Note: In test environment, logging should be silenced
       expect(() => {
         logDatabaseError(testLogger, error, 'SELECT * FROM test', {
           operation: 'test-query',

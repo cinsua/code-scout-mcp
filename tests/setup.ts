@@ -3,29 +3,26 @@ import { expect } from '@jest/globals';
 import { LogManager } from '../src/shared/utils/LogManager';
 import { initializeLogging } from '../src/config/logging';
 
+// Configure test logging IMMEDIATELY at module load time
+// This ensures that any static loggers created during import get the silent config
+process.env.NODE_ENV = 'test';
+
+// Initialize test logging using the test config (completely silent)
+initializeLogging({
+  level: 'silent',
+  format: 'json',
+  file: { enabled: false },
+  console: { enabled: false },
+  structured: true,
+});
+
 export {};
 beforeAll(async () => {
-  // Set test environment variables
-  process.env.NODE_ENV = 'test';
-
-  // Initialize test logging using the test config (completely silent)
-  initializeLogging({
-    level: 'silent',
-    format: 'json',
-    file: { enabled: false },
-    console: { enabled: false },
-    structured: true,
-  });
-
-  const logger = LogManager.getLogger('test-setup');
-  logger.info('Test environment initialized');
-
+  // Test environment initialized - logging silenced for tests
   // Setup test database (will be implemented when database is added)
   // await setupTestDatabase();
-
   // Configure test logging
   // configureTestLogging();
-
   // Initialize test fixtures
   // await initializeTestFixtures();
 });
@@ -114,5 +111,4 @@ declare global {
   isTestEnvironment: () => process.env.NODE_ENV === 'test',
 };
 
-const logger = LogManager.getLogger('test-setup');
-logger.info('Global test configuration loaded');
+// Global test configuration loaded - logging silenced for tests
