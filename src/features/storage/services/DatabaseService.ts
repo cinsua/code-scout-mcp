@@ -11,31 +11,30 @@ import type {
   TransactionCallback,
   MigrationResult,
   BackupOptions,
-} from '../types/StorageTypes';
-import type { PerformanceReport } from '../types/PerformanceTypes';
-import type { DatabaseError } from '../../../shared/errors/DatabaseError';
-import { DatabaseErrorType } from '../../../shared/errors/DatabaseError';
-import { EnhancedConnectionPool } from '../utils/EnhancedConnectionPool';
-import { MigrationManager } from '../migrations/MigrationManager';
-import { DatabaseMaintenance } from '../utils/databaseMaintenance';
-import { PerformanceConfigManager } from '../config/PerformanceConfig';
-import { MONITORING_DEFAULTS } from '../config/PerformanceConstants';
-import { LogManager } from '../../../shared/utils/LogManager';
-import { createQueryPerformanceContext } from '../../../shared/utils/PerformanceLogger';
-import { logDatabaseError } from '../../../shared/utils/ErrorLogger';
-import { ErrorAggregator } from '../../../shared/services/ErrorAggregator';
-import type { OperationContext } from '../../../shared/services/BaseService';
-import { BaseService } from '../../../shared/services/BaseService';
-import { ErrorFactory } from '../../../shared/errors/ErrorFactory';
-import { ErrorMigration } from '../../../shared/errors/ErrorMigration';
-import { TimeoutError } from '../../../shared/errors/TimeoutError';
-import { ServiceError } from '../../../shared/errors/ServiceError';
+} from '@/features/storage/types/StorageTypes';
+import type { PerformanceReport } from '@/features/storage/types/PerformanceTypes';
+import type { DatabaseError } from '@/shared/errors/DatabaseError';
+import { DatabaseErrorType } from '@/shared/errors/DatabaseError';
+import { EnhancedConnectionPool } from '@/features/storage/utils/EnhancedConnectionPool';
+import { MigrationManager } from '@/features/storage/migrations/MigrationManager';
+import { DatabaseMaintenance } from '@/features/storage/utils/databaseMaintenance';
+import { PerformanceConfigManager } from '@/features/storage/config/PerformanceConfig';
+import { MONITORING_DEFAULTS } from '@/features/storage/config/PerformanceConstants';
+import { LogManager } from '@/shared/utils/LogManager';
+import { createQueryPerformanceContext } from '@/shared/utils/PerformanceLogger';
+import { logDatabaseError } from '@/shared/utils/ErrorLogger';
+import { ErrorAggregator } from '@/shared/services/ErrorAggregator';
+import type { OperationContext } from '@/shared/services/BaseService';
+import { BaseService } from '@/shared/services/BaseService';
+import { ErrorFactory } from '@/shared/errors/ErrorFactory';
+import { ErrorMigration } from '@/shared/errors/ErrorMigration';
+import { TimeoutError } from '@/shared/errors/TimeoutError';
+import { ServiceError } from '@/shared/errors/ServiceError';
 import {
   getRetryDelay,
   getCircuitBreakerConstant,
-} from '../../../shared/errors/ErrorConstants';
-
-import { PerformanceService } from './PerformanceService';
+} from '@/shared/errors/ErrorConstants';
+import { PerformanceService } from '@/features/storage/services/PerformanceService';
 
 // Constants for database service
 const SLOW_QUERY_THRESHOLD_MS = MONITORING_DEFAULTS.SLOW_QUERY_THRESHOLD_MS;

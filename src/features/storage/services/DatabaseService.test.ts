@@ -1,8 +1,7 @@
 import { promises as fs } from 'node:fs';
 
-import type { DatabaseConfig } from '../types/StorageTypes';
-
-import { DatabaseService } from './DatabaseService';
+import type { DatabaseConfig } from '@/features/storage/types/StorageTypes';
+import { DatabaseService } from '@/features/storage/services/DatabaseService';
 
 describe('DatabaseService', () => {
   let dbService: DatabaseService;

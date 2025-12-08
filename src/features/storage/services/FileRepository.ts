@@ -3,15 +3,15 @@ import type Database from 'better-sqlite3';
 import {
   DatabaseError,
   DatabaseErrorType,
-} from '../../../shared/errors/DatabaseError';
+} from '@/shared/errors/DatabaseError';
 import type {
   FileMetadata,
   ListOptions,
   BatchResult,
-} from '../types/StorageTypes';
-import { PERFORMANCE_LIMITS } from '../config/PerformanceConstants';
-import { LogManager } from '../../../shared/utils/LogManager';
-import { SERVICE_CONTEXTS } from '../../../shared/utils/LoggingConstants';
+} from '@/features/storage/types/StorageTypes';
+import { PERFORMANCE_LIMITS } from '@/features/storage/config/PerformanceConstants';
+import { LogManager } from '@/shared/utils/LogManager';
+import { SERVICE_CONTEXTS } from '@/shared/utils/LoggingConstants';
 
 /**
  * Repository class for handling CRUD operations on file metadata

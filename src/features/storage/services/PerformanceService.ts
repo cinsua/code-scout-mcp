@@ -1,22 +1,22 @@
 import type Database from 'better-sqlite3';
 
-import { ErrorFactory } from '../../../shared/errors/ErrorFactory';
+import { ErrorFactory } from '@/shared/errors/ErrorFactory';
 import type {
   PerformanceConfig,
   PerformanceReport,
   DatabaseStats,
   EnhancedConnectionPoolStats,
   OptimizedQuery,
-} from '../types/StorageTypes';
-import { PerformanceMonitor } from '../utils/PerformanceMonitor';
-import { QueryOptimizer } from '../utils/QueryOptimizer';
-import { ResourceManager } from '../utils/ResourceManager';
-import { PerformanceProfiler } from '../utils/PerformanceProfiler';
-import { PerformanceConfigManager } from '../config/PerformanceConfig';
-import { PERFORMANCE_THRESHOLDS } from '../config/PerformanceConstants';
-import { generateQueryCacheKey } from '../utils/PerformanceUtils';
-import type { EnhancedConnectionPool } from '../utils/EnhancedConnectionPool';
-import { LogManager } from '../../../shared/utils/LogManager';
+} from '@/features/storage/types/StorageTypes';
+import { PerformanceMonitor } from '@/features/storage/utils/PerformanceMonitor';
+import { QueryOptimizer } from '@/features/storage/utils/QueryOptimizer';
+import { ResourceManager } from '@/features/storage/utils/ResourceManager';
+import { PerformanceProfiler } from '@/features/storage/utils/PerformanceProfiler';
+import { PerformanceConfigManager } from '@/features/storage/config/PerformanceConfig';
+import { PERFORMANCE_THRESHOLDS } from '@/features/storage/config/PerformanceConstants';
+import { generateQueryCacheKey } from '@/features/storage/utils/PerformanceUtils';
+import type { EnhancedConnectionPool } from '@/features/storage/utils/EnhancedConnectionPool';
+import { LogManager } from '@/shared/utils/LogManager';
 
 /**
  * Performance service that integrates all performance monitoring and optimization components

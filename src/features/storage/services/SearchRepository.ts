@@ -5,6 +5,8 @@
  * ranking and filtering capabilities using SQLite FTS5 extension.
  */
 
+import type { DatabaseService } from './DatabaseService';
+
 import type {
   SearchCandidate,
   SearchOptions,
@@ -13,20 +15,18 @@ import type {
   IndexMaintenanceResult,
   SearchStats,
   SearchMatch,
-} from '../types/StorageTypes';
-import { DatabaseErrorType } from '../../../shared/errors/DatabaseError';
-import { ErrorFactory } from '../../../shared/errors/ErrorFactory';
-import { ErrorMigration } from '../../../shared/errors/ErrorMigration';
-import { TIME_INTERVALS } from '../config/PerformanceConstants';
-import { PERFORMANCE_THRESHOLDS } from '../config/PerformanceThresholds';
-import { LogManager } from '../../../shared/utils/LogManager';
+} from '@/features/storage/types/StorageTypes';
+import { DatabaseErrorType } from '@/shared/errors/DatabaseError';
+import { ErrorFactory } from '@/shared/errors/ErrorFactory';
+import { ErrorMigration } from '@/shared/errors/ErrorMigration';
+import { TIME_INTERVALS } from '@/features/storage/config/PerformanceConstants';
+import { PERFORMANCE_THRESHOLDS } from '@/features/storage/config/PerformanceThresholds';
+import { LogManager } from '@/shared/utils/LogManager';
 import {
   SERVICE_CONTEXTS,
   ERROR_AGGREGATION,
-} from '../../../shared/utils/LoggingConstants';
-import { ErrorAggregator } from '../../../shared/utils/ErrorLogger';
-
-import type { DatabaseService } from './DatabaseService';
+} from '@/shared/utils/LoggingConstants';
+import { ErrorAggregator } from '@/shared/utils/ErrorLogger';
 
 /**
  * Search Repository class for FTS5 operations
