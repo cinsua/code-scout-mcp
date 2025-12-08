@@ -659,6 +659,40 @@ export class ConfigurationManager extends EventEmitter {
   }
 
   /**
+   * Update error handling configuration with validation
+   */
+  async updateErrorHandlingConfig(
+    updates: Partial<ErrorHandlingConfig>,
+    source: string = 'manual',
+  ): Promise<void> {
+    // Create snapshot before update
+    const snapshot = new ConfigurationSnapshot(
+      this.configuration.config,
+      new Date(),
+      source,
+      `Update error handling configuration: ${JSON.stringify(updates)}`,
+    );
+    this.history.addSnapshot(snapshot);
+
+    // Create test config with updates
+    const testConfig = this.configuration.clone();
+    testConfig.errorHandling = {
+      ...testConfig.errorHandling,
+      ...updates,
+    };
+
+    // Validate the updated configuration
+    const validationResult = this.validateConfiguration(testConfig);
+    if (!validationResult.valid) {
+      throw new BatchValidationError(validationResult.errors);
+    }
+
+    // Apply the updates
+    this.configuration.updatePath('errorHandling', updates, source);
+    await Promise.resolve();
+  }
+
+  /**
    * Destroy the configuration manager
    */
   destroy(): void {

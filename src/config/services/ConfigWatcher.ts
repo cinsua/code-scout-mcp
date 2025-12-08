@@ -18,6 +18,8 @@ import type {
 } from '../types/ConfigTypes';
 import { SchemaValidator } from '../validators/SchemaValidator';
 import { SemanticValidator } from '../validators/SemanticValidator';
+import { CircuitBreaker } from '../../shared/utils/CircuitBreaker';
+import { getCircuitBreakerConstant } from '../../shared/errors/ErrorConstants';
 
 /**
  * Configuration watcher options
@@ -131,6 +133,7 @@ export class ConfigWatcher extends EventEmitter {
   private semanticValidator: SemanticValidator;
   private backups: ConfigBackup[] = [];
   private currentConfig: PartialAppConfig = {};
+  private circuitBreaker: CircuitBreaker;
 
   constructor(options: ConfigWatcherOptions = {}) {
     super();
@@ -138,6 +141,18 @@ export class ConfigWatcher extends EventEmitter {
     this.options = this.createDefaultOptions(options);
     this.schemaValidator = new SchemaValidator();
     this.semanticValidator = new SemanticValidator();
+
+    // Initialize circuit breaker for file operations
+    this.circuitBreaker = new CircuitBreaker({
+      failureThreshold: getCircuitBreakerConstant('FAILURE_THRESHOLD'),
+      recoveryTimeout: getCircuitBreakerConstant('RECOVERY_TIMEOUT'),
+      monitoringPeriod: getCircuitBreakerConstant('MONITORING_PERIOD'),
+      successThreshold: getCircuitBreakerConstant('SUCCESS_THRESHOLD'),
+      timeout: 5000, // 5 second timeout for file operations
+      onStateChange: (from, to) => {
+        this.emit('circuit-breaker:state-change', { from, to });
+      },
+    });
   }
 
   /**
@@ -322,9 +337,11 @@ export class ConfigWatcher extends EventEmitter {
       config: { ...config },
     };
 
-    // Write backup to file
+    // Write backup to file with circuit breaker protection
     try {
-      await fs.writeFile(backupPath, JSON.stringify(config, null, 2), 'utf-8');
+      await this.circuitBreaker.execute(() =>
+        fs.writeFile(backupPath, JSON.stringify(config, null, 2), 'utf-8'),
+      );
     } catch (error) {
       throw new ConfigurationError(
         `Failed to create configuration backup: ${error instanceof Error ? error.message : String(error)}`,
@@ -402,7 +419,7 @@ export class ConfigWatcher extends EventEmitter {
       await Promise.allSettled(
         toDelete.map(async backup => {
           try {
-            await fs.unlink(backup.filePath);
+            await this.circuitBreaker.execute(() => fs.unlink(backup.filePath));
           } catch {
             // Ignore errors when deleting backup files
           }
@@ -542,8 +559,10 @@ export class ConfigWatcher extends EventEmitter {
     oldValue = this.getConfigValue(this.currentConfig, filePath);
 
     if (changeType !== 'removed') {
-      // Read new configuration
-      const content = await fs.readFile(filePath, 'utf-8');
+      // Read new configuration with circuit breaker protection
+      const content = await this.circuitBreaker.execute(() =>
+        fs.readFile(filePath, 'utf-8'),
+      );
       newConfig = JSON.parse(content);
       newValue = newConfig;
     }
@@ -721,6 +740,20 @@ export class ConfigWatcher extends EventEmitter {
     this.removeAllListeners();
     this.backups = [];
     this.currentConfig = {};
+  }
+
+  /**
+   * Get circuit breaker status and statistics
+   */
+  getCircuitBreakerStatus() {
+    return this.circuitBreaker.getStats();
+  }
+
+  /**
+   * Reset the circuit breaker to closed state
+   */
+  resetCircuitBreaker(): void {
+    this.circuitBreaker.reset();
   }
 }
 

@@ -136,5 +136,71 @@
       "memoryLimitMB": 512,
       "allowNetworkAccess": true
     }
+  },
+  "errorHandling": {
+    "retryDelays": {
+      "immediate": 0,
+      "short": 500,
+      "medium": 1500,
+      "long": 4000,
+      "extended": 8000,
+      "maximum": 30000
+    },
+    "timeouts": {
+      "database": 15000,
+      "parsing": 8000,
+      "network": 3000,
+      "filesystem": 3000,
+      "indexing": 240000,
+      "query": 15000,
+      "connection": 8000,
+      "read": 15000,
+      "write": 15000,
+      "lock": 3000,
+      "default": 8000
+    },
+    "circuitBreaker": {
+      "failureThreshold": 3,
+      "recoveryTimeout": 30000,
+      "monitoringPeriod": 180000,
+      "successThreshold": 2,
+      "timeout": 15000
+    },
+    "degradation": {
+      "errorRateThreshold": 0.15,
+      "responseTimeThreshold": 3000,
+      "memoryUsageThreshold": 0.85,
+      "cpuUsageThreshold": 0.95,
+      "monitoringInterval": 15000
+    },
+    "aggregation": {
+      "windowMs": 180000,
+      "cleanupIntervalMs": 2400000,
+      "maxErrorEntries": 5000
+    },
+    "performance": {
+      "slowQueryThresholdMs": 500,
+      "verySlowQueryThresholdMs": 3000,
+      "connectionAcquisitionThresholdMs": 500,
+      "memoryUsageBytes": 2147483648,
+      "poolUtilizationThreshold": 0.85
+    },
+    "resource": {
+      "maxAgeMs": 2400000,
+      "idleTimeoutMs": 240000,
+      "cleanupIntervalMs": 45000,
+      "leakThresholdAgeMs": 1200000
+    },
+    "retryHandler": {
+      "baseDelay": 500,
+      "maxDelay": 20000,
+      "maxAttempts": 2,
+      "linearIncrement": 500
+    },
+    "logging": {
+      "errorRetentionHours": 12,
+      "trendAnalysisWindowHours": 1,
+      "aggregationWindowMinutes": 3
+    }
   }
 }
