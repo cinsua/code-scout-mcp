@@ -5,8 +5,8 @@
  * with proper error codes and structured error information.
  */
 
-import { ServiceError } from '../../shared/errors/ServiceError';
-import { getRetryDelay } from '../../shared/errors/ErrorConstants';
+import { ServiceError } from '@/shared/errors/ServiceError';
+import { getRetryDelay } from '@/shared/errors/ErrorConstants';
 
 export class ConfigurationError extends ServiceError {
   public readonly path?: string;

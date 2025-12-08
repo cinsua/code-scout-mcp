@@ -13,8 +13,8 @@ import type {
   ConfigurationChangeEvent,
   ConfigurationSource,
   ValidationResult,
-} from '../types/ConfigTypes';
-import { ConfigurationError } from '../errors/ConfigurationError';
+} from '@/config/types/ConfigTypes';
+import { ConfigurationError } from '@/config/errors/ConfigurationError';
 
 /**
  * Maximum number of configuration snapshots to keep
