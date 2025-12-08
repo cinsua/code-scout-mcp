@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 
-import type { Migration } from '../types/StorageTypes';
+import type { Migration } from '@/features/storage/types/StorageTypes';
 
 /**
  * Migration interface for internal use

@@ -3,15 +3,18 @@ import path from 'node:path';
 
 import type Database from 'better-sqlite3';
 
-import type { Migration, MigrationResult } from '../types/StorageTypes';
+import type { InternalMigration } from './types';
+
+import type {
+  Migration,
+  MigrationResult,
+} from '@/features/storage/types/StorageTypes';
 import {
   DatabaseError,
   DatabaseErrorType,
-} from '../../../shared/errors/DatabaseError';
-import { getRetryDelay } from '../../../shared/errors/ErrorConstants';
-import { SyncRetryHandler } from '../../../shared/utils/SyncRetryHandler';
-
-import type { InternalMigration } from './types';
+} from '@/shared/errors/DatabaseError';
+import { getRetryDelay } from '@/shared/errors/ErrorConstants';
+import { SyncRetryHandler } from '@/shared/utils/SyncRetryHandler';
 
 /**
  * Migration manager for database schema versioning
