@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { EnhancedConnectionPool } from '../../../src/features/storage/utils/EnhancedConnectionPool';
-import type { DatabaseConfig } from '../../../src/features/storage/types/StorageTypes';
+import { EnhancedConnectionPool } from '@/features/storage/utils/EnhancedConnectionPool';
+import type { DatabaseConfig } from '@/features/storage/types/StorageTypes';
 
 describe('EnhancedConnectionPool', () => {
   let pool: EnhancedConnectionPool;

@@ -1,6 +1,6 @@
-import { Logger, LogManager } from '../../../src/shared/utils/LogManager';
-import { createQueryPerformanceContext } from '../../../src/shared/utils/PerformanceLogger';
-import { logDatabaseError } from '../../../src/shared/utils/ErrorLogger';
+import { Logger, LogManager } from '@/shared/utils/LogManager';
+import { createQueryPerformanceContext } from '@/shared/utils/PerformanceLogger';
+import { logDatabaseError } from '@/shared/utils/ErrorLogger';
 
 describe('Logging System', () => {
   let logger: Logger;

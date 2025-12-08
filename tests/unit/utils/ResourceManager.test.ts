@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { ResourceManager } from '../../../src/features/storage/utils/ResourceManager';
+import { ResourceManager } from '@/features/storage/utils/ResourceManager';
 
 describe('ResourceManager', () => {
   let resourceManager: ResourceManager;

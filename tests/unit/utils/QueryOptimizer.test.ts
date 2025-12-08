@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import Database from 'better-sqlite3';
-import { QueryOptimizer } from '../../../src/features/storage/utils/QueryOptimizer';
+import { QueryOptimizer } from '@/features/storage/utils/QueryOptimizer';
 
 describe('QueryOptimizer', () => {
   let optimizer: QueryOptimizer;

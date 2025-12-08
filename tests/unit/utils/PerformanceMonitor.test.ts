@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { PerformanceMonitor } from '../../../src/features/storage/utils/PerformanceMonitor';
-import type { PerformanceConfig } from '../../../src/features/storage/types/StorageTypes';
+import { PerformanceMonitor } from '@/features/storage/utils/PerformanceMonitor';
+import type { PerformanceConfig } from '@/features/storage/types/StorageTypes';
 
 describe('PerformanceMonitor', () => {
   let monitor: PerformanceMonitor;
