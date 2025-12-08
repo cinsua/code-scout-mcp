@@ -1,12 +1,9 @@
 import {
   DatabaseError,
   DatabaseErrorType,
-} from '../../../../src/features/storage/types/StorageTypes';
-import { ServiceError } from '../../../../src/shared/errors/ServiceError';
-import {
-  getRetryDelay,
-  getTimeout,
-} from '../../../../src/shared/errors/ErrorConstants';
+} from '@/features/storage/types/StorageTypes';
+import { ServiceError } from '@/shared/errors/ServiceError';
+import { getRetryDelay, getTimeout } from '@/shared/errors/ErrorConstants';
 
 describe('DatabaseError Refactoring', () => {
   describe('ServiceError Integration', () => {
