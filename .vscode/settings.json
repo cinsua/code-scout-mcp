@@ -12,6 +12,8 @@
   "typescript.preferences.quoteStyle": "single",
   "typescript.suggest.autoImports": true,
   "typescript.preferences.includePackageJsonAutoImports": "auto",
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "typescript.suggest.importsFromWorkspacePackages": true,
   "eslint.validate": ["typescript", "javascript"],
   "eslint.workingDirectories": ["."],
   "eslint.codeAction.showDocumentation": {
