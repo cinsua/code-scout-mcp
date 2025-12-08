@@ -1,3 +1,5 @@
+import { ServiceError } from '../errors/ServiceError';
+
 import type { Logger, LogContext } from './Logger';
 import { sanitizeQueryForLogging } from './QuerySanitizer';
 import { ERROR_AGGREGATION } from './LoggingConstants';
@@ -35,6 +37,7 @@ export function logError(
   error: Error | string,
   context?: ErrorContext,
   level: 'error' | 'warn' | 'fatal' = 'error',
+  aggregator: ErrorAggregator = globalErrorAggregator,
 ): void {
   const errorObj = error instanceof Error ? error : new Error(error);
   const errorContext: LogContext = {
@@ -57,6 +60,11 @@ export function logError(
   }
 
   const message = errorObj.message || 'An error occurred';
+
+  // Record error in aggregator for monitoring and analysis
+  if (level === 'error' || level === 'fatal') {
+    aggregator.recordError(errorObj);
+  }
 
   switch (level) {
     case 'fatal':
@@ -195,10 +203,10 @@ export class ErrorAggregator {
   private lastCleanup = Date.now();
 
   /**
-   * Record an error for aggregation
+   * Record an error for aggregation with enhanced ServiceError support
    */
   recordError(error: Error, errorType?: string): void {
-    const type = errorType ?? error.constructor.name;
+    const type = this.getErrorType(error, errorType);
     const existing = this.errors.get(type);
     const now = new Date();
 
@@ -230,6 +238,81 @@ export class ErrorAggregator {
   }
 
   /**
+   * Get enhanced error type classification for ServiceError hierarchy
+   */
+  private getErrorType(error: Error, fallbackType?: string): string {
+    // If error is already a ServiceError, use its type information
+    if (error instanceof ServiceError) {
+      const baseType = error.type;
+      const code = error.code;
+
+      // Create a specific type that includes both base type and error code
+      // This allows for more granular error tracking and analysis
+      return `${baseType}_${code}`;
+    }
+
+    // For legacy errors, use the constructor name or provided fallback
+    return fallbackType ?? error.constructor.name;
+  }
+
+  /**
+   * Analyze ServiceError patterns for enhanced insights
+   */
+  private analyzeServiceErrors(aggregated: ErrorAggregation[]): {
+    byType: Record<string, number>;
+    byCode: Record<string, number>;
+    retryableErrors: number;
+    nonRetryableErrors: number;
+  } {
+    const byType = new Map<string, number>();
+    const byCode = new Map<string, number>();
+    let retryableErrors = 0;
+    let nonRetryableErrors = 0;
+
+    for (const agg of aggregated) {
+      // Parse ServiceError types (format: TYPE_CODE)
+      const match = agg.errorType.match(/^([A-Z]+)_(.+)$/);
+      if (match) {
+        const [, type, code] = match;
+
+        // Count by type
+        if (type) {
+          byType.set(type, (byType.get(type) ?? 0) + agg.count);
+        }
+
+        // Count by code
+        if (code) {
+          byCode.set(code, (byCode.get(code) ?? 0) + agg.count);
+        }
+
+        // Analyze sample errors for retryable status
+        for (const error of agg.sampleErrors) {
+          if (error instanceof ServiceError) {
+            if (error.retryable) {
+              retryableErrors += agg.count;
+            } else {
+              nonRetryableErrors += agg.count;
+            }
+            break; // Only need to check one sample per aggregation
+          }
+        }
+      } else {
+        // Legacy error - categorize as unknown type
+        byType.set('LEGACY', (byType.get('LEGACY') ?? 0) + agg.count);
+        byCode.set(agg.errorType, (byCode.get(agg.errorType) ?? 0) + agg.count);
+        nonRetryableErrors += agg.count; // Assume legacy errors are non-retryable
+      }
+    }
+
+    return {
+      byType: Object.fromEntries(byType),
+      byCode: Object.fromEntries(byCode),
+      retryableErrors,
+      nonRetryableErrors,
+    };
+  }
+
+  /**
    * Get aggregated error statistics
    */
   getAggregatedErrors(): ErrorAggregation[] {
@@ -237,7 +320,7 @@ export class ErrorAggregator {
   }
 
   /**
-   * Get error statistics with additional metrics
+   * Get error statistics with additional metrics and ServiceError insights
    */
   getErrorStatistics(): {
     totalErrors: number;
@@ -249,6 +332,12 @@ export class ErrorAggregator {
       trend: 'increasing' | 'decreasing' | 'stable';
     }>;
     criticalErrors: string[];
+    serviceErrorBreakdown: {
+      byType: Record<string, number>;
+      byCode: Record<string, number>;
+      retryableErrors: number;
+      nonRetryableErrors: number;
+    };
   } {
     const aggregated = this.getAggregatedErrors();
     const totalErrors = aggregated.reduce((sum, agg) => sum + agg.count, 0);
@@ -276,6 +365,9 @@ export class ErrorAggregator {
       .filter(agg => agg.count > ERROR_AGGREGATION.CRITICAL_THRESHOLD)
       .map(agg => agg.errorType);
 
+    // Enhanced ServiceError breakdown
+    const serviceErrorBreakdown = this.analyzeServiceErrors(aggregated);
+
     return {
       totalErrors,
       uniqueErrorTypes,
@@ -288,6 +380,7 @@ export class ErrorAggregator {
       errorRate,
       trends,
       criticalErrors,
+      serviceErrorBreakdown,
     };
   }
 
@@ -572,5 +665,88 @@ export class ErrorAggregator {
    */
   reset(): void {
     this.errors.clear();
+    this.errorHistory = [];
+    this.lastCleanup = Date.now();
+  }
+
+  /**
+   * Get real-time error rate monitoring for the last N minutes
+   */
+  getRealTimeErrorRate(minutes: number = 5): {
+    errorsPerMinute: number;
+    totalErrors: number;
+    errorTypes: Array<{
+      type: string;
+      count: number;
+      percentage: number;
+    }>;
+    trend: 'increasing' | 'decreasing' | 'stable';
+  } {
+    const now = Date.now();
+    const windowStart = now - minutes * 60 * 1000;
+
+    // Filter errors within the time window
+    const recentErrors = this.errorHistory.filter(
+      entry => entry.timestamp > windowStart,
+    );
+
+    const totalErrors = recentErrors.reduce(
+      (sum, entry) => sum + entry.count,
+      0,
+    );
+    const errorsPerMinute = totalErrors / minutes;
+
+    // Group by error type
+    const typeCounts = new Map<string, number>();
+    for (const entry of recentErrors) {
+      const current = typeCounts.get(entry.type) ?? 0;
+      typeCounts.set(entry.type, current + entry.count);
+    }
+
+    const errorTypes = Array.from(typeCounts.entries())
+      .map(([type, count]) => ({
+        type,
+        count,
+        percentage: totalErrors > 0 ? (count / totalErrors) * 100 : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    // Calculate trend by comparing first half vs second half of the window
+    const midpoint = windowStart + (minutes * 60 * 1000) / 2;
+    const firstHalf = recentErrors.filter(entry => entry.timestamp < midpoint);
+    const secondHalf = recentErrors.filter(
+      entry => entry.timestamp >= midpoint,
+    );
+
+    const firstHalfCount = firstHalf.reduce(
+      (sum, entry) => sum + entry.count,
+      0,
+    );
+    const secondHalfCount = secondHalf.reduce(
+      (sum, entry) => sum + entry.count,
+      0,
+    );
+
+    let trend: 'increasing' | 'decreasing' | 'stable';
+    const difference = secondHalfCount - firstHalfCount;
+    const threshold = Math.max(1, firstHalfCount * 0.2); // 20% change threshold
+
+    if (difference > threshold) {
+      trend = 'increasing';
+    } else if (difference < -threshold) {
+      trend = 'decreasing';
+    } else {
+      trend = 'stable';
+    }
+
+    return {
+      errorsPerMinute,
+      totalErrors,
+      errorTypes,
+      trend,
+    };
   }
 }
+
+// Global error aggregator instance for automatic error tracking
+export const globalErrorAggregator = new ErrorAggregator();
