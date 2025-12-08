@@ -1,6 +1,9 @@
 import type Database from 'better-sqlite3';
 
-import { DatabaseError, DatabaseErrorType } from '../types/StorageTypes';
+import {
+  DatabaseError,
+  DatabaseErrorType,
+} from '../../../shared/errors/DatabaseError';
 import type {
   FileMetadata,
   ListOptions,

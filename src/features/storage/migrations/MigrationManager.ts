@@ -4,7 +4,11 @@ import path from 'node:path';
 import type Database from 'better-sqlite3';
 
 import type { Migration, MigrationResult } from '../types/StorageTypes';
-import { DatabaseError, DatabaseErrorType } from '../types/StorageTypes';
+import {
+  DatabaseError,
+  DatabaseErrorType,
+} from '../../../shared/errors/DatabaseError';
+import { getRetryDelay } from '../../../shared/errors/ErrorConstants';
 
 import type { InternalMigration } from './types';
 
@@ -362,7 +366,10 @@ export class MigrationManager {
         }
 
         // Wait before retry (exponential backoff) - synchronous delay
-        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+        const delay = Math.min(
+          getRetryDelay('SHORT') * Math.pow(2, attempt - 1),
+          getRetryDelay('EXTENDED'),
+        );
         // Log retry attempt
         // console.log(`Retrying migration ${migration.version} in ${delay}ms...`);
 

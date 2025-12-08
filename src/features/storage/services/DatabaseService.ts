@@ -13,8 +13,8 @@ import type {
   BackupOptions,
 } from '../types/StorageTypes';
 import type { PerformanceReport } from '../types/PerformanceTypes';
-import { DatabaseError } from '../types/StorageTypes';
-import { DatabaseErrorType } from '../types/StorageTypes';
+import type { DatabaseError } from '../../../shared/errors/DatabaseError';
+import { DatabaseErrorType } from '../../../shared/errors/DatabaseError';
 import { EnhancedConnectionPool } from '../utils/EnhancedConnectionPool';
 import { MigrationManager } from '../migrations/MigrationManager';
 import { DatabaseMaintenance } from '../utils/databaseMaintenance';
@@ -23,6 +23,13 @@ import { MONITORING_DEFAULTS } from '../config/PerformanceConstants';
 import { LogManager } from '../../../shared/utils/LogManager';
 import { createQueryPerformanceContext } from '../../../shared/utils/PerformanceLogger';
 import { logDatabaseError } from '../../../shared/utils/ErrorLogger';
+import type { OperationContext } from '../../../shared/services/BaseService';
+import { BaseService } from '../../../shared/services/BaseService';
+import { ErrorFactory } from '../../../shared/errors/ErrorFactory';
+import {
+  getRetryDelay,
+  getCircuitBreakerConstant,
+} from '../../../shared/errors/ErrorConstants';
 
 import { PerformanceService } from './PerformanceService';
 
@@ -30,19 +37,39 @@ import { PerformanceService } from './PerformanceService';
 const SLOW_QUERY_THRESHOLD_MS = MONITORING_DEFAULTS.SLOW_QUERY_THRESHOLD_MS;
 
 /**
- * Main database service for SQLite operations
+ * Database Service
+ *
+ * Provides high-level database operations with connection pooling,
+ * performance monitoring, and error handling.
  */
-export class DatabaseService {
+export class DatabaseService extends BaseService {
   private pool: EnhancedConnectionPool;
-  private migrationManager!: MigrationManager;
-  private maintenance!: DatabaseMaintenance;
+  private migrationManager?: MigrationManager;
+  private maintenance?: DatabaseMaintenance;
   private performanceService?: PerformanceService;
-  private logger = LogManager.getLogger('database-service');
   private stats: DatabaseStats;
+  private config: DatabaseConfig;
+  private logger = LogManager.getLogger('DatabaseService');
   private isInitialized = false;
   private isClosing = false;
 
-  constructor(private config: DatabaseConfig) {
+  constructor(config: DatabaseConfig) {
+    super({
+      name: 'DatabaseService',
+      timeout: config.connectionTimeout,
+      enableRetry: true,
+      enableTimeout: true,
+      enableCircuitBreaker: true,
+      circuitBreakerOptions: {
+        failureThreshold: getCircuitBreakerConstant('FAILURE_THRESHOLD'),
+        recoveryTimeout: getCircuitBreakerConstant('RECOVERY_TIMEOUT'),
+        monitoringPeriod: getCircuitBreakerConstant('MONITORING_PERIOD'),
+        successThreshold: getCircuitBreakerConstant('SUCCESS_THRESHOLD'),
+        timeout: config.connectionTimeout,
+      },
+    });
+
+    this.config = config;
     this.pool = new EnhancedConnectionPool(config);
     this.stats = this.initializeStats();
   }
@@ -67,7 +94,9 @@ export class DatabaseService {
       await this.ensureDatabaseDirectory();
 
       // Get a connection to initialize the database
-      const db = await this.pool.getConnection();
+      const db = await this.executeOperation(() => this.pool.getConnection(), {
+        operation: 'database_initialize',
+      });
 
       try {
         // Initialize migration manager
@@ -397,6 +426,9 @@ export class DatabaseService {
       }
     }
 
+    if (!this.migrationManager) {
+      throw new Error('Migration manager not initialized');
+    }
     return this.migrationManager.migrate();
   }
 
@@ -423,7 +455,7 @@ export class DatabaseService {
   /**
    * Get database statistics
    */
-  getStats(): DatabaseStats {
+  override getStats(): DatabaseStats {
     const poolStats = this.pool.getStats();
 
     // Update connection stats
@@ -470,6 +502,9 @@ export class DatabaseService {
    */
   getMigrationManager(): MigrationManager {
     this.ensureInitialized();
+    if (!this.migrationManager) {
+      throw new Error('Migration manager not initialized');
+    }
     return this.migrationManager;
   }
 
@@ -478,7 +513,7 @@ export class DatabaseService {
    */
   getPendingMigrationsCount(): number {
     this.ensureInitialized();
-    return this.migrationManager.getPendingMigrations().length;
+    return this.migrationManager?.getPendingMigrations().length ?? 0;
   }
 
   /**
@@ -553,7 +588,7 @@ export class DatabaseService {
   }
 
   /**
-   * Create a database error
+   * Create a database error using ErrorFactory
    */
   private createDatabaseError(
     type: DatabaseErrorType,
@@ -565,7 +600,99 @@ export class DatabaseService {
       context?: Record<string, unknown>;
     } = {},
   ): DatabaseError {
-    return new DatabaseError(type, message, options);
+    return ErrorFactory.database(type, message, {
+      ...options,
+      retryable: this.isRetryableError(type),
+      retryAfter: this.getDefaultRetryDelay(type),
+    }) as DatabaseError;
+  }
+
+  /**
+   * Determine if a database error type is retryable
+   */
+  private isRetryableError(type: DatabaseErrorType): boolean {
+    switch (type) {
+      case DatabaseErrorType.CONNECTION_FAILED:
+      case DatabaseErrorType.TIMEOUT:
+      case DatabaseErrorType.QUERY_FAILED:
+        return true;
+      case DatabaseErrorType.CONSTRAINT_VIOLATION:
+      case DatabaseErrorType.CORRUPTION:
+      case DatabaseErrorType.PERMISSION_DENIED:
+      case DatabaseErrorType.TRANSACTION_FAILED:
+      case DatabaseErrorType.MIGRATION_FAILED:
+        return false;
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Get default retry delay for a database error type
+   */
+  private getDefaultRetryDelay(type: DatabaseErrorType): number {
+    switch (type) {
+      case DatabaseErrorType.CONNECTION_FAILED:
+        return getRetryDelay('EXTENDED'); // 10 seconds
+      case DatabaseErrorType.TIMEOUT:
+        return getRetryDelay('LONG'); // 5 seconds
+      case DatabaseErrorType.QUERY_FAILED:
+        return getRetryDelay('MEDIUM'); // 2 seconds
+      case DatabaseErrorType.TRANSACTION_FAILED:
+        return getRetryDelay('SHORT'); // 1 second
+      default:
+        return getRetryDelay('SHORT'); // 1 second
+    }
+  }
+
+  /**
+   * Log operation events for BaseService
+   */
+  protected logOperation(
+    event: 'success' | 'error' | 'retry',
+    context: OperationContext,
+    data: any,
+  ): Promise<void> {
+    const logger = LogManager.getLogger('DatabaseService');
+
+    switch (event) {
+      case 'success':
+        logger.debug(`Operation completed: ${context.operation}`, {
+          operation: context.operation,
+          duration: data.duration,
+        });
+        break;
+      case 'error':
+        logger.error(`Operation failed: ${context.operation}`, data.error, {
+          operation: context.operation,
+          duration: data.duration,
+          attempt: context.attempt,
+        });
+        break;
+      case 'retry':
+        logger.warn(`Retrying operation: ${context.operation}`, {
+          operation: context.operation,
+          attempt: context.attempt,
+          delay: data.delay,
+          error: data.error?.message,
+        });
+        break;
+      default:
+        logger.error(`Unknown operation event: ${event}`);
+        break;
+    }
+
+    return Promise.resolve();
+  }
+
+  /**
+   * Handle service shutdown
+   */
+  protected async onShutdown(): Promise<void> {
+    const logger = LogManager.getLogger('DatabaseService');
+    logger.info('Shutting down database service');
+
+    await this.gracefulShutdown();
   }
 
   /**

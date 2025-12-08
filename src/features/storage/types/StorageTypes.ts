@@ -1,4 +1,9 @@
 import type Database from 'better-sqlite3';
+// Re-export DatabaseError from shared location for backward compatibility
+export {
+  DatabaseError,
+  DatabaseErrorType,
+} from '../../../shared/errors/DatabaseError';
 
 /**
  * Database configuration interface
@@ -182,20 +187,6 @@ export interface MaintenanceOptions {
   integrity?: boolean;
   /** Whether to reindex */
   reindex?: boolean;
-}
-
-/**
- * Error types for database operations
- */
-export enum DatabaseErrorType {
-  CONNECTION_FAILED = 'CONNECTION_FAILED',
-  QUERY_FAILED = 'QUERY_FAILED',
-  TRANSACTION_FAILED = 'TRANSACTION_FAILED',
-  MIGRATION_FAILED = 'MIGRATION_FAILED',
-  CONSTRAINT_VIOLATION = 'CONSTRAINT_VIOLATION',
-  TIMEOUT = 'TIMEOUT',
-  CORRUPTION = 'CORRUPTION',
-  PERMISSION_DENIED = 'PERMISSION_DENIED',
 }
 
 /**
@@ -736,52 +727,4 @@ export interface ResourceStats {
   cleanupOperations: number;
   /** Last cleanup timestamp */
   lastCleanup: number;
-}
-
-/**
- * Database error class
- */
-export class DatabaseError extends Error {
-  /** Error type */
-  public readonly type: DatabaseErrorType;
-
-  /** Original error if available */
-  public readonly original?: Error;
-
-  /** Query that caused the error */
-  public readonly query?: string;
-
-  /** Query parameters */
-  public readonly params?: unknown[];
-
-  /** Error timestamp */
-  public readonly timestamp: Date;
-
-  /** Error context */
-  public readonly context?: Record<string, unknown>;
-
-  constructor(
-    type: DatabaseErrorType,
-    message: string,
-    options: {
-      original?: Error;
-      query?: string;
-      params?: unknown[];
-      context?: Record<string, unknown>;
-    } = {},
-  ) {
-    super(message);
-    this.name = 'DatabaseError';
-    this.type = type;
-    this.original = options.original;
-    this.query = options.query;
-    this.params = options.params;
-    this.timestamp = new Date();
-    this.context = options.context;
-
-    // Maintains proper stack trace for where our error was thrown (only available on V8)
-    if (typeof Error.captureStackTrace === 'function') {
-      Error.captureStackTrace(this, DatabaseError);
-    }
-  }
 }

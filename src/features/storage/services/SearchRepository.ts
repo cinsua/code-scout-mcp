@@ -14,7 +14,10 @@ import type {
   SearchStats,
   SearchMatch,
 } from '../types/StorageTypes';
-import { DatabaseError, DatabaseErrorType } from '../types/StorageTypes';
+import {
+  DatabaseError,
+  DatabaseErrorType,
+} from '../../../shared/errors/DatabaseError';
 import { TIME_INTERVALS } from '../config/PerformanceConstants';
 import { LogManager } from '../../../shared/utils/LogManager';
 import { SERVICE_CONTEXTS } from '../../../shared/utils/LoggingConstants';
