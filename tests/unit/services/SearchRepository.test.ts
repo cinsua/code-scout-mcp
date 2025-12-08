@@ -11,15 +11,15 @@ import {
   jest,
 } from '@jest/globals';
 
-import { SearchRepository } from '../../../src/features/storage/services/SearchRepository';
-import { DatabaseService } from '../../../src/features/storage/services/DatabaseService';
+import { SearchRepository } from '@/features/storage/services/SearchRepository';
+import { DatabaseService } from '@/features/storage/services/DatabaseService';
 import {
   DatabaseError,
   SearchOptions,
-} from '../../../src/features/storage/types/StorageTypes';
+} from '@/features/storage/types/StorageTypes';
 
 // Mock DatabaseService
-jest.mock('../../../src/features/storage/services/DatabaseService');
+jest.mock('@/features/storage/services/DatabaseService');
 
 describe('SearchRepository', () => {
   let searchRepository: SearchRepository;

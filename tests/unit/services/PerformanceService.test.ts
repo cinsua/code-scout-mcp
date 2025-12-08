@@ -1,6 +1,6 @@
-import { PerformanceService } from '../../../src/features/storage/services/PerformanceService';
-import type { PerformanceConfig } from '../../../src/features/storage/types/StorageTypes';
-import { EnhancedConnectionPool } from '../../../src/features/storage/utils/EnhancedConnectionPool';
+import { PerformanceService } from '@/features/storage/services/PerformanceService';
+import type { PerformanceConfig } from '@/features/storage/types/StorageTypes';
+import { EnhancedConnectionPool } from '@/features/storage/utils/EnhancedConnectionPool';
 import Database from 'better-sqlite3';
 
 describe('PerformanceService', () => {

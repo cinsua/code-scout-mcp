@@ -6,12 +6,12 @@ import {
   afterEach,
   jest,
 } from '@jest/globals';
-import { ErrorAggregator } from '../../../src/shared/services/ErrorAggregator';
-import type { ErrorAlert } from '../../../src/shared/services/types';
+import { ErrorAggregator } from '@/shared/services/ErrorAggregator';
+import type { ErrorAlert } from '@/shared/services/types';
 import {
   DatabaseError,
   DatabaseErrorType,
-} from '../../../src/shared/errors/DatabaseError';
+} from '@/shared/errors/DatabaseError';
 
 describe('ErrorAggregator', () => {
   let aggregator: ErrorAggregator;

@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
-import { FileRepository } from '../../../src/features/storage/services/FileRepository';
-import type { FileMetadata } from '../../../src/features/storage/types/StorageTypes';
+import { FileRepository } from '@/features/storage/services/FileRepository';
+import type { FileMetadata } from '@/features/storage/types/StorageTypes';
 
 describe('FileRepository', () => {
   let db: Database.Database;
