@@ -7,6 +7,7 @@ import { ErrorFactory } from '../../../../src/shared/errors/ErrorFactory';
 import { ServiceError } from '../../../../src/shared/errors/ServiceError';
 import { ErrorType } from '../../../../src/shared/errors/ErrorTypes';
 import { ConfigurationError } from '../../../../src/config/errors/ConfigurationError';
+import { DatabaseErrorType } from '../../../../src/shared/errors/DatabaseError';
 
 describe('ErrorFactory Integration', () => {
   beforeEach(() => {
@@ -43,7 +44,7 @@ describe('ErrorFactory Integration', () => {
     it('should create DatabaseError using factory pattern', () => {
       expect(() => {
         const error = ErrorFactory.database(
-          'CONNECTION_FAILED' as any,
+          DatabaseErrorType.CONNECTION_FAILED,
           'Database connection failed',
           {
             query: 'SELECT * FROM users',

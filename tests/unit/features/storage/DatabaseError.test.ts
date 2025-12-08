@@ -72,7 +72,7 @@ describe('DatabaseError Refactoring', () => {
       expect(error.databaseType).toBe(DatabaseErrorType.CONNECTION_FAILED);
       expect(error.retryable).toBe(true);
       expect(error.retryAfter).toBe(getRetryDelay('EXTENDED'));
-      expect(error.operation).toBe('database_operation');
+      expect(error.operation).toBe('database_connection_failed');
     });
 
     it('should create query failure with medium retry delay', () => {
@@ -86,6 +86,7 @@ describe('DatabaseError Refactoring', () => {
       expect(error.databaseType).toBe(DatabaseErrorType.QUERY_FAILED);
       expect(error.retryable).toBe(true);
       expect(error.retryAfter).toBe(getRetryDelay('MEDIUM'));
+      expect(error.operation).toBe('database_query_failed');
       expect(error.query).toBe('SELECT * FROM test');
       expect(error.params).toEqual(['param']);
     });
@@ -100,6 +101,7 @@ describe('DatabaseError Refactoring', () => {
       expect(error.databaseType).toBe(DatabaseErrorType.TIMEOUT);
       expect(error.retryable).toBe(true);
       expect(error.retryAfter).toBe(getTimeout('DATABASE'));
+      expect(error.operation).toBe('database_timeout');
       expect(error.query).toBe('SELECT * FROM test');
     });
 
