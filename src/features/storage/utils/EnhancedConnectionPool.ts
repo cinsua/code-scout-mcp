@@ -92,7 +92,7 @@ export class EnhancedConnectionPool extends ConnectionPool {
           );
         }
 
-        // Exponential backoff
+        // Exponential backoff using standardized calculation
         const delay = Math.min(
           this.performanceConfig.connectionPool.retryBaseDelayMs *
             Math.pow(2, attempt - 1),

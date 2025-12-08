@@ -9,6 +9,7 @@ import {
   DatabaseErrorType,
 } from '../../../shared/errors/DatabaseError';
 import { getRetryDelay } from '../../../shared/errors/ErrorConstants';
+import { SyncRetryHandler } from '../../../shared/utils/SyncRetryHandler';
 
 import type { InternalMigration } from './types';
 
@@ -365,7 +366,7 @@ export class MigrationManager {
           break;
         }
 
-        // Wait before retry (exponential backoff) - synchronous delay
+        // Wait before retry (using standardized exponential backoff)
         const delay = Math.min(
           getRetryDelay('SHORT') * Math.pow(2, attempt - 1),
           getRetryDelay('EXTENDED'),
@@ -399,15 +400,7 @@ export class MigrationManager {
    * Check if an error is retryable
    */
   private isRetryableError(error: Error): boolean {
-    const message = error.message.toLowerCase();
-
-    // Retry on database lock conflicts, temporary I/O errors, etc.
-    return (
-      message.includes('database is locked') ||
-      message.includes('busy') ||
-      message.includes('temporarily unavailable') ||
-      message.includes('disk i/o error')
-    );
+    return SyncRetryHandler.isRetryableDatabaseError(error);
   }
 
   /**

@@ -258,72 +258,80 @@ export class DatabaseService extends BaseService {
   /**
    * Execute a query and return results
    */
-  async executeQuery<T = unknown>(
+  executeQuery<T = unknown>(
     query: string,
     params: unknown[] = [],
     options: QueryOptions = {},
   ): Promise<T[]> {
     this.ensureInitialized();
 
-    const startTime = Date.now();
-    let db: Database.Database | null = null;
+    return this.executeOperation(
+      async () => {
+        const startTime = Date.now();
+        let db: Database.Database | null = null;
 
-    try {
-      db = await this.pool.getConnection();
+        try {
+          db = await this.pool.getConnection();
 
-      // Set timeout if specified
-      if (options.timeout) {
-        db.defaultSafeIntegers(true);
-        // Note: busy_timeout is set via pragma in connection pool
-      }
+          // Set timeout if specified
+          if (options.timeout) {
+            db.defaultSafeIntegers(true);
+            // Note: busy_timeout is set via pragma in connection pool
+          }
 
-      let results: T[];
+          let results: T[];
 
-      // Use performance service if available for monitoring and optimization
-      if (this.performanceService) {
-        results = this.performanceService.executeQuery<T>(query, params);
-      } else {
-        // Fallback to direct execution if no performance service
-        const stmt = db.prepare(query);
-        results = stmt.all(...params) as T[];
-      }
+          // Use performance service if available for monitoring and optimization
+          if (this.performanceService) {
+            results = this.performanceService.executeQuery<T>(query, params);
+          } else {
+            // Fallback to direct execution if no performance service
+            const stmt = db.prepare(query);
+            results = stmt.all(...params) as T[];
+          }
 
-      const duration = Date.now() - startTime;
-      this.updateQueryStats(duration, false);
+          const duration = Date.now() - startTime;
+          this.updateQueryStats(duration, false);
 
-      // Log query performance
-      const context = createQueryPerformanceContext(
-        query,
-        duration,
-        results.length,
-      );
-      if (duration > SLOW_QUERY_THRESHOLD_MS) {
-        this.logger.warn('Slow query executed', context);
-      } else {
-        this.logger.debug('Query executed successfully', context);
-      }
+          // Log query performance
+          const context = createQueryPerformanceContext(
+            query,
+            duration,
+            results.length,
+          );
+          if (duration > SLOW_QUERY_THRESHOLD_MS) {
+            this.logger.warn('Slow query executed', context);
+          } else {
+            this.logger.debug('Query executed successfully', context);
+          }
 
-      return results;
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      this.updateQueryStats(duration, true);
+          return results;
+        } catch (error) {
+          const duration = Date.now() - startTime;
+          this.updateQueryStats(duration, true);
 
-      logDatabaseError(this.logger, error as Error, query, {
-        operation: 'execute-query',
-        duration,
-        params: params.length,
-      });
+          logDatabaseError(this.logger, error as Error, query, {
+            operation: 'execute-query',
+            duration,
+            params: params.length,
+          });
 
-      throw this.createDatabaseError(
-        DatabaseErrorType.QUERY_FAILED,
-        `Query failed: ${(error as Error).message}`,
-        { original: error as Error, query, params },
-      );
-    } finally {
-      if (db) {
-        this.pool.releaseConnection(db);
-      }
-    }
+          throw this.createDatabaseError(
+            DatabaseErrorType.QUERY_FAILED,
+            `Query failed: ${(error as Error).message}`,
+            { original: error as Error, query, params },
+          );
+        } finally {
+          if (db) {
+            this.pool.releaseConnection(db);
+          }
+        }
+      },
+      {
+        operation: 'database_execute_query',
+        timeout: options.timeout,
+      },
+    );
   }
 
   /**
