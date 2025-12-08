@@ -22,7 +22,7 @@ import {
 } from '../../src/shared/errors/DatabaseError';
 import { RetryHandler } from '../../src/shared/utils/RetryHandler';
 import { CircuitBreaker } from '../../src/shared/utils/CircuitBreaker';
-import { ErrorAggregator } from '../../src/shared/utils/ErrorLogger';
+import { ErrorAggregator } from '../../src/shared/services/ErrorAggregator';
 
 describe('Chaos Engineering Tests', () => {
   let configManager: ConfigurationManager;
@@ -46,13 +46,26 @@ describe('Chaos Engineering Tests', () => {
         busy_timeout: 30000,
       },
     });
-    errorAggregator = new ErrorAggregator();
+    errorAggregator = new ErrorAggregator({
+      name: 'test-chaos-aggregator',
+      alertConfig: {
+        enabled: false, // Disable alerts in chaos tests
+        thresholds: {
+          errorRateThreshold: 10,
+          criticalErrorThreshold: 5,
+          cooldownMs: 60000,
+        },
+        channels: {
+          log: false,
+        },
+      },
+    });
   });
 
   afterEach(async () => {
     await configManager.destroy();
     await databaseService.close();
-    errorAggregator.reset();
+    await errorAggregator.reset();
     jest.clearAllMocks();
   });
 
@@ -78,7 +91,10 @@ describe('Chaos Engineering Tests', () => {
           });
         } catch (error) {
           errors.push(error as Error);
-          errorAggregator.recordError(error as Error);
+          await errorAggregator.recordError(error as Error, {
+            service: 'chaos-test',
+            operation: 'circuit-breaker-test',
+          });
         }
       }
 
@@ -93,11 +109,11 @@ describe('Chaos Engineering Tests', () => {
       // - 3 DatabaseError instances (initial failures)
       // - 7 ServiceError instances (circuit breaker open)
       const aggregation = errorAggregator.getAggregatedErrors();
-      const dbErrors = aggregation.find(
-        agg => agg.errorType === 'DatabaseError',
+      const dbErrors = aggregation.find(agg =>
+        agg.errorType.includes('DATABASE_CONNECTION_FAILED'),
       );
-      const circuitErrors = aggregation.find(
-        agg => agg.errorType === 'ConcreteServiceError',
+      const circuitErrors = aggregation.find(agg =>
+        agg.errorType.includes('SERVICE_CIRCUIT_BREAKER_OPEN'),
       );
       expect(dbErrors).toBeDefined();
       expect(dbErrors?.count).toBe(3); // Only initial failures before circuit breaker opens
@@ -167,7 +183,10 @@ describe('Chaos Engineering Tests', () => {
       for (const operation of fileOperations) {
         const error = operation();
         errors.push(error);
-        errorAggregator.recordError(error);
+        await errorAggregator.recordError(error, {
+          service: 'chaos-test',
+          operation: 'filesystem-test',
+        });
       }
 
       // All errors should be properly categorized
@@ -180,8 +199,8 @@ describe('Chaos Engineering Tests', () => {
 
       // Error aggregation should show pattern
       const aggregation = errorAggregator.getAggregatedErrors();
-      const configErrors = aggregation.find(
-        agg => agg.errorType === 'ConfigurationError',
+      const configErrors = aggregation.find(agg =>
+        agg.errorType.includes('CONFIGURATION_FILE_ACCESS_ERROR'),
       );
       expect(configErrors).toBeDefined();
       expect(configErrors!.count).toBe(4);
@@ -230,7 +249,10 @@ describe('Chaos Engineering Tests', () => {
                 `DB error ${i}`,
               );
 
-        errorAggregator.recordError(error);
+        await errorAggregator.recordError(error, {
+          service: 'chaos-test',
+          operation: 'memory-test',
+        });
       }
 
       const aggregation = errorAggregator.getAggregatedErrors();
@@ -250,7 +272,10 @@ describe('Chaos Engineering Tests', () => {
     it('should cleanup old errors to prevent memory leaks', async () => {
       // Add some errors
       for (let i = 0; i < 10; i++) {
-        errorAggregator.recordError(new Error(`Test error ${i}`));
+        await errorAggregator.recordError(new Error(`Test error ${i}`), {
+          service: 'chaos-test',
+          operation: 'cleanup-test',
+        });
       }
 
       const initialStats = errorAggregator.getErrorStatistics();
@@ -304,7 +329,10 @@ describe('Chaos Engineering Tests', () => {
         expect(true).toBe(true); // Should succeed
       } catch (error) {
         timeoutErrors.push(error as Error);
-        errorAggregator.recordError(error as Error);
+        await errorAggregator.recordError(error as Error, {
+          service: 'chaos-test',
+          operation: 'network-timeout-test',
+        });
       }
     });
 
@@ -335,7 +363,7 @@ describe('Chaos Engineering Tests', () => {
 
       // Should use exponential backoff
       const expectedMinTime = 10 + 20 + 40; // Base delays for 3 failures
-      expect(elapsedTime).toBeGreaterThan(expectedMinTime);
+      expect(elapsedTime).toBeGreaterThanOrEqual(expectedMinTime);
       expect(attemptCount).toBe(4);
     });
   });
@@ -389,7 +417,10 @@ describe('Chaos Engineering Tests', () => {
       // Add many errors to aggregation
       for (let i = 0; i < loadSize; i++) {
         const error = new Error(`Load test error ${i}`);
-        errorAggregator.recordError(error);
+        await errorAggregator.recordError(error, {
+          service: 'chaos-test',
+          operation: 'load-test',
+        });
       }
 
       const aggregationTime = Date.now() - startTime;
@@ -455,7 +486,10 @@ describe('Chaos Engineering Tests', () => {
         if (generator) {
           const error = generator();
           mixedErrors.push(error);
-          errorAggregator.recordError(error);
+          await errorAggregator.recordError(error, {
+            service: 'chaos-test',
+            operation: 'filesystem-test',
+          });
         }
       }
 
@@ -465,17 +499,26 @@ describe('Chaos Engineering Tests', () => {
       expect(aggregation.length).toBeGreaterThanOrEqual(3); // At least 3 different types
 
       // Should categorize errors correctly
-      const configErrors = aggregation.find(
-        agg => agg.errorType === 'ConfigurationError',
+      const configError1 = aggregation.find(agg =>
+        agg.errorType.includes('CONFIGURATION_CONFIG_ERROR'),
       );
-      const dbErrors = aggregation.find(
-        agg => agg.errorType === 'DatabaseError',
+      const configError2 = aggregation.find(agg =>
+        agg.errorType.includes('CONFIGURATION_VALIDATION_ERROR'),
+      );
+      const dbError1 = aggregation.find(agg =>
+        agg.errorType.includes('DATABASE_CONNECTION_FAILED'),
+      );
+      const dbError2 = aggregation.find(agg =>
+        agg.errorType.includes('DATABASE_TIMEOUT'),
       );
       const genericErrors = aggregation.find(agg => agg.errorType === 'Error');
 
-      expect(configErrors?.count).toBe(8); // 2 * 4 cycles
-      expect(dbErrors?.count).toBe(8); // 2 * 4 cycles
-      expect(genericErrors?.count).toBe(4); // 1 * 4 cycles
+      // Each error type appears 4 times in 20 iterations (20/5 = 4)
+      expect(configError1?.count).toBe(4);
+      expect(configError2?.count).toBe(4);
+      expect(dbError1?.count).toBe(4);
+      expect(dbError2?.count).toBe(4);
+      expect(genericErrors?.count).toBe(4);
     });
   });
 

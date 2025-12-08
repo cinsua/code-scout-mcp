@@ -37,6 +37,7 @@ describe('ErrorAggregator', () => {
           cooldownMs: 1000,
         },
       },
+      rateTrackingWindowMinutes: 1, // 1-minute window for testing
     });
   });
 
