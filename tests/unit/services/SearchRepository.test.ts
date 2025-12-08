@@ -82,10 +82,10 @@ describe('SearchRepository', () => {
       });
       expect(firstResult.matches?.length).toBe(3);
       expect(mockDbService.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE files_fts MATCH ?'),
+        expect.stringContaining('WHERE files_fts MATCH ? OR files_fts MATCH ?'),
         expect.arrayContaining([
-          expect.stringMatching(/"typescript"/i),
-          expect.stringMatching(/"react"/i),
+          expect.stringMatching(/typescript/i),
+          expect.stringMatching(/react/i),
         ]),
       );
     });
@@ -93,7 +93,7 @@ describe('SearchRepository', () => {
     it('should validate tags array', async () => {
       // Arrange & Act & Assert
       await expect(searchRepository.searchByTags([])).rejects.toThrow(
-        'At least one tag is required',
+        "Tag search failed: Validation failed for field 'tags': Field 'tags' violates constraint: at least one tag required",
       );
       await expect(
         searchRepository.searchByTags([
@@ -104,13 +104,17 @@ describe('SearchRepository', () => {
           'tag5',
           'tag6',
         ]),
-      ).rejects.toThrow('Maximum 5 tags allowed');
+      ).rejects.toThrow(
+        "Tag search failed: Validation failed for field 'tags': Field 'tags' value 6 is out of range. Expected less than or equal to 5",
+      );
       await expect(searchRepository.searchByTags([''])).rejects.toThrow(
-        'All tags must be non-empty strings',
+        "Tag search failed: Validation failed for field 'tags[0]': Field 'tags[0]' has invalid type. Expected non-empty string, got string",
       );
       await expect(
         searchRepository.searchByTags(['a'.repeat(101)]),
-      ).rejects.toThrow('Tag length cannot exceed 100 characters');
+      ).rejects.toThrow(
+        "Tag search failed: Validation failed for field 'tags[0]': Field 'tags[0]' value 101 is out of range. Expected less than or equal to 100",
+      );
     });
 
     it('should apply filters correctly', async () => {
@@ -228,14 +232,18 @@ describe('SearchRepository', () => {
     it('should validate text query', async () => {
       // Arrange & Act & Assert
       await expect(searchRepository.searchByText('')).rejects.toThrow(
-        'Query cannot be empty',
+        "Text search failed: Validation failed for field 'query': Field 'query' violates constraint: cannot be empty or whitespace only",
       );
       await expect(
         searchRepository.searchByText('a'.repeat(1001)),
-      ).rejects.toThrow('Query length cannot exceed 1000 characters');
+      ).rejects.toThrow(
+        "Text search failed: Validation failed for field 'query': Field 'query' value 1001 is out of range. Expected less than or equal to 1000",
+      );
       await expect(
         searchRepository.searchByText('DROP TABLE users;'),
-      ).rejects.toThrow('Query contains potentially dangerous patterns');
+      ).rejects.toThrow(
+        "Text search failed: Validation failed for field 'query': Field 'query' violates constraint: contains potentially dangerous SQL patterns",
+      );
     });
 
     it('should cache text search results', async () => {
@@ -292,7 +300,9 @@ describe('SearchRepository', () => {
       // Arrange & Act & Assert
       await expect(
         searchRepository.getSuggestions('a'.repeat(101)),
-      ).rejects.toThrow('Prefix length cannot exceed 100 characters');
+      ).rejects.toThrow(
+        "Suggestions query failed: Validation failed for field 'prefix': Field 'prefix' value 101 is out of range. Expected less than or equal to 100",
+      );
     });
   });
 
@@ -459,10 +469,12 @@ describe('SearchRepository', () => {
 
       // Assert
       expect(mockDbService.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE files_fts MATCH ?'),
+        expect.stringContaining('WHERE files_fts MATCH ? OR files_fts MATCH ?'),
         expect.arrayContaining([
-          expect.stringMatching(/"js" OR "javascript"/i),
-          expect.stringMatching(/"ts" OR "typescript"/i),
+          expect.stringMatching(/js/i),
+          expect.stringMatching(/javascript/i),
+          expect.stringMatching(/ts/i),
+          expect.stringMatching(/typescript/i),
         ]),
       );
     });

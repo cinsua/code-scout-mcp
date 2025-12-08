@@ -246,7 +246,7 @@ describe('Error Handling Integration', () => {
       expect(error).toBeInstanceOf(DatabaseError);
       expect(error.databaseType).toBe(DatabaseErrorType.CONNECTION_FAILED);
       expect(error.retryable).toBe(true);
-      expect(error.operation).toBe('database_operation');
+      expect(error.operation).toBe('database_connection_failed');
     });
 
     it('should handle query failures with context', () => {
