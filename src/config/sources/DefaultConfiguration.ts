@@ -5,10 +5,9 @@
  * for the Code-Scout MCP server.
  */
 
-import type { AppConfig, PartialAppConfig } from '../types/ConfigTypes';
-import { ErrorFactory } from '../../shared/errors/ErrorFactory';
-
-import { ConfigurationSource } from './ConfigurationSource';
+import type { AppConfig, PartialAppConfig } from '@/config/types/ConfigTypes';
+import { ErrorFactory } from '@/shared/errors/ErrorFactory';
+import { ConfigurationSource } from '@/config/sources/ConfigurationSource';
 
 /**
  * Minimum file size for indexing in bytes

@@ -8,11 +8,10 @@
 import type {
   PartialAppConfig,
   EnvironmentVariableMapping,
-} from '../types/ConfigTypes';
-import { ConfigurationError } from '../errors/ConfigurationError';
-import { ErrorFactory } from '../../shared/errors/ErrorFactory';
-
-import { ConfigurationSource } from './ConfigurationSource';
+} from '@/config/types/ConfigTypes';
+import { ConfigurationError } from '@/config/errors/ConfigurationError';
+import { ErrorFactory } from '@/shared/errors/ErrorFactory';
+import { ConfigurationSource } from '@/config/sources/ConfigurationSource';
 
 /**
  * Priority level for environment configuration

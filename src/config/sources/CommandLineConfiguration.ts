@@ -5,10 +5,9 @@
  * arguments with highest priority.
  */
 
-import type { PartialAppConfig } from '../types/ConfigTypes';
-import { ConfigurationError } from '../errors/ConfigurationError';
-
-import { ConfigurationSource } from './ConfigurationSource';
+import type { PartialAppConfig } from '@/config/types/ConfigTypes';
+import { ConfigurationError } from '@/config/errors/ConfigurationError';
+import { ConfigurationSource } from '@/config/sources/ConfigurationSource';
 
 /**
  * Priority level for command line configuration (highest priority)

@@ -9,10 +9,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 
-import type { PartialAppConfig } from '../types/ConfigTypes';
-import { ConfigurationError } from '../errors/ConfigurationError';
-
-import { ConfigurationSource } from './ConfigurationSource';
+import type { PartialAppConfig } from '@/config/types/ConfigTypes';
+import { ConfigurationError } from '@/config/errors/ConfigurationError';
+import { ConfigurationSource } from '@/config/sources/ConfigurationSource';
 
 /**
  * File permissions for configuration files (owner read/write only)

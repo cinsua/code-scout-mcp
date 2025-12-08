@@ -8,8 +8,8 @@
 import type {
   ConfigurationSource as IConfigurationSource,
   PartialAppConfig,
-} from '../types/ConfigTypes';
-import { ConfigurationError } from '../errors/ConfigurationError';
+} from '@/config/types/ConfigTypes';
+import { ConfigurationError } from '@/config/errors/ConfigurationError';
 
 /**
  * Abstract base class for configuration sources
