@@ -1,7 +1,9 @@
 /**
- * Error type definitions and enums for the Code-Scout MCP application.
+ * Error type definitions and enums for Code-Scout MCP application.
  * Provides standardized error classification and codes.
  */
+
+import { getRetryDelay } from './ErrorConstants';
 
 /**
  * Main error type categories
@@ -215,15 +217,15 @@ export const CRITICAL_ERROR_CODES: Set<string> = new Set([
  * Default retry delays for different error types (in milliseconds)
  */
 export const DEFAULT_RETRY_DELAYS: Record<ErrorType, number> = {
-  [ErrorType.DATABASE]: 1000,
-  [ErrorType.NETWORK]: 500,
-  [ErrorType.TIMEOUT]: 2000,
-  [ErrorType.RESOURCE]: 5000,
-  [ErrorType.FILESYSTEM]: 1000,
+  [ErrorType.DATABASE]: getRetryDelay('SHORT'),
+  [ErrorType.NETWORK]: getRetryDelay('SHORT') / 2, // 500ms default for network
+  [ErrorType.TIMEOUT]: getRetryDelay('MEDIUM'),
+  [ErrorType.RESOURCE]: getRetryDelay('LONG'),
+  [ErrorType.FILESYSTEM]: getRetryDelay('SHORT'),
   [ErrorType.VALIDATION]: 0, // Don't retry validation errors
   [ErrorType.PARSING]: 0, // Don't retry parsing errors
   [ErrorType.CONFIGURATION]: 0, // Don't retry configuration errors
-  [ErrorType.SERVICE]: 1000,
+  [ErrorType.SERVICE]: getRetryDelay('SHORT'),
 };
 
 /**
@@ -250,7 +252,7 @@ export class ErrorTypeUtils {
   static getDefaultRetryDelay(errorType: ErrorType): number {
     return (
       DEFAULT_RETRY_DELAYS[errorType as keyof typeof DEFAULT_RETRY_DELAYS] ||
-      1000
+      getRetryDelay('SHORT')
     );
   }
 

@@ -1,5 +1,6 @@
 import { ServiceError, type ServiceErrorOptions } from './ServiceError';
 import { ErrorType, TimeoutErrorCodes } from './ErrorTypes';
+import { getRetryDelay } from './ErrorConstants';
 
 export interface TimeoutErrorContext {
   operation?: string;
@@ -29,7 +30,7 @@ export class TimeoutError extends ServiceError {
     super(ErrorType.TIMEOUT, code, message, {
       ...options,
       retryable: true, // Timeout errors are generally retryable
-      retryAfter: options.retryAfter ?? 1000, // Default 1 second retry delay
+      retryAfter: options.retryAfter ?? getRetryDelay('SHORT'), // Default 1 second retry delay
     });
 
     this.context = options.context;
@@ -147,7 +148,7 @@ export class TimeoutError extends ServiceError {
           timeoutMs,
           actualDuration,
         },
-        retryAfter: 2000, // Longer retry delay for query timeouts
+        retryAfter: getRetryDelay('MEDIUM'), // Longer retry delay for query timeouts
       },
     );
   }
@@ -192,7 +193,7 @@ export class TimeoutError extends ServiceError {
           timeoutMs,
           actualDuration,
         },
-        retryAfter: 5000, // Longer retry delay for indexing timeouts
+        retryAfter: getRetryDelay('LONG'), // Longer retry delay for indexing timeouts
       },
     );
   }

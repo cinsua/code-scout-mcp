@@ -1,5 +1,6 @@
 import { ServiceError, type ServiceErrorOptions } from './ServiceError';
 import { ErrorType, ResourceErrorCodes } from './ErrorTypes';
+import { getRetryDelay } from './ErrorConstants';
 
 export interface ResourceErrorContext {
   resourceType?: string;
@@ -54,7 +55,7 @@ export class ResourceError extends ServiceError {
         unit: 'MB',
         process,
       },
-      retryAfter: 5000, // 5 second retry delay for memory issues
+      retryAfter: getRetryDelay('LONG'), // 5 second retry delay for memory issues
     });
   }
 
@@ -76,7 +77,7 @@ export class ResourceError extends ServiceError {
         unit: '%',
         process,
       },
-      retryAfter: 3000, // 3 second retry delay for CPU issues
+      retryAfter: getRetryDelay('MEDIUM'), // 3 second retry delay for CPU issues
     });
   }
 
@@ -123,7 +124,7 @@ export class ResourceError extends ServiceError {
           unit: 'count',
           process,
         },
-        retryAfter: 2000, // 2 second retry delay for file descriptor issues
+        retryAfter: getRetryDelay('MEDIUM'), // 2 second retry delay for file descriptor issues
       },
     );
   }
@@ -149,7 +150,7 @@ export class ResourceError extends ServiceError {
           unit: 'connections',
           component: poolName,
         },
-        retryAfter: 1000, // 1 second retry delay for connection pool issues
+        retryAfter: getRetryDelay('SHORT'), // 1 second retry delay for connection pool issues
       },
     );
   }
@@ -175,7 +176,7 @@ export class ResourceError extends ServiceError {
           unit: 'threads',
           component: poolName,
         },
-        retryAfter: 2000, // 2 second retry delay for thread pool issues
+        retryAfter: getRetryDelay('MEDIUM'), // 2 second retry delay for thread pool issues
       },
     );
   }
@@ -199,7 +200,7 @@ export class ResourceError extends ServiceError {
         unit: quotaType,
         component,
       },
-      retryAfter: 60000, // 1 minute retry delay for quota exceeded
+      retryAfter: getRetryDelay('MAXIMUM'), // 1 minute retry delay for quota exceeded
     });
   }
 
@@ -225,7 +226,7 @@ export class ResourceError extends ServiceError {
           unit: 'count',
           component,
         },
-        retryAfter: 5000, // 5 second retry delay for resource limits
+        retryAfter: getRetryDelay('LONG'), // 5 second retry delay for resource limits
       },
     );
   }

@@ -1,11 +1,15 @@
+import { ConfigurationError } from '../../config/errors/ConfigurationError';
+
 import { ServiceError } from './ServiceError';
-import { ValidationError } from './ValidationError';
-import { ParsingError } from './ParsingError';
 import { FileSystemError } from './FileSystemError';
-import { TimeoutError } from './TimeoutError';
 import { ResourceError } from './ResourceError';
+import { TimeoutError } from './TimeoutError';
+import { ValidationError } from './ValidationError';
 import { NetworkError } from './NetworkError';
 import { ErrorType, ErrorTypeUtils } from './ErrorTypes';
+import { ParsingError } from './ParsingError';
+import { getTimeout, getRetryDelay } from './ErrorConstants';
+import { DatabaseError, DatabaseErrorType } from './DatabaseError';
 
 // Concrete implementation of ServiceError for factory use
 class ConcreteServiceError extends ServiceError {
@@ -43,8 +47,16 @@ export class ErrorFactory {
       case ErrorType.FILESYSTEM:
         return FileSystemError.ioError(error.message);
 
-      case ErrorType.TIMEOUT:
-        return TimeoutError.operationTimeout(operation ?? 'unknown', 30000);
+      case ErrorType.TIMEOUT: {
+        const timeoutError = TimeoutError.operationTimeout(
+          operation ?? 'unknown',
+          getTimeout('DEFAULT'),
+        );
+        if (operation) {
+          timeoutError.setOperation(operation);
+        }
+        return timeoutError;
+      }
 
       case ErrorType.NETWORK:
         return NetworkError.protocolError('unknown', error.message);
@@ -204,14 +216,17 @@ export class ErrorFactory {
    */
   static retryable(
     message: string,
-    retryAfter: number = 1000,
+    retryAfter?: number,
     operation?: string,
   ): ServiceError {
     const error = new ConcreteServiceError(
       ErrorType.SERVICE,
       'RETRYABLE_ERROR',
       message,
-      { retryable: true, retryAfter },
+      {
+        retryable: true,
+        retryAfter: retryAfter ?? getRetryDelay('SHORT'),
+      },
     );
 
     if (operation) {
@@ -234,8 +249,8 @@ export class ErrorFactory {
       'CRITICAL_ERROR',
       message,
       {
-        retryable: false,
-        context: { ...context, severity: 'critical' },
+        retryable: false, // Critical errors are not retryable
+        context,
       },
     );
 
@@ -259,13 +274,13 @@ export class ErrorFactory {
       return typeFromName;
     }
 
-    // Infer from error message
-    if (message.includes('validation') || message.includes('invalid')) {
-      return ErrorType.VALIDATION;
-    }
-
+    // Infer from error message - check parsing before validation
     if (message.includes('parse') || message.includes('syntax')) {
       return ErrorType.PARSING;
+    }
+
+    if (message.includes('validation') || message.includes('invalid')) {
+      return ErrorType.VALIDATION;
     }
 
     if (
@@ -336,5 +351,233 @@ export class ErrorFactory {
   static withOperation(error: ServiceError, operation: string): ServiceError {
     error.setOperation(operation);
     return error;
+  }
+
+  /**
+   * Create ConfigurationError using factory pattern
+   */
+  static configuration(
+    code: string,
+    message: string,
+    options: {
+      path?: string;
+      source?: string;
+      suggestions?: string[];
+      retryable?: boolean;
+      retryAfter?: number;
+      operation?: string;
+      context?: Record<string, any>;
+      cause?: Error;
+    } = {},
+  ): ServiceError {
+    // ConfigurationError already extends ServiceError, so return it directly
+    return new ConfigurationError(message, code, {
+      path: options.path,
+      source: options.source,
+      suggestions: options.suggestions,
+      retryable: options.retryable,
+      retryAfter: options.retryAfter,
+      operation: options.operation,
+      context: options.context,
+      cause: options.cause,
+    });
+  }
+
+  /**
+   * Create DatabaseError using factory pattern
+   */
+  static database(
+    type: any,
+    message: string,
+    options: {
+      original?: Error;
+      query?: string;
+      params?: unknown[];
+      context?: Record<string, unknown>;
+      retryable?: boolean;
+      retryAfter?: number;
+    } = {},
+  ): ServiceError {
+    // DatabaseError already extends ServiceError, so return it directly
+    return new DatabaseError(type, message, {
+      original: options.original,
+      query: options.query,
+      params: options.params,
+      context: options.context,
+      retryable: options.retryable,
+      retryAfter: options.retryAfter,
+    });
+  }
+
+  /**
+   * Wrap legacy errors in appropriate ServiceError types
+   */
+  static wrapLegacyError(error: Error): ServiceError {
+    if (error instanceof ServiceError) {
+      return error;
+    }
+
+    // Try to detect ConfigurationError by name or structure
+    if (
+      error.name === 'ConfigurationError' ||
+      (error as any).code?.startsWith('VALIDATION_')
+    ) {
+      const legacy = error as any;
+      return this.configuration(
+        legacy.code ?? 'UNKNOWN_ERROR',
+        legacy.message,
+        {
+          path: legacy.path,
+          source: legacy.source,
+          suggestions: legacy.suggestions,
+        },
+      );
+    }
+
+    // Try to detect DatabaseError by name or structure
+    if (
+      error.name === 'DatabaseError' ||
+      (error as any).type?.startsWith('CONNECTION_')
+    ) {
+      const legacy = error as any;
+
+      return this.database(
+        legacy.type ?? DatabaseErrorType.QUERY_FAILED,
+        legacy.message,
+        {
+          original: legacy.original,
+          query: legacy.query,
+          params: legacy.params,
+        },
+      );
+    }
+
+    // Fallback to generic service error
+    return this.service(error.message, 'LEGACY_ERROR', false);
+  }
+
+  /**
+   * Create error type detection and automatic wrapping
+   */
+  static detectAndWrap(error: Error, operation?: string): ServiceError {
+    // If it's already a ServiceError, just add operation if needed
+    if (error instanceof ServiceError) {
+      if (operation) {
+        error.setOperation(operation);
+      }
+      return error;
+    }
+
+    // Try to infer error type and create appropriate error
+    const inferredType = this.inferErrorType(error);
+
+    let serviceError: ServiceError;
+
+    switch (inferredType) {
+      case ErrorType.VALIDATION:
+        serviceError = ValidationError.validationFailed(error.message);
+        break;
+
+      case ErrorType.PARSING:
+        serviceError = ParsingError.malformedData(error.message);
+        break;
+
+      case ErrorType.FILESYSTEM:
+        serviceError = FileSystemError.ioError(error.message);
+        break;
+
+      case ErrorType.TIMEOUT:
+        serviceError = TimeoutError.operationTimeout(
+          operation ?? 'unknown',
+          getTimeout('DEFAULT'),
+        );
+        break;
+
+      case ErrorType.NETWORK:
+        serviceError = NetworkError.connectionRefused('unknown');
+        break;
+
+      case ErrorType.RESOURCE:
+        serviceError = ResourceError.resourceLimitReached('unknown');
+        break;
+
+      default:
+        // Try legacy error wrapping first
+        serviceError = this.wrapLegacyError(error);
+        break;
+    }
+
+    // Add operation if provided
+    if (operation) {
+      serviceError.setOperation(operation);
+    }
+
+    return serviceError;
+  }
+
+  /**
+   * Create legacy error migration utilities
+   */
+  static migrateLegacyError(error: Error): {
+    migrated: ServiceError;
+    wasLegacy: boolean;
+    originalType: string;
+  } {
+    const originalType = error.constructor.name;
+    const wasLegacy = !(error instanceof ServiceError);
+
+    if (!wasLegacy) {
+      return {
+        migrated: error as ServiceError,
+        wasLegacy: false,
+        originalType,
+      };
+    }
+
+    const migrated = this.detectAndWrap(error);
+
+    return {
+      migrated,
+      wasLegacy: true,
+      originalType,
+    };
+  }
+
+  /**
+   * Create error conversion utilities for backward compatibility
+   */
+  static convertToServiceError(
+    error: Error | ServiceError,
+    options: {
+      preserveOriginal?: boolean;
+      addContext?: Record<string, any>;
+      operation?: string;
+    } = {},
+  ): ServiceError {
+    // If it's already a ServiceError, enhance it if needed
+    if (error instanceof ServiceError) {
+      let serviceError = error;
+      if (options.addContext) {
+        serviceError = serviceError.withContext(options.addContext);
+      }
+      if (options.operation) {
+        serviceError.setOperation(options.operation);
+      }
+      return serviceError;
+    }
+
+    // Convert legacy error
+    let serviceError = this.detectAndWrap(error, options.operation);
+
+    if (options.addContext) {
+      serviceError = serviceError.withContext(options.addContext);
+    }
+
+    // Preserve original error if requested
+    if (options.preserveOriginal) {
+      serviceError = serviceError.withContext({ originalError: error });
+    }
+
+    return serviceError;
   }
 }

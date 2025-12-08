@@ -1,5 +1,6 @@
 import { ServiceError, type ServiceErrorOptions } from './ServiceError';
 import { ErrorType, NetworkErrorCodes } from './ErrorTypes';
+import { getRetryDelay } from './ErrorConstants';
 
 export interface NetworkErrorContext {
   host?: string;
@@ -32,7 +33,7 @@ export class NetworkError extends ServiceError {
     super(ErrorType.NETWORK, code, message, {
       ...options,
       retryable: true, // Network errors are generally retryable
-      retryAfter: options.retryAfter ?? 1000, // Default 1 second retry delay
+      retryAfter: options.retryAfter ?? getRetryDelay('SHORT'), // Default 1 second retry delay
     });
 
     this.context = options.context;
@@ -76,7 +77,7 @@ export class NetworkError extends ServiceError {
           port,
           timeout,
         },
-        retryAfter: 2000, // Longer retry delay for timeouts
+        retryAfter: getRetryDelay('MEDIUM'), // Longer retry delay for timeouts
       },
     );
   }
@@ -96,7 +97,7 @@ export class NetworkError extends ServiceError {
           host: hostname,
           dnsError,
         },
-        retryAfter: 5000, // Longer retry delay for DNS issues
+        retryAfter: getRetryDelay('LONG'), // Longer retry delay for DNS issues
       },
     );
   }
@@ -126,7 +127,7 @@ export class NetworkError extends ServiceError {
       `Network unreachable${network ? `: ${network}` : ''}`,
       {
         context: {},
-        retryAfter: 10000, // Longer retry delay for network issues
+        retryAfter: getRetryDelay('EXTENDED'), // Longer retry delay for network issues
       },
     );
   }
@@ -164,7 +165,7 @@ export class NetworkError extends ServiceError {
           port,
           protocol: 'https',
         },
-        retryAfter: 3000, // 3 second retry delay for SSL errors
+        retryAfter: getRetryDelay('MEDIUM'), // 3 second retry delay for SSL errors
       },
     );
   }
@@ -190,8 +191,8 @@ export class NetworkError extends ServiceError {
    */
   static rateLimited(
     resource: string,
-    retryAfter?: number,
     statusCode?: number,
+    retryAfter?: number,
   ): NetworkError {
     return new NetworkError(
       NetworkErrorCodes.RATE_LIMITED,
@@ -201,7 +202,7 @@ export class NetworkError extends ServiceError {
           url: resource,
           statusCode,
         },
-        retryAfter: retryAfter ?? 60000, // Default 1 minute retry for rate limiting
+        retryAfter: retryAfter ?? getRetryDelay('MAXIMUM'), // Default 1 minute retry for rate limiting
       },
     );
   }
