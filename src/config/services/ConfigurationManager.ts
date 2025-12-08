@@ -14,24 +14,24 @@ import type {
   ValidationResult,
   ConfigurationChangeEvent,
   ErrorHandlingConfig,
-} from '../types/ConfigTypes';
-import { initializeErrorHandling } from '../../shared/errors/ErrorConstants';
-import { RetryHandler } from '../../shared/utils/RetryHandler';
+} from '@/config/types/ConfigTypes';
+import { initializeErrorHandling } from '@/shared/errors/ErrorConstants';
+import { RetryHandler } from '@/shared/utils/RetryHandler';
 import {
   ConfigurationError,
   BatchValidationError,
-} from '../errors/ConfigurationError';
+} from '@/config/errors/ConfigurationError';
 // Import all configuration sources
-import { DefaultConfiguration } from '../sources/DefaultConfiguration';
-import { GlobalConfiguration } from '../sources/GlobalConfiguration';
-import { ProjectConfiguration } from '../sources/ProjectConfiguration';
-import { EnvironmentConfiguration } from '../sources/EnvironmentConfiguration';
-import { CommandLineConfiguration } from '../sources/CommandLineConfiguration';
+import { DefaultConfiguration } from '@/config/sources/DefaultConfiguration';
+import { GlobalConfiguration } from '@/config/sources/GlobalConfiguration';
+import { ProjectConfiguration } from '@/config/sources/ProjectConfiguration';
+import { EnvironmentConfiguration } from '@/config/sources/EnvironmentConfiguration';
+import { CommandLineConfiguration } from '@/config/sources/CommandLineConfiguration';
 import {
   Configuration,
   ConfigurationHistory,
   ConfigurationSnapshot,
-} from '../models/Configuration';
+} from '@/config/models/Configuration';
 
 /**
  * Maximum number of indexing workers allowed
