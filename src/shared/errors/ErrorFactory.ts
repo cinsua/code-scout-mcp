@@ -143,6 +143,28 @@ export class ErrorFactory {
   }
 
   /**
+   * Create a validation error for constraint violation
+   */
+  static validationConstraint(
+    field: string,
+    constraint: string,
+    value?: any,
+  ): ValidationError {
+    return ValidationError.constraintViolation(field, constraint, value);
+  }
+
+  /**
+   * Create a validation error for invalid type
+   */
+  static validationType(
+    field: string,
+    value: any,
+    expectedType: string,
+  ): ValidationError {
+    return ValidationError.invalidType(field, value, expectedType);
+  }
+
+  /**
    * Create a parsing error
    */
   static parsing(

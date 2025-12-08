@@ -1,8 +1,12 @@
 import { ServiceError } from '../errors/ServiceError';
+import { LogManager } from '../utils/LogManager';
+import type { Logger } from '../utils/Logger';
 import { ErrorMigration } from '../errors/ErrorMigration';
 import { RetryHandler } from '../utils/RetryHandler';
 import { TimeoutManager } from '../utils/TimeoutManager';
 import { CircuitBreaker } from '../utils/CircuitBreaker';
+
+import type { IErrorAggregator } from './types';
 
 export interface ServiceOptions {
   name: string;
@@ -31,6 +35,8 @@ export abstract class BaseService {
   protected readonly name: string;
   protected readonly options: ServiceOptions;
   protected circuitBreaker?: CircuitBreaker;
+  protected errorAggregator?: IErrorAggregator;
+  private internalLogger: Logger;
 
   constructor(options: ServiceOptions) {
     this.name = options.name;
@@ -40,6 +46,8 @@ export abstract class BaseService {
       enableCircuitBreaker: false,
       ...options,
     };
+
+    this.internalLogger = LogManager.getLogger(this.name);
 
     if (
       this.options.enableCircuitBreaker &&
@@ -154,6 +162,18 @@ export abstract class BaseService {
   ): Promise<void> {
     const duration = Date.now() - context.startTime;
 
+    // Record success in aggregator if available
+    if (this.errorAggregator) {
+      try {
+        await this.errorAggregator.recordSuccess(this.name, context.operation);
+      } catch (aggError) {
+        // Don't let aggregator errors break the main flow
+        this.internalLogger.warn('Failed to record success in aggregator', {
+          aggregatorError: aggError,
+        });
+      }
+    }
+
     // Log success (implementation specific)
     await this.logOperation('success', context, { duration, result });
   }
@@ -166,6 +186,23 @@ export abstract class BaseService {
     error: Error,
   ): Promise<void> {
     const duration = Date.now() - context.startTime;
+
+    // Record error in aggregator if available
+    if (this.errorAggregator) {
+      try {
+        await this.errorAggregator.recordError(error, {
+          service: this.name,
+          operation: context.operation,
+        });
+      } catch (aggError) {
+        // Don't let aggregator errors break the main error flow
+        this.internalLogger.error(
+          'Failed to record error in aggregator',
+          undefined,
+          { aggregatorError: aggError },
+        );
+      }
+    }
 
     // Log error (implementation specific)
     await this.logOperation('error', context, { duration, error });
@@ -209,6 +246,11 @@ export abstract class BaseService {
       stats.circuitBreaker = this.circuitBreaker.getStats();
     }
 
+    if (this.errorAggregator) {
+      stats.errorRate = this.errorAggregator.getErrorRate(this.name);
+      stats.errorStats = this.errorAggregator.getErrorStatistics();
+    }
+
     return stats;
   }
 
@@ -226,9 +268,9 @@ export abstract class BaseService {
   /**
    * Reset service state
    */
-  reset(): void {
+  async reset(): Promise<void> {
     if (this.circuitBreaker) {
-      this.circuitBreaker.reset();
+      await this.circuitBreaker.reset();
     }
   }
 
@@ -357,6 +399,13 @@ export abstract class BaseService {
     };
 
     return new ServiceClass(childOptions);
+  }
+
+  /**
+   * Set error aggregator for error tracking
+   */
+  protected setErrorAggregator(aggregator: IErrorAggregator): void {
+    this.errorAggregator = aggregator;
   }
 
   /**

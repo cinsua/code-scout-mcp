@@ -35,6 +35,7 @@ export {
   type NetworkErrorOptions,
 } from './NetworkError';
 export { ErrorFactory } from './ErrorFactory';
+export { ErrorMigration } from './ErrorMigration';
 
 // Error types and utilities
 export {
