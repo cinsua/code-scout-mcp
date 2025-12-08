@@ -29,5 +29,5 @@ export default {
 
   clearMocks: true,
   restoreMocks: true,
-  verbose: true,
+  verbose: false,
 };

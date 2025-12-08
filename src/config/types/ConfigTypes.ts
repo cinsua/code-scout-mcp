@@ -287,7 +287,7 @@ export interface LoggingConfig {
   /**
    * Log level
    */
-  level: 'error' | 'warn' | 'info' | 'debug' | 'trace';
+  level: 'error' | 'warn' | 'info' | 'debug' | 'trace' | 'silent';
 
   /**
    * Log format

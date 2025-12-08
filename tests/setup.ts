@@ -7,11 +7,10 @@ export {};
 beforeAll(async () => {
   // Set test environment variables
   process.env.NODE_ENV = 'test';
-  process.env.LOG_LEVEL = 'error';
 
-  // Initialize test logging (silent mode)
+  // Initialize test logging using the test config (completely silent)
   initializeLogging({
-    level: 'error', // Only log errors in tests
+    level: 'silent',
     format: 'json',
     file: { enabled: false },
     console: { enabled: false },
@@ -32,8 +31,6 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  const logger = LogManager.getLogger('test-setup');
-
   // Cleanup test database (will be implemented when database is added)
   // await cleanupTestDatabase();
 
@@ -42,9 +39,9 @@ afterAll(async () => {
 
   // Reset global state
   delete process.env.NODE_ENV;
-  delete process.env.LOG_LEVEL;
 
-  logger.info('Test environment cleaned up');
+  // Reset LogManager to clean state
+  LogManager.reset();
 });
 
 // Custom matchers for common validations

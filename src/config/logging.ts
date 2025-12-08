@@ -53,11 +53,11 @@ export function createCicdConfig(): PinoLoggerConfig {
 
 /**
  * Create test logging configuration
- * Features silent logging for unit tests
+ * Features completely silent logging for unit tests
  */
 export function createTestConfig(): PinoLoggerConfig {
   return {
-    level: 'fatal', // Use fatal level for tests to minimize output
+    level: 'silent' as pino.Level, // Completely disable logging in tests
     prettyPrint: false,
   };
 }
