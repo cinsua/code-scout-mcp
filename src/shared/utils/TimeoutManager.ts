@@ -1,14 +1,13 @@
 /// <reference types="node" />
 /// <reference lib="dom" />
 /* global AbortSignal */
-import { TimeoutError } from '../errors/TimeoutError';
-import { getTimeout } from '../errors/ErrorConstants';
-import { ErrorFactory } from '../errors/ErrorFactory';
-import { ErrorMigration } from '../errors/ErrorMigration';
-import type { IErrorAggregator } from '../services/types';
-import { ErrorSeverity } from '../errors/ErrorTypes';
-
-import { Logger } from './Logger';
+import { TimeoutError } from '@/shared/errors/TimeoutError';
+import { getTimeout } from '@/shared/errors/ErrorConstants';
+import { ErrorFactory } from '@/shared/errors/ErrorFactory';
+import { ErrorMigration } from '@/shared/errors/ErrorMigration';
+import type { IErrorAggregator } from '@/shared/services/types';
+import { ErrorSeverity } from '@/shared/errors/ErrorTypes';
+import { Logger } from '@/shared/utils/Logger';
 
 // Create a logger instance for timeout operations
 const logger = new Logger().child({

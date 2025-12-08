@@ -1,7 +1,7 @@
 import type pino from 'pino';
 
-import type { LoggerConfig } from './Logger';
-import { Logger } from './Logger';
+import type { LoggerConfig } from '@/shared/utils/Logger';
+import { Logger } from '@/shared/utils/Logger';
 
 export { Logger } from './Logger';
 

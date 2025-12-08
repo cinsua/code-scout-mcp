@@ -1,9 +1,10 @@
-import { ServiceError } from '../errors/ServiceError';
-import { ErrorTypeUtils } from '../errors/ErrorTypes';
 import {
   getRetryHandlerConstant,
   getRetryHandlerFloatConstant,
 } from '../errors/ErrorConstants';
+
+import { ServiceError } from '@/shared/errors/ServiceError';
+import { ErrorTypeUtils } from '@/shared/errors/ErrorTypes';
 
 export interface RetryOptions {
   maxAttempts: number;

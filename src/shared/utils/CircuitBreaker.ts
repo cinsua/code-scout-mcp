@@ -1,5 +1,3 @@
-import { ServiceError } from '../errors/ServiceError';
-import { ErrorFactory } from '../errors/ErrorFactory';
 import {
   getCircuitBreakerConstant,
   getTimeout,
@@ -8,9 +6,11 @@ import type {
   ErrorAggregatorOptions,
   AlertConfig,
 } from '../services/ErrorAggregator';
-import { ErrorAggregator } from '../services/ErrorAggregator';
 
-import { Logger } from './Logger';
+import { ServiceError } from '@/shared/errors/ServiceError';
+import { ErrorFactory } from '@/shared/errors/ErrorFactory';
+import { ErrorAggregator } from '@/shared/services/ErrorAggregator';
+import { Logger } from '@/shared/utils/Logger';
 
 // Concrete implementation of ServiceError for circuit breaker use
 class ConcreteServiceError extends ServiceError {

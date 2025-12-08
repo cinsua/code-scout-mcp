@@ -1,6 +1,6 @@
-import type { Logger, LogContext } from './Logger';
-import { sanitizeQueryForLogging } from './QuerySanitizer';
-import { PERFORMANCE_THRESHOLDS } from './LoggingConstants';
+import type { Logger, LogContext } from '@/shared/utils/Logger';
+import { sanitizeQueryForLogging } from '@/shared/utils/QuerySanitizer';
+import { PERFORMANCE_THRESHOLDS } from '@/shared/utils/LoggingConstants';
 
 /**
  * Performance logging utilities for structured performance monitoring

@@ -1,8 +1,7 @@
-import { ServiceError } from '../errors/ServiceError';
-
-import type { Logger, LogContext } from './Logger';
-import { sanitizeQueryForLogging } from './QuerySanitizer';
-import { ERROR_AGGREGATION } from './LoggingConstants';
+import { ServiceError } from '@/shared/errors/ServiceError';
+import type { Logger, LogContext } from '@/shared/utils/Logger';
+import { sanitizeQueryForLogging } from '@/shared/utils/QuerySanitizer';
+import { ERROR_AGGREGATION } from '@/shared/utils/LoggingConstants';
 
 /**
  * Error handling and logging utilities for structured error reporting

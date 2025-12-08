@@ -6,7 +6,7 @@
  * SQLite transaction contexts where async operations aren't possible.
  */
 
-import { getRetryDelay } from '../errors/ErrorConstants';
+import { getRetryDelay } from '@/shared/errors/ErrorConstants';
 
 export interface SyncRetryOptions {
   /**

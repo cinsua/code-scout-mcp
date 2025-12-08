@@ -1,7 +1,6 @@
-import { getDegradationThreshold } from '../errors/ErrorConstants';
-import { ErrorFactory } from '../errors/ErrorFactory';
-
-import { LogManager } from './LogManager';
+import { getDegradationThreshold } from '@/shared/errors/ErrorConstants';
+import { ErrorFactory } from '@/shared/errors/ErrorFactory';
+import { LogManager } from '@/shared/utils/LogManager';
 
 export enum DegradationLevel {
   FULL = 'full',

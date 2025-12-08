@@ -1,5 +1,5 @@
-import type { ServiceError } from '../errors/ServiceError';
-import { ErrorType } from '../errors/ErrorTypes';
+import type { ServiceError } from '@/shared/errors/ServiceError';
+import { ErrorType } from '@/shared/errors/ErrorTypes';
 
 export interface FormattingOptions {
   includeStack?: boolean;
