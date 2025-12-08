@@ -1,23 +1,22 @@
 import type Database from 'better-sqlite3';
 
-import { DatabaseErrorType } from '../../../shared/errors/DatabaseError';
-import type { ServiceError } from '../../../shared/errors/ServiceError';
-import { ErrorFactory } from '../../../shared/errors/ErrorFactory';
-import { ErrorMigration } from '../../../shared/errors/ErrorMigration';
-import { LogManager } from '../../../shared/utils/LogManager';
-import type { DatabaseConfig } from '../types/StorageTypes';
+import { DatabaseErrorType } from '@/shared/errors/DatabaseError';
+import type { ServiceError } from '@/shared/errors/ServiceError';
+import { ErrorFactory } from '@/shared/errors/ErrorFactory';
+import { ErrorMigration } from '@/shared/errors/ErrorMigration';
+import { LogManager } from '@/shared/utils/LogManager';
+import type { DatabaseConfig } from '@/features/storage/types/StorageTypes';
 import type {
   ConnectionHealth,
   EnhancedConnectionPoolStats,
   PerformanceConfig,
-} from '../types/PerformanceTypes';
+} from '@/features/storage/types/PerformanceTypes';
 import {
   DEFAULT_PERFORMANCE_CONFIG,
   CONNECTION_POOL_DEFAULTS,
   PERFORMANCE_THRESHOLDS,
-} from '../config/PerformanceConstants';
-
-import { ConnectionPool } from './connectionPool';
+} from '@/features/storage/config/PerformanceConstants';
+import { ConnectionPool } from '@/features/storage/utils/connectionPool';
 
 /**
  * Enhanced connection pool with health checking, retry logic, and performance monitoring

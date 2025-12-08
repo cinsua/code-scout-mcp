@@ -1,6 +1,6 @@
-import { ErrorMigration } from '../../../shared/errors/ErrorMigration';
-import { ValidationError } from '../../../shared/errors/ValidationError';
-import { LogManager } from '../../../shared/utils/LogManager';
+import { ErrorMigration } from '@/shared/errors/ErrorMigration';
+import { ValidationError } from '@/shared/errors/ValidationError';
+import { LogManager } from '@/shared/utils/LogManager';
 
 /**
  * Error factory methods for consistent error creation in query builders

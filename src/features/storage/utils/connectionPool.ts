@@ -1,10 +1,10 @@
 import Database from 'better-sqlite3';
 
-import { ErrorFactory } from '../../../shared/errors/ErrorFactory';
+import { ErrorFactory } from '@/shared/errors/ErrorFactory';
 import type {
   DatabaseConfig,
   ConnectionPoolStats,
-} from '../types/StorageTypes';
+} from '@/features/storage/types/StorageTypes';
 
 // Constants for connection pool health thresholds
 const PERCENTAGE_MULTIPLIER = 100;

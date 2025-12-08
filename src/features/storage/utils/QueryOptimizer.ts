@@ -1,14 +1,17 @@
 import type Database from 'better-sqlite3';
 
-import { ErrorFactory } from '../../../shared/errors/ErrorFactory';
-import { DatabaseErrorType } from '../../../shared/errors/DatabaseError';
-import type { QueryPlan, OptimizedQuery } from '../types/StorageTypes';
+import { hashQuery } from './PerformanceUtils';
+
+import { ErrorFactory } from '@/shared/errors/ErrorFactory';
+import { DatabaseErrorType } from '@/shared/errors/DatabaseError';
+import type {
+  QueryPlan,
+  OptimizedQuery,
+} from '@/features/storage/types/StorageTypes';
 import {
   PERFORMANCE_THRESHOLDS,
   PERFORMANCE_LIMITS,
-} from '../config/PerformanceConstants';
-
-import { hashQuery } from './PerformanceUtils';
+} from '@/features/storage/config/PerformanceConstants';
 
 /**
  * Query optimization and execution plan analysis

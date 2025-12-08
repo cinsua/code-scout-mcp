@@ -2,10 +2,10 @@
  * Performance profiling tools for monitoring and analysis
  */
 
-import { PERFORMANCE_THRESHOLDS } from '../../../shared/utils/LoggingConstants';
-import { LogManager } from '../../../shared/utils/LogManager';
-import { ErrorFactory } from '../../../shared/errors/ErrorFactory';
-import { ErrorMigration } from '../../../shared/errors/ErrorMigration';
+import { PERFORMANCE_THRESHOLDS } from '@/shared/utils/LoggingConstants';
+import { LogManager } from '@/shared/utils/LogManager';
+import { ErrorFactory } from '@/shared/errors/ErrorFactory';
+import { ErrorMigration } from '@/shared/errors/ErrorMigration';
 
 export class PerformanceProfiler {
   private profiles: Map<string, ProfileSession> = new Map();

@@ -4,12 +4,11 @@ import type {
   PerformanceThresholds,
   PerformanceReport,
   PerformanceConfig,
-} from '../types/StorageTypes';
-import { PERFORMANCE_THRESHOLDS } from '../config/PerformanceConstants';
-
-import { hashQuery } from './PerformanceUtils';
-import { memoryUtils } from './MemoryUtils';
-import type { EnhancedConnectionPool } from './EnhancedConnectionPool';
+} from '@/features/storage/types/StorageTypes';
+import { PERFORMANCE_THRESHOLDS } from '@/features/storage/config/PerformanceConstants';
+import { hashQuery } from '@/features/storage/utils/PerformanceUtils';
+import { memoryUtils } from '@/features/storage/utils/MemoryUtils';
+import type { EnhancedConnectionPool } from '@/features/storage/utils/EnhancedConnectionPool';
 
 /**
  * Performance monitoring and metrics collection for database operations

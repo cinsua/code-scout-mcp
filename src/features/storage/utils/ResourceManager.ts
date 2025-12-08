@@ -3,10 +3,9 @@ import type {
   ResourceInfo,
   ResourceLeak,
   ResourceType,
-} from '../types/StorageTypes';
-import { PERFORMANCE_THRESHOLDS } from '../config/PerformanceConstants';
-
-import { memoryUtils } from './MemoryUtils';
+} from '@/features/storage/types/StorageTypes';
+import { PERFORMANCE_THRESHOLDS } from '@/features/storage/config/PerformanceConstants';
+import { memoryUtils } from '@/features/storage/utils/MemoryUtils';
 
 /**
  * Resource management and leak detection for database operations

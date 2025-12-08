@@ -3,14 +3,14 @@ import path from 'node:path';
 
 import type Database from 'better-sqlite3';
 
-import { ErrorFactory } from '../../../shared/errors';
-import { DatabaseErrorType } from '../../../shared/errors/DatabaseError';
+import { ErrorFactory } from '@/shared/errors';
+import { DatabaseErrorType } from '@/shared/errors/DatabaseError';
 import type {
   DatabaseConfig,
   MaintenanceOptions,
   BackupOptions,
   DatabaseHealth,
-} from '../types/StorageTypes';
+} from '@/features/storage/types/StorageTypes';
 
 // Constants for database maintenance thresholds
 const HIGH_FRAGMENTATION_THRESHOLD = 0.3;

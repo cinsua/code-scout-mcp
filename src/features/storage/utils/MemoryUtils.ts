@@ -1,4 +1,4 @@
-import { PERFORMANCE_THRESHOLDS } from '../config/PerformanceConstants';
+import { PERFORMANCE_THRESHOLDS } from '@/features/storage/config/PerformanceConstants';
 
 /**
  * Centralized memory management utilities

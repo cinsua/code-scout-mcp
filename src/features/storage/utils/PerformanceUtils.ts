@@ -3,7 +3,7 @@
  * Centralized to eliminate code duplication across the codebase
  */
 
-import { sanitizeQueryForLogging as sanitizeQuery } from '../../../shared/utils/QuerySanitizer';
+import { sanitizeQueryForLogging as sanitizeQuery } from '@/shared/utils/QuerySanitizer';
 
 /**
  * Hash a query string for identification and caching purposes
