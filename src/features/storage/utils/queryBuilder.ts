@@ -624,7 +624,9 @@ export class FTSQueryBuilder {
  * Search Query Builder for FTS5 operations
  */
 export class SearchQueryBuilder {
-  private static logger = LogManager.getLogger('SearchQueryBuilder');
+  private static get logger() {
+    return LogManager.getLogger('SearchQueryBuilder');
+  }
   /**
    * Build tag search query with FTS5 MATCH
    */
@@ -1318,7 +1320,9 @@ export class QueryUtils {
  * Error migration utilities for query builder operations
  */
 export class QueryBuilderErrorMigration {
-  private static logger = LogManager.getLogger('QueryBuilderErrorMigration');
+  private static get logger() {
+    return LogManager.getLogger('QueryBuilderErrorMigration');
+  }
 
   /**
    * Migrate legacy validation errors to ServiceError types

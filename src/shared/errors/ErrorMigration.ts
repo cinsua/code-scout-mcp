@@ -53,7 +53,9 @@ export class ErrorMigration {
     },
   };
 
-  private static logger = LogManager.getLogger('error-migration');
+  private static get logger() {
+    return LogManager.getLogger('error-migration');
+  }
 
   /**
    * Configure migration settings

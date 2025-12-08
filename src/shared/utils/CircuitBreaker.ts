@@ -9,7 +9,7 @@ import type {
 import { ServiceError } from '@/shared/errors/ServiceError';
 import { ErrorFactory } from '@/shared/errors/ErrorFactory';
 import { ErrorAggregator } from '@/shared/services/ErrorAggregator';
-import { Logger } from '@/shared/utils/Logger';
+import { LogManager } from '@/shared/utils/LogManager';
 
 // Concrete implementation of ServiceError for circuit breaker use
 class ConcreteServiceError extends ServiceError {
@@ -49,7 +49,10 @@ export interface CircuitBreakerStats {
  * Prevents cascade failures by temporarily stopping calls to failing services.
  */
 export class CircuitBreaker {
-  private static logger = new Logger();
+  private static get logger() {
+    // Lazy initialization to ensure test configuration is applied
+    return LogManager.getLogger('CircuitBreaker');
+  }
   private state: CircuitState = 'closed';
   private failureCount = 0;
   private successCount = 0;

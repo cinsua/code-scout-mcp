@@ -7,12 +7,10 @@ import { ErrorFactory } from '@/shared/errors/ErrorFactory';
 import { ErrorMigration } from '@/shared/errors/ErrorMigration';
 import type { IErrorAggregator } from '@/shared/services/types';
 import { ErrorSeverity } from '@/shared/errors/ErrorTypes';
-import { Logger } from '@/shared/utils/Logger';
+import { LogManager } from '@/shared/utils/LogManager';
 
-// Create a logger instance for timeout operations
-const logger = new Logger().child({
-  service: 'TimeoutManager',
-});
+// Create a getLogger() instance for timeout operations with lazy initialization
+const getLogger = () => LogManager.getLogger('TimeoutManager');
 
 export interface TimeoutOptions {
   timeoutMs?: number;
@@ -115,18 +113,22 @@ export class TimeoutManager {
     const result = await this.executeWithMetrics(operation, options);
 
     if (!result.success) {
-      logger.error('Operation failed with timeout or error', result.error, {
-        operationType: options.operationType,
-        timeoutMs: result.duration,
-        timedOut: result.timedOut,
-      });
+      getLogger().error(
+        'Operation failed with timeout or error',
+        result.error,
+        {
+          operationType: options.operationType,
+          timeoutMs: result.duration,
+          timedOut: result.timedOut,
+        },
+      );
       throw (
         result.error ??
         ErrorFactory.service('Operation failed', 'OPERATION_FAILED', false)
       );
     }
 
-    logger.debug('Operation completed successfully', {
+    getLogger().debug('Operation completed successfully', {
       operationType: options.operationType,
       duration: result.duration,
     });
@@ -164,7 +166,7 @@ export class TimeoutManager {
       if (options.signal) {
         const handleAbort = () => {
           clearTimeout(timeoutId);
-          logger.info('Operation aborted via signal', {
+          getLogger().info('Operation aborted via signal', {
             operationType: options.operationType,
           });
           reject(
@@ -229,18 +231,22 @@ export class TimeoutManager {
       }
 
       if (isTimeout) {
-        logger.warn('Operation timed out', {
+        getLogger().warn('Operation timed out', {
           operationType: options.operationType,
           timeoutMs,
           actualDuration: duration,
         });
       } else {
-        logger.error('Operation failed with error', migratedError.migrated, {
-          operationType: options.operationType,
-          duration,
-          wasLegacy: migratedError.wasLegacy,
-          originalType: migratedError.originalType,
-        });
+        getLogger().error(
+          'Operation failed with error',
+          migratedError.migrated,
+          {
+            operationType: options.operationType,
+            duration,
+            wasLegacy: migratedError.wasLegacy,
+            originalType: migratedError.originalType,
+          },
+        );
       }
 
       return {
@@ -350,7 +356,7 @@ export class TimeoutManager {
     operations: Array<() => Promise<T>>,
     options: TimeoutOptions = {},
   ): Promise<Array<TimeoutResult<T>>> {
-    logger.debug('Executing multiple operations with timeout', {
+    getLogger().debug('Executing multiple operations with timeout', {
       operationCount: operations.length,
       operationType: options.operationType,
       timeoutMs: options.timeoutMs,
@@ -368,7 +374,7 @@ export class TimeoutManager {
     operations: Array<() => Promise<T>>,
     options: TimeoutOptions = {},
   ): Promise<Array<TimeoutResult<T>>> {
-    logger.debug('Executing operations in sequence with timeout', {
+    getLogger().debug('Executing operations in sequence with timeout', {
       operationCount: operations.length,
       operationType: options.operationType,
       timeoutMs: options.timeoutMs,
@@ -383,7 +389,7 @@ export class TimeoutManager {
 
       // Stop sequence if operation timed out
       if (result.timedOut) {
-        logger.warn('Sequence stopped due to timeout', {
+        getLogger().warn('Sequence stopped due to timeout', {
           operationIndex,
           totalOperations: operations.length,
           operationType: options.operationType,
@@ -430,7 +436,7 @@ export class TimeoutManager {
         });
 
         if (attempt > 1) {
-          logger.info('Progressive timeout succeeded after retry', {
+          getLogger().info('Progressive timeout succeeded after retry', {
             attempt,
             finalTimeout: Math.min(currentTimeout, maxTimeout),
           });
@@ -446,7 +452,7 @@ export class TimeoutManager {
 
         // Don't increase timeout for non-timeout errors
         if (!(error instanceof TimeoutError)) {
-          logger.error(
+          getLogger().error(
             'Operation failed with non-timeout error during progressive timeout',
             migratedError.migrated,
             {
@@ -461,7 +467,7 @@ export class TimeoutManager {
         }
 
         currentTimeout *= multiplier;
-        logger.warn('Progressive timeout retry', {
+        getLogger().warn('Progressive timeout retry', {
           attempt,
           maxAttempts,
           currentTimeout,
@@ -484,7 +490,7 @@ export class TimeoutManager {
     if (options.operationType) {
       // Validate that the operation type exists to prevent object injection
       if (!this.VALID_OPERATION_TYPES.includes(options.operationType)) {
-        logger.warn('Invalid operation type provided', {
+        getLogger().warn('Invalid operation type provided', {
           operationType: options.operationType,
           validTypes: this.VALID_OPERATION_TYPES,
           context: 'timeout_options_validation',
@@ -512,7 +518,7 @@ export class TimeoutManager {
   ): number {
     // Validate that the operation type exists to prevent object injection
     if (!this.VALID_OPERATION_TYPES.includes(operationType)) {
-      logger.warn('Invalid operation type provided for default timeout', {
+      getLogger().warn('Invalid operation type provided for default timeout', {
         operationType,
         validTypes: this.VALID_OPERATION_TYPES,
         context: 'default_timeout_validation',
@@ -539,7 +545,7 @@ export class TimeoutManager {
   ): void {
     // Validate that the operation type exists in DEFAULT_TIMEOUTS
     if (!this.VALID_OPERATION_TYPES.includes(operationType)) {
-      logger.warn(
+      getLogger().warn(
         'Invalid operation type provided for setting default timeout',
         {
           operationType,
@@ -556,7 +562,7 @@ export class TimeoutManager {
 
     // Validate timeout is a positive number
     if (typeof timeoutMs !== 'number' || timeoutMs <= 0) {
-      logger.warn('Invalid timeout value provided', {
+      getLogger().warn('Invalid timeout value provided', {
         timeoutMs,
         operationType,
       });
@@ -570,7 +576,7 @@ export class TimeoutManager {
     // Safe property assignment using customTimeouts
     this.customTimeouts.set(operationType, timeoutMs);
 
-    logger.info('Custom timeout set for operation type', {
+    getLogger().info('Custom timeout set for operation type', {
       operationType,
       timeoutMs,
     });
@@ -654,7 +660,7 @@ export class TimeoutManager {
       // Cap at reasonable maximum
       timeoutMs = Math.min(timeoutMs, maxDuration * 2, baseTimeout * 5);
 
-      logger.debug('Adaptive timeout calculated', {
+      getLogger().debug('Adaptive timeout calculated', {
         baseTimeout,
         calculatedTimeout: timeoutMs,
         avgDuration,
@@ -751,7 +757,7 @@ export class TimeoutManager {
 
     if (overallTimeoutRate.timeoutRate > 10) {
       // More than 10 timeouts per minute
-      logger.warn('Critical timeout rate detected', {
+      getLogger().warn('Critical timeout rate detected', {
         timeoutRate: overallTimeoutRate.timeoutRate,
         totalTimeouts: overallTimeoutRate.totalTimeouts,
         timeoutPercentage: overallTimeoutRate.timeoutPercentage,
@@ -767,7 +773,7 @@ export class TimeoutManager {
       );
 
       if (criticalPatterns.length > 0) {
-        logger.error('Critical timeout patterns detected', undefined, {
+        getLogger().error('Critical timeout patterns detected', undefined, {
           patternCount: criticalPatterns.length,
           context: 'critical_timeout_pattern_alert',
         });
@@ -786,7 +792,7 @@ export class TimeoutManager {
       .map(([service, count]) => ({ service, count: count as number }));
 
     if (timeoutServices.length > 0) {
-      logger.warn('High timeout volume in timeout-manager service', {
+      getLogger().warn('High timeout volume in timeout-manager service', {
         services: timeoutServices,
         context: 'service_timeout_volume_alert',
       });
