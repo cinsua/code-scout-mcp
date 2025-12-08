@@ -1,9 +1,8 @@
 import pino from 'pino';
 
-import type { LoggerConfig } from '../shared/utils/Logger';
-import { LogManager } from '../shared/utils/LogManager';
-
-import type { LoggingConfig } from './types/ConfigTypes';
+import type { LoggerConfig } from '@/shared/utils/Logger';
+import { LogManager } from '@/shared/utils/LogManager';
+import type { LoggingConfig } from '@/config/types/ConfigTypes';
 
 /**
  * Logging configuration utilities for different environments

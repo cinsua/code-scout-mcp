@@ -5,14 +5,14 @@
  * for the Code-Scout MCP server.
  */
 
-import { ConfigurationManager } from './services/ConfigurationManager';
-import { Configuration } from './models/Configuration';
+import { ConfigurationManager } from '@/config/services/ConfigurationManager';
+import { Configuration } from '@/config/models/Configuration';
 import {
   BatchValidationError,
   ConfigurationError,
   ConfigurationErrorCode,
-} from './errors/ConfigurationError';
-import { initializeLogging } from './logging';
+} from '@/config/errors/ConfigurationError';
+import { initializeLogging } from '@/config/logging';
 import type {
   AppConfig,
   ConfigurationChangeEvent,
@@ -31,17 +31,17 @@ import type {
   ValidationError,
   ValidationResult,
   WatchingConfig,
-} from './types/ConfigTypes';
-import { DefaultConfiguration } from './sources/DefaultConfiguration';
-import { GlobalConfiguration } from './sources/GlobalConfiguration';
-import { ProjectConfiguration } from './sources/ProjectConfiguration';
-import { EnvironmentConfiguration } from './sources/EnvironmentConfiguration';
-import { CommandLineConfiguration } from './sources/CommandLineConfiguration';
+} from '@/config/types/ConfigTypes';
+import { DefaultConfiguration } from '@/config/sources/DefaultConfiguration';
+import { GlobalConfiguration } from '@/config/sources/GlobalConfiguration';
+import { ProjectConfiguration } from '@/config/sources/ProjectConfiguration';
+import { EnvironmentConfiguration } from '@/config/sources/EnvironmentConfiguration';
+import { CommandLineConfiguration } from '@/config/sources/CommandLineConfiguration';
 // Export configuration models
 import {
   ConfigurationHistory,
   ConfigurationSnapshot,
-} from './models/Configuration';
+} from '@/config/models/Configuration';
 
 /**
  * Global configuration manager instance
