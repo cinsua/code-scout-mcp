@@ -27,6 +27,9 @@ export default {
     '^.+\\.ts$': 'ts-jest',
   },
 
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1',
+  },
   clearMocks: true,
   restoreMocks: true,
   verbose: false,
