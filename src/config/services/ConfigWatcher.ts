@@ -753,7 +753,9 @@ export class ConfigWatcher extends EventEmitter {
    * Reset the circuit breaker to closed state
    */
   resetCircuitBreaker(): void {
-    this.circuitBreaker.reset();
+    void this.circuitBreaker.reset().catch(error => {
+      this.emit('circuit-breaker:reset-error', { error });
+    });
   }
 }
 

@@ -9,6 +9,9 @@ import type { ErrorObject, ValidateFunction, KeywordDefinition } from 'ajv';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 
+import { LogManager } from '../../shared/utils/LogManager';
+import { ErrorFactory } from '../../shared/errors/ErrorFactory';
+import type { ServiceError } from '../../shared/errors/ServiceError';
 import type {
   PartialAppConfig,
   ValidationResult,
@@ -74,6 +77,7 @@ export class SchemaValidator {
   private ajv: Ajv;
   private validateFunction: ValidateFunction;
   private options: Required<SchemaValidatorOptions>;
+  private logger = LogManager.getLogger('SchemaValidator');
 
   constructor(options: SchemaValidatorOptions = {}) {
     this.options = this.processOptions(options);
@@ -141,6 +145,16 @@ export class SchemaValidator {
         this.validateFunction.errors,
       );
       errors.push(...validationErrors);
+
+      // Log validation failures
+      this.logger.warn('Schema validation failed', {
+        errorCount: validationErrors.length,
+        errors: validationErrors.map(e => ({
+          path: e.path,
+          code: e.code,
+          message: e.message,
+        })),
+      });
     }
 
     // Check for additional properties if not allowed
@@ -152,6 +166,18 @@ export class SchemaValidator {
     // Perform semantic checks that can't be expressed in JSON schema
     const semanticWarnings = this.performSemanticChecks(config);
     warnings.push(...semanticWarnings);
+
+    // Log warnings if any
+    if (warnings.length > 0) {
+      this.logger.info('Schema validation completed with warnings', {
+        warningCount: warnings.length,
+        warnings: warnings.map(w => ({
+          path: w.path,
+          code: w.code,
+          message: w.message,
+        })),
+      });
+    }
 
     return {
       valid: isValid && errors.length === 0,
@@ -186,7 +212,22 @@ export class SchemaValidator {
     // Create a partial config with only the section to validate
     const sectionConfig = { [section]: config[section] } as PartialAppConfig;
 
-    return this.validate(sectionConfig);
+    const result = this.validate(sectionConfig);
+
+    // Log section validation failures
+    if (!result.valid) {
+      this.logger.warn('Section validation failed', {
+        section,
+        errorCount: result.errors.length,
+        errors: result.errors.map(e => ({
+          path: e.path,
+          code: e.code,
+          message: e.message,
+        })),
+      });
+    }
+
+    return result;
   }
 
   /**
@@ -220,11 +261,41 @@ export class SchemaValidator {
           sectionErrors.push(...sectionResult.errors);
         }
       } catch (error) {
-        sectionErrors.push({
-          path: sectionName,
-          message: `Failed to validate section: ${error instanceof Error ? error.message : String(error)}`,
-          code: 'SECTION_VALIDATION_ERROR',
-        });
+        // Log the section validation error
+        this.logger.error(
+          'Section validation failed',
+          error instanceof Error ? error : new Error(String(error)),
+          {
+            section: sectionName,
+          },
+        );
+
+        // Use ErrorFactory to create consistent error, migrating any legacy errors
+        const serviceError = ErrorFactory.convertToServiceError(
+          error instanceof Error ? error : new Error(String(error)),
+          {
+            operation: 'schema_validation',
+            addContext: { section: sectionName },
+            preserveOriginal: true,
+          },
+        );
+
+        // If it's already a ConfigurationError, enhance it; otherwise create one
+        if (serviceError.type === 'CONFIGURATION') {
+          throw serviceError;
+        } else {
+          throw ErrorFactory.configuration(
+            'SCHEMA_VALIDATION_ERROR',
+            `Failed to validate section '${sectionName}': ${serviceError.message}`,
+            {
+              path: sectionName,
+              suggestions: [
+                'Check section configuration',
+                'Verify schema compatibility',
+              ],
+            },
+          );
+        }
       }
     }
 
@@ -251,13 +322,35 @@ export class SchemaValidator {
       const code = this.getErrorCode(error);
       const suggestion = this.getSuggestion(error);
 
-      return {
-        path,
-        message,
-        code,
-        suggestion,
-      };
+      // Use the new createValidationError method for consistency
+      return this.createValidationError(message, path, code, suggestion);
     });
+  }
+
+  /**
+   * Create a validation error using ErrorFactory for consistency
+   *
+   * @param message - Error message
+   * @param path - Configuration path
+   * @param code - Error code
+   * @param suggestion - Optional suggestion
+   * @returns ValidationError object
+   */
+  private createValidationError(
+    message: string,
+    path: string,
+    code: string,
+    suggestion?: string,
+  ): ValidationError {
+    // Use ErrorFactory to create a consistent validation error
+    const validationError = ErrorFactory.validation(message, path);
+
+    return {
+      path,
+      message: validationError.message,
+      code,
+      suggestion,
+    };
   }
 
   /**
@@ -489,6 +582,35 @@ export class SchemaValidator {
    */
   addKeyword(keyword: string, definition: KeywordDefinition): void {
     this.ajv.addKeyword(keyword, definition);
+  }
+
+  /**
+   * Migrate legacy validation errors to ServiceError format
+   * This method is exposed for external consumers who need to migrate
+   * validation errors from older systems
+   *
+   * @param validationErrors - Array of legacy ValidationError objects
+   * @param operation - Optional operation context
+   * @returns Array of migrated ServiceError instances
+   */
+  migrateValidationErrors(
+    validationErrors: ValidationError[],
+    operation?: string,
+  ): ServiceError[] {
+    return validationErrors.map(error => {
+      // Create a legacy-style error for migration
+      const legacyError = new Error(error.message);
+      (legacyError as any).code = error.code;
+      (legacyError as any).path = error.path;
+      (legacyError as any).suggestion = error.suggestion;
+
+      // Use ErrorFactory to convert to ServiceError
+      return ErrorFactory.convertToServiceError(legacyError, {
+        operation: operation ?? 'schema_validation',
+        addContext: { validationPath: error.path },
+        preserveOriginal: true,
+      });
+    });
   }
 }
 

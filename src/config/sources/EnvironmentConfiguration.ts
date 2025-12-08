@@ -10,6 +10,7 @@ import type {
   EnvironmentVariableMapping,
 } from '../types/ConfigTypes';
 import { ConfigurationError } from '../errors/ConfigurationError';
+import { ErrorFactory } from '../../shared/errors/ErrorFactory';
 
 import { ConfigurationSource } from './ConfigurationSource';
 
@@ -361,13 +362,13 @@ export class EnvironmentConfiguration extends ConfigurationSource {
     try {
       switch (mapping.type) {
         case 'boolean':
-          return this.parseBoolean(value);
+          return this.parseBoolean(value, mapping.envVar, mapping.configPath);
 
         case 'number':
-          return this.parseNumber(value, mapping.envVar);
+          return this.parseNumber(value, mapping.envVar, mapping.configPath);
 
         case 'json':
-          return this.parseJson(value, mapping.envVar);
+          return this.parseJson(value, mapping.envVar, mapping.configPath);
 
         case 'string':
         default:
@@ -385,7 +386,11 @@ export class EnvironmentConfiguration extends ConfigurationSource {
   /**
    * Parse boolean value from string
    */
-  private parseBoolean(value: string): boolean {
+  private parseBoolean(
+    value: string,
+    envVar: string,
+    configPath: string,
+  ): boolean {
     const lowerValue = value.toLowerCase().trim();
 
     if (['true', '1', 'yes', 'on', 'enabled'].includes(lowerValue)) {
@@ -396,13 +401,25 @@ export class EnvironmentConfiguration extends ConfigurationSource {
       return false;
     }
 
-    throw new Error(`Cannot parse '${value}' as boolean`);
+    throw ErrorFactory.configuration(
+      'INVALID_BOOLEAN_VALUE',
+      `Cannot parse '${value}' as boolean`,
+      {
+        path: configPath,
+        source: 'environment',
+        context: { envVar, value },
+      },
+    );
   }
 
   /**
    * Validate number range for environment variables
    */
-  private validateNumberRange(num: number, envVar: string): void {
+  private validateNumberRange(
+    num: number,
+    envVar: string,
+    configPath: string,
+  ): void {
     const validators = [
       {
         condition: envVar.includes('CONNECTIONS'),
@@ -426,7 +443,20 @@ export class EnvironmentConfiguration extends ConfigurationSource {
 
     for (const validator of validators) {
       if (validator.condition && (num < validator.min || num > validator.max)) {
-        throw new Error(validator.message);
+        throw ErrorFactory.configuration(
+          'NUMBER_OUT_OF_RANGE',
+          validator.message,
+          {
+            path: configPath,
+            source: 'environment',
+            context: {
+              envVar,
+              value: num,
+              min: validator.min,
+              max: validator.max,
+            },
+          },
+        );
       }
     }
   }
@@ -434,14 +464,26 @@ export class EnvironmentConfiguration extends ConfigurationSource {
   /**
    * Parse number value from string
    */
-  private parseNumber(value: string, envVar: string): number {
+  private parseNumber(
+    value: string,
+    envVar: string,
+    configPath: string,
+  ): number {
     const num = Number(value);
 
     if (isNaN(num)) {
-      throw new Error(`Cannot parse '${value}' as number`);
+      throw ErrorFactory.configuration(
+        'INVALID_NUMBER_VALUE',
+        `Cannot parse '${value}' as number`,
+        {
+          path: configPath,
+          source: 'environment',
+          context: { envVar, value },
+        },
+      );
     }
 
-    this.validateNumberRange(num, envVar);
+    this.validateNumberRange(num, envVar, configPath);
 
     return num;
   }
@@ -449,12 +491,23 @@ export class EnvironmentConfiguration extends ConfigurationSource {
   /**
    * Parse JSON value from string
    */
-  private parseJson(value: string, _envVar: string): unknown {
+  private parseJson(
+    value: string,
+    envVar: string,
+    configPath: string,
+  ): unknown {
     try {
       return JSON.parse(value);
     } catch (error) {
-      throw new Error(
+      throw ErrorFactory.configuration(
+        'INVALID_JSON_VALUE',
         `Invalid JSON: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        {
+          path: configPath,
+          source: 'environment',
+          context: { envVar, value },
+          cause: error instanceof Error ? error : undefined,
+        },
       );
     }
   }

@@ -6,6 +6,7 @@
  */
 
 import type { AppConfig, PartialAppConfig } from '../types/ConfigTypes';
+import { ErrorFactory } from '../../shared/errors/ErrorFactory';
 
 import { ConfigurationSource } from './ConfigurationSource';
 
@@ -213,14 +214,34 @@ export class DefaultConfiguration extends ConfigurationSource {
   private validateSearchLimits(): void {
     const search = this.defaults.search;
     if (search && search.defaultLimit > search.maxLimit) {
-      throw new Error('Default search limit cannot exceed maximum limit');
+      throw ErrorFactory.configuration(
+        'INVALID_SEARCH_LIMITS',
+        'Default search limit cannot exceed maximum limit',
+        {
+          operation: 'default_configuration_validation',
+          context: {
+            defaultLimit: search.defaultLimit,
+            maxLimit: search.maxLimit,
+          },
+        },
+      );
     }
   }
 
   private validateFileSize(): void {
     const indexing = this.defaults.indexing;
     if (indexing && indexing.maxFileSize < MIN_DEFAULT_FILE_SIZE) {
-      throw new Error('Maximum file size must be at least 1KB');
+      throw ErrorFactory.configuration(
+        'INVALID_FILE_SIZE',
+        'Maximum file size must be at least 1KB',
+        {
+          operation: 'default_configuration_validation',
+          context: {
+            maxFileSize: indexing.maxFileSize,
+            minRequired: MIN_DEFAULT_FILE_SIZE,
+          },
+        },
+      );
     }
   }
 
@@ -230,8 +251,17 @@ export class DefaultConfiguration extends ConfigurationSource {
       indexing &&
       (indexing.maxWorkers < 1 || indexing.maxWorkers > MAX_DEFAULT_WORKERS)
     ) {
-      throw new Error(
+      throw ErrorFactory.configuration(
+        'INVALID_WORKER_COUNT',
         `Max workers must be between 1 and ${MAX_DEFAULT_WORKERS}`,
+        {
+          operation: 'default_configuration_validation',
+          context: {
+            maxWorkers: indexing.maxWorkers,
+            min: 1,
+            max: MAX_DEFAULT_WORKERS,
+          },
+        },
       );
     }
   }
@@ -244,8 +274,17 @@ export class DefaultConfiguration extends ConfigurationSource {
         0,
       );
       if (total <= 0 || total > MAX_SCORING_WEIGHT_SUM) {
-        throw new Error(
+        throw ErrorFactory.configuration(
+          'INVALID_SCORING_WEIGHTS',
           `Scoring weights must sum to a positive value less than ${MAX_SCORING_WEIGHT_SUM}`,
+          {
+            operation: 'default_configuration_validation',
+            context: {
+              total,
+              maxAllowed: MAX_SCORING_WEIGHT_SUM,
+              weights,
+            },
+          },
         );
       }
     }

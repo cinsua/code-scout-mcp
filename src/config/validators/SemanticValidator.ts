@@ -17,6 +17,10 @@ import type {
   WatchingConfig,
   LanguageConfig,
 } from '../types/ConfigTypes';
+import { ConfigurationError } from '../errors/ConfigurationError';
+import { ErrorFactory } from '../../shared/errors/ErrorFactory';
+import { ErrorMigration } from '../../shared/errors/ErrorMigration';
+import { LogManager } from '../../shared/utils/LogManager';
 
 /**
  * Maximum recommended database connections
@@ -140,6 +144,7 @@ export interface ValidationRule {
 export class SemanticValidator {
   private options: Required<SemanticValidatorOptions>;
   private rules: ValidationRule[] = [];
+  private logger = LogManager.getLogger('SemanticValidator');
 
   constructor(options: SemanticValidatorOptions = {}) {
     this.options = {
@@ -163,26 +168,33 @@ export class SemanticValidator {
     const warnings: ValidationWarning[] = [];
 
     for (const rule of this.rules) {
-      try {
-        const result = rule.validate(config);
+      const result = this.executeValidationRule(rule, config);
 
-        // Filter results by severity
-        if (rule.severity === 'error') {
-          errors.push(...result.errors);
-        } else if (rule.severity === 'warning') {
-          warnings.push(...result.warnings);
-        }
-
-        // Always include warnings from error rules
+      // Filter results by severity
+      if (rule.severity === 'error') {
+        errors.push(...result.errors);
+      } else if (rule.severity === 'warning') {
         warnings.push(...result.warnings);
-      } catch (error) {
-        errors.push({
-          path: 'semantic',
-          message: `Validation rule '${rule.name}' failed: ${error instanceof Error ? error.message : String(error)}`,
-          code: 'RULE_EXECUTION_ERROR',
-          suggestion: 'Check the configuration and try again',
-        });
       }
+
+      // Always include warnings from error rules
+      warnings.push(...result.warnings);
+    }
+
+    // Log validation failures
+    if (errors.length > 0) {
+      this.logger.warn('Semantic validation completed with errors', {
+        errorCount: errors.length,
+        warningCount: warnings.length,
+        errorCodes: errors.map(e => e.code),
+      });
+    } else if (warnings.length > 0) {
+      this.logger.info('Semantic validation completed with warnings', {
+        warningCount: warnings.length,
+        warningCodes: warnings.map(w => w.code),
+      });
+    } else {
+      this.logger.debug('Semantic validation completed successfully');
     }
 
     return {
@@ -232,6 +244,113 @@ export class SemanticValidator {
     this.addLanguageRules();
     this.addLoggingRules();
     this.addDependencyRules();
+  }
+
+  /**
+   * Create configuration errors using ErrorFactory for consistency
+   */
+  private createConfigurationError(
+    code: string,
+    message: string,
+    options: {
+      path?: string;
+      suggestions?: string[];
+      operation?: string;
+      cause?: Error;
+    } = {},
+  ): ConfigurationError {
+    // Use ErrorFactory for consistent error creation
+    return ErrorFactory.configuration(
+      code,
+      message,
+      options,
+    ) as ConfigurationError;
+  }
+
+  /**
+   * Migrate legacy errors to ServiceError format
+   */
+  private migrateLegacyError(
+    error: Error,
+    operation?: string,
+  ): ConfigurationError {
+    try {
+      const migrationResult = ErrorMigration.migrateError(
+        error,
+        operation ?? 'semantic_validation',
+      );
+
+      if (migrationResult.wasLegacy) {
+        this.logger.debug('Migrated legacy error in semantic validation', {
+          originalType: migrationResult.originalType,
+          operation,
+        });
+      }
+
+      // Ensure we return a ConfigurationError
+      if (migrationResult.migrated instanceof ConfigurationError) {
+        return migrationResult.migrated;
+      }
+
+      // If migration resulted in a different error type, wrap it
+      return this.createConfigurationError(
+        'LEGACY_ERROR_MIGRATION',
+        `Migrated error: ${migrationResult.migrated.message}`,
+        {
+          operation: operation ?? 'semantic_validation',
+          cause: migrationResult.migrated,
+        },
+      );
+    } catch (migrationError) {
+      // If migration fails, create a safe fallback error
+      this.logger.warn('Error migration failed, creating fallback error', {
+        migrationError:
+          migrationError instanceof Error
+            ? migrationError.message
+            : String(migrationError),
+        originalError: error.message,
+      });
+
+      return this.createConfigurationError(
+        'MIGRATION_FAILED',
+        'Failed to migrate legacy error, using fallback',
+        {
+          operation: operation ?? 'semantic_validation',
+          cause: error,
+        },
+      );
+    }
+  }
+
+  /**
+   * Safely execute validation rules with error migration support
+   */
+  private executeValidationRule(
+    rule: ValidationRule,
+    config: PartialAppConfig,
+  ): ValidationResult {
+    try {
+      return rule.validate(config);
+    } catch (error) {
+      // If rule execution fails, try to migrate the error
+      const migratedError = this.migrateLegacyError(
+        error instanceof Error ? error : new Error(String(error)),
+        `rule_${rule.name}`,
+      );
+
+      this.logger.error(
+        'Validation rule execution failed with migrated error',
+        migratedError,
+        {
+          rule: rule.name,
+          ruleDescription: rule.description,
+          severity: rule.severity,
+        },
+      );
+
+      // Re-throw the migrated error
+      throw migratedError;
+    }
   }
 
   /**
@@ -949,7 +1068,7 @@ export class SemanticValidator {
     if (duplicates.length > 0) {
       warnings.push({
         path: 'languages',
-        message: `Duplicate file extensions: ${[...new Set(duplicates)].join(', ')}`,
+        message: `Duplicate file extensions: ${Array.from(new Set(duplicates)).join(', ')}`,
         code: 'DUPLICATE_EXTENSIONS',
         suggestion: 'Remove duplicate extensions from language configurations',
       });
