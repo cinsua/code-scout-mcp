@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
 
+import { ErrorFactory } from '../../../shared/errors/ErrorFactory';
 import type {
   PerformanceConfig,
   PerformanceReport,
@@ -356,7 +357,7 @@ export class PerformanceService {
             // Get column names from first record of chunk
             const firstRecord = chunk[0];
             if (!firstRecord) {
-              throw new Error('Empty record in chunk');
+              throw ErrorFactory.validation('Empty record in chunk');
             }
 
             const columns = Object.keys(firstRecord);
@@ -616,7 +617,8 @@ export class PerformanceService {
     // Validate new configuration before applying
     const validation = this.validateConfigUpdate(newConfig);
     if (!validation.isValid) {
-      throw new Error(
+      throw ErrorFactory.configuration(
+        'CONFIG_VALIDATION_ERROR',
         `Invalid configuration update: ${validation.errors.join(', ')}`,
       );
     }

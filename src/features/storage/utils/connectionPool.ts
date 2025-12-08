@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 
+import { ErrorFactory } from '../../../shared/errors/ErrorFactory';
 import type {
   DatabaseConfig,
   ConnectionPoolStats,
@@ -39,7 +40,11 @@ export class ConnectionPool {
    */
   getConnection(): Promise<Database.Database> {
     if (this.isClosing) {
-      throw new Error('Connection pool is closing');
+      throw ErrorFactory.service(
+        'Connection pool is closing',
+        'SERVICE_UNAVAILABLE',
+        false,
+      );
     }
 
     // Check if there's an available connection
@@ -69,7 +74,9 @@ export class ConnectionPool {
           this.waiting.splice(index, 1);
           this.stats.waiting = this.waiting.length;
         }
-        reject(new Error('Connection timeout'));
+        reject(
+          ErrorFactory.timeout('getConnection', this.config.connectionTimeout),
+        );
       }, this.config.connectionTimeout);
 
       this.waiting.push({
@@ -121,7 +128,13 @@ export class ConnectionPool {
     this.stats.waiting = 0;
     waiting.forEach(waiter => {
       clearTimeout(waiter.timeout);
-      waiter.reject(new Error('Connection pool is closing'));
+      waiter.reject(
+        ErrorFactory.service(
+          'Connection pool is closing',
+          'SERVICE_UNAVAILABLE',
+          false,
+        ),
+      );
     });
 
     // Close all connections

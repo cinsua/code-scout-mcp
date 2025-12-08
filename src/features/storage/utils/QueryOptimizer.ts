@@ -1,5 +1,7 @@
 import type Database from 'better-sqlite3';
 
+import { ErrorFactory } from '../../../shared/errors/ErrorFactory';
+import { DatabaseErrorType } from '../../../shared/errors/DatabaseError';
 import type { QueryPlan, OptimizedQuery } from '../types/StorageTypes';
 import {
   PERFORMANCE_THRESHOLDS,
@@ -64,7 +66,14 @@ export class QueryOptimizer {
 
       // Validate the result structure before casting
       if (!Array.isArray(rawResult)) {
-        throw new Error('EXPLAIN QUERY PLAN returned non-array result');
+        throw ErrorFactory.database(
+          DatabaseErrorType.QUERY_FAILED,
+          'EXPLAIN QUERY PLAN returned non-array result',
+          {
+            query: 'EXPLAIN QUERY PLAN ' + query,
+            context: { rawResult },
+          },
+        );
       }
 
       const explainResult = rawResult as unknown[];

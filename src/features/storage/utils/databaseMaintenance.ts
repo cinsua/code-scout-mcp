@@ -3,6 +3,8 @@ import path from 'node:path';
 
 import type Database from 'better-sqlite3';
 
+import { ErrorFactory } from '../../../shared/errors';
+import { DatabaseErrorType } from '../../../shared/errors/DatabaseError';
 import type {
   DatabaseConfig,
   MaintenanceOptions,
@@ -170,8 +172,13 @@ export class DatabaseMaintenance {
         schemaVersion,
       };
     } catch (error) {
-      throw new Error(
+      throw ErrorFactory.database(
+        DatabaseErrorType.QUERY_FAILED,
         `Failed to get database info: ${(error as Error).message}`,
+        {
+          original: error as Error,
+          context: { operation: 'getDatabaseInfo' },
+        },
       );
     }
   }
@@ -259,8 +266,13 @@ export class DatabaseMaintenance {
         rowCount: rowCount.count,
       };
     } catch (error) {
-      throw new Error(
+      throw ErrorFactory.database(
+        DatabaseErrorType.QUERY_FAILED,
         `Failed to get table info for ${tableName}: ${(error as Error).message}`,
+        {
+          original: error as Error,
+          context: { operation: 'getTableInfo', tableName },
+        },
       );
     }
   }
@@ -278,7 +290,14 @@ export class DatabaseMaintenance {
 
       return result.map(row => row.name);
     } catch (error) {
-      throw new Error(`Failed to get tables: ${(error as Error).message}`);
+      throw ErrorFactory.database(
+        DatabaseErrorType.QUERY_FAILED,
+        `Failed to get tables: ${(error as Error).message}`,
+        {
+          original: error as Error,
+          context: { operation: 'getTables' },
+        },
+      );
     }
   }
 

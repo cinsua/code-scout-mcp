@@ -14,13 +14,17 @@ import type {
   SearchStats,
   SearchMatch,
 } from '../types/StorageTypes';
-import {
-  DatabaseError,
-  DatabaseErrorType,
-} from '../../../shared/errors/DatabaseError';
+import { DatabaseErrorType } from '../../../shared/errors/DatabaseError';
+import { ErrorFactory } from '../../../shared/errors/ErrorFactory';
+import { ErrorMigration } from '../../../shared/errors/ErrorMigration';
 import { TIME_INTERVALS } from '../config/PerformanceConstants';
+import { PERFORMANCE_THRESHOLDS } from '../config/PerformanceThresholds';
 import { LogManager } from '../../../shared/utils/LogManager';
-import { SERVICE_CONTEXTS } from '../../../shared/utils/LoggingConstants';
+import {
+  SERVICE_CONTEXTS,
+  ERROR_AGGREGATION,
+} from '../../../shared/utils/LoggingConstants';
+import { ErrorAggregator } from '../../../shared/utils/ErrorLogger';
 
 import type { DatabaseService } from './DatabaseService';
 
@@ -35,6 +39,9 @@ export class SearchRepository {
   >();
   private readonly cacheTimeout = TIME_INTERVALS.FIVE_MINUTES_MS;
   private readonly logger = LogManager.getLogger(SERVICE_CONTEXTS.QUERYING);
+  private readonly errorAggregator = new ErrorAggregator();
+  private totalSearchErrors = 0;
+  private lastErrorCheck = Date.now();
   private stats: SearchStats = {
     totalSearches: 0,
     avgSearchTime: 0,
@@ -87,11 +94,22 @@ export class SearchRepository {
 
       return results;
     } catch (error) {
-      throw this.createDatabaseError(
+      // Record error in aggregator for monitoring
+      this.errorAggregator.recordError(
+        error instanceof Error ? error : new Error('Unknown error'),
+        'searchByTags',
+      );
+      this.totalSearchErrors++;
+
+      throw ErrorFactory.database(
         DatabaseErrorType.QUERY_FAILED,
         `Tag search failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        { query: 'searchByTags', params: { tags, options } },
-        error instanceof Error ? error : undefined,
+        {
+          query: 'searchByTags',
+          params: [tags, options],
+          context: { operation: 'searchByTags' },
+          original: error instanceof Error ? error : undefined,
+        },
       );
     }
   }
@@ -135,11 +153,22 @@ export class SearchRepository {
 
       return results;
     } catch (error) {
-      throw this.createDatabaseError(
+      // Record error in aggregator for monitoring
+      this.errorAggregator.recordError(
+        error instanceof Error ? error : new Error('Unknown error'),
+        'searchByText',
+      );
+      this.totalSearchErrors++;
+
+      throw ErrorFactory.database(
         DatabaseErrorType.QUERY_FAILED,
         `Text search failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        { query: 'searchByText', params: { query, options } },
-        error instanceof Error ? error : undefined,
+        {
+          query: 'searchByText',
+          params: [query, options],
+          context: { operation: 'searchByText' },
+          original: error instanceof Error ? error : undefined,
+        },
       );
     }
   }
@@ -169,11 +198,22 @@ export class SearchRepository {
         context: row.context,
       }));
     } catch (error) {
-      throw this.createDatabaseError(
+      // Record error in aggregator for monitoring
+      this.errorAggregator.recordError(
+        error instanceof Error ? error : new Error('Unknown error'),
+        'getSuggestions',
+      );
+      this.totalSearchErrors++;
+
+      throw ErrorFactory.database(
         DatabaseErrorType.QUERY_FAILED,
         `Suggestions query failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        { query: 'getSuggestions', params: { prefix, limit } },
-        error instanceof Error ? error : undefined,
+        {
+          query: 'getSuggestions',
+          params: [prefix, limit],
+          context: { operation: 'getSuggestions' },
+          original: error instanceof Error ? error : undefined,
+        },
       );
     }
   }
@@ -220,6 +260,13 @@ export class SearchRepository {
         sizeAfter,
       };
     } catch (error) {
+      // Record error in aggregator for monitoring
+      this.errorAggregator.recordError(
+        error instanceof Error ? error : new Error('Unknown error'),
+        'rebuildIndex',
+      );
+      this.totalSearchErrors++;
+
       return {
         success: false,
         operation: 'rebuild',
@@ -267,6 +314,13 @@ export class SearchRepository {
         sizeAfter,
       };
     } catch (error) {
+      // Record error in aggregator for monitoring
+      this.errorAggregator.recordError(
+        error instanceof Error ? error : new Error('Unknown error'),
+        'optimizeIndex',
+      );
+      this.totalSearchErrors++;
+
       return {
         success: false,
         operation: 'optimize',
@@ -297,24 +351,115 @@ export class SearchRepository {
    */
   private validateTags(tags: string[]): void {
     if (!Array.isArray(tags)) {
-      throw new Error('Tags must be an array');
+      const actualType = Array.isArray(tags) ? 'array' : typeof tags;
+      const error = ErrorFactory.validation(
+        `Field 'tags' has invalid type. Expected array, got ${actualType}`,
+        'tags',
+        tags,
+      );
+      this.logger.warn('Tag validation failed: invalid type', {
+        field: 'tags',
+        value: tags,
+        expectedType: 'array',
+        operation: 'validateTags',
+      });
+      throw error;
     }
 
     if (tags.length === 0) {
-      throw new Error('At least one tag is required');
+      const error = ErrorFactory.validation(
+        `Field 'tags' violates constraint: at least one tag required`,
+        'tags',
+        tags,
+      );
+      this.logger.warn('Tag validation failed: empty array', {
+        field: 'tags',
+        value: tags,
+        constraint: 'minimum length 1',
+        operation: 'validateTags',
+      });
+      throw error;
     }
 
     if (tags.length > 5) {
-      throw new Error('Maximum 5 tags allowed');
+      const error = ErrorFactory.validation(
+        `Field 'tags' value ${tags.length} is out of range. Expected less than or equal to 5`,
+        'tags',
+        tags.length,
+      );
+      this.logger.warn('Tag validation failed: too many tags', {
+        field: 'tags',
+        value: tags.length,
+        constraint: 'maximum 5 tags',
+        operation: 'validateTags',
+      });
+      throw error;
     }
 
-    for (const tag of tags) {
+    for (let i = 0; i < tags.length; i++) {
+      const tag = tags.at(i);
       if (typeof tag !== 'string' || tag.trim().length === 0) {
-        throw new Error('All tags must be non-empty strings');
+        const actualType = typeof tag;
+        const error = ErrorFactory.validation(
+          `Field 'tags' at index ${i} has invalid type. Expected non-empty string, got ${actualType}`,
+          'tags',
+          tag,
+        );
+        this.logger.warn('Tag validation failed: invalid tag', {
+          field: 'tags',
+          index: i,
+          value: tag,
+          expectedType: 'non-empty string',
+          operation: 'validateTags',
+        });
+        throw error;
       }
 
       if (tag.length > 100) {
-        throw new Error('Tag length cannot exceed 100 characters');
+        const error = ErrorFactory.validation(
+          `Field 'tags' at index ${i} value ${tag.length} is out of range. Expected less than or equal to 100`,
+          'tags',
+          tag.length,
+        );
+        this.logger.warn('Tag validation failed: tag too long', {
+          field: 'tags',
+          index: i,
+          value: tag.length,
+          constraint: 'maximum 100 characters',
+          operation: 'validateTags',
+        });
+        throw error;
+      }
+
+      // Check for potentially dangerous patterns
+      const dangerousPatterns = [
+        /["']\s*;/,
+        /\b(drop|delete|update|insert|alter|create)\b/i,
+        /--/,
+        /\/\*/,
+        /\*\//,
+      ];
+
+      for (const pattern of dangerousPatterns) {
+        if (pattern.test(tag)) {
+          const error = ErrorFactory.validation(
+            `Field 'tags' at index ${i} violates constraint: contains potentially dangerous SQL patterns`,
+            'tags',
+            tag,
+          );
+          this.logger.warn(
+            'Tag validation failed: dangerous patterns detected',
+            {
+              field: 'tags',
+              index: i,
+              value: tag,
+              constraint: 'no SQL injection patterns',
+              operation: 'validateTags',
+              pattern: pattern.toString(),
+            },
+          );
+          throw error;
+        }
       }
     }
   }
@@ -324,15 +469,49 @@ export class SearchRepository {
    */
   private validateTextQuery(query: string): void {
     if (typeof query !== 'string') {
-      throw new Error('Query must be a string');
+      const actualType = typeof query;
+      const error = ErrorFactory.validation(
+        `Field 'query' has invalid type. Expected string, got ${actualType}`,
+        'query',
+        query,
+      );
+      this.logger.warn('Text query validation failed: invalid type', {
+        field: 'query',
+        value: query,
+        expectedType: 'string',
+        operation: 'validateTextQuery',
+      });
+      throw error;
     }
 
     if (query.trim().length === 0) {
-      throw new Error('Query cannot be empty');
+      const error = ErrorFactory.validation(
+        `Field 'query' violates constraint: cannot be empty or whitespace only`,
+        'query',
+        query,
+      );
+      this.logger.warn('Text query validation failed: empty query', {
+        field: 'query',
+        value: query,
+        constraint: 'non-empty string',
+        operation: 'validateTextQuery',
+      });
+      throw error;
     }
 
     if (query.length > 1000) {
-      throw new Error('Query length cannot exceed 1000 characters');
+      const error = ErrorFactory.validation(
+        `Field 'query' value ${query.length} is out of range. Expected less than or equal to 1000`,
+        'query',
+        query.length,
+      );
+      this.logger.warn('Text query validation failed: query too long', {
+        field: 'query',
+        value: query.length,
+        constraint: 'maximum 1000 characters',
+        operation: 'validateTextQuery',
+      });
+      throw error;
     }
 
     // Check for potentially dangerous patterns
@@ -346,7 +525,22 @@ export class SearchRepository {
 
     for (const pattern of dangerousPatterns) {
       if (pattern.test(query)) {
-        throw new Error('Query contains potentially dangerous patterns');
+        const error = ErrorFactory.validation(
+          `Field 'query' violates constraint: contains potentially dangerous SQL patterns`,
+          'query',
+          query,
+        );
+        this.logger.warn(
+          'Text query validation failed: dangerous patterns detected',
+          {
+            field: 'query',
+            value: query,
+            constraint: 'no SQL injection patterns',
+            operation: 'validateTextQuery',
+            pattern: pattern.toString(),
+          },
+        );
+        throw error;
       }
     }
   }
@@ -356,11 +550,34 @@ export class SearchRepository {
    */
   private validateSuggestionPrefix(prefix: string): void {
     if (typeof prefix !== 'string') {
-      throw new Error('Prefix must be a string');
+      const actualType = typeof prefix;
+      const error = ErrorFactory.validation(
+        `Field 'prefix' has invalid type. Expected string, got ${actualType}`,
+        'prefix',
+        prefix,
+      );
+      this.logger.warn('Suggestion prefix validation failed: invalid type', {
+        field: 'prefix',
+        value: prefix,
+        expectedType: 'string',
+        operation: 'validateSuggestionPrefix',
+      });
+      throw error;
     }
 
     if (prefix.length > 100) {
-      throw new Error('Prefix length cannot exceed 100 characters');
+      const error = ErrorFactory.validation(
+        `Field 'prefix' value ${prefix.length} is out of range. Expected less than or equal to 100`,
+        'prefix',
+        prefix.length,
+      );
+      this.logger.warn('Suggestion prefix validation failed: prefix too long', {
+        field: 'prefix',
+        value: prefix.length,
+        constraint: 'maximum 100 characters',
+        operation: 'validateSuggestionPrefix',
+      });
+      throw error;
     }
   }
 
@@ -477,11 +694,15 @@ export class SearchRepository {
 
       return rows.map((row: any) => this.mapRowToSearchCandidate(row, options));
     } catch (error) {
-      throw this.createDatabaseError(
+      throw ErrorFactory.database(
         DatabaseErrorType.QUERY_FAILED,
         `Query execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        { query: query.sql, params: query.params },
-        error instanceof Error ? error : undefined,
+        {
+          query: query.sql,
+          params: query.params,
+          context: { operation: 'executeQuery' },
+          original: error instanceof Error ? error : undefined,
+        },
       );
     }
   }
@@ -590,8 +811,10 @@ export class SearchRepository {
     // Expand tags for broader matching
     const expandedTags = this.expandTags(tags);
 
-    // Build FTS5 MATCH expression
-    const tagExpression = expandedTags.map(tag => `"${tag}"`).join(' OR ');
+    // Build parameterized MATCH conditions for security
+    const matchConditions = expandedTags
+      .map(() => 'files_fts MATCH ?')
+      .join(' OR ');
 
     const defaultLimit = 50;
     const opts = options ?? {};
@@ -601,7 +824,7 @@ export class SearchRepository {
     const offset = opts.offset ?? 0;
 
     let sql = `
-      SELECT 
+      SELECT
         f.id,
         f.path,
         f.filename,
@@ -622,10 +845,10 @@ export class SearchRepository {
         1 as match_count
       FROM files f
       JOIN files_fts fts ON f.rowid = fts.rowid
-      WHERE files_fts MATCH ?
+      WHERE ${matchConditions}
     `;
 
-    const params: unknown[] = [tagExpression];
+    const params: unknown[] = [...expandedTags];
 
     // Add filters
     if (opts.filters) {
@@ -895,19 +1118,115 @@ export class SearchRepository {
   }
 
   /**
-   * Create a database error with context
+   * Create error boundary with automatic migration
+   * Wraps operations that might throw legacy errors
    */
-  private createDatabaseError(
-    type: DatabaseErrorType,
-    message: string,
-    context: Record<string, unknown>,
-    original?: Error,
-  ): DatabaseError {
-    return new DatabaseError(type, message, {
-      original,
-      query: context.query as string,
-      params: context.params as unknown[],
-      context,
-    });
+  private withErrorMigration<T>(
+    operation: string,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    return ErrorMigration.createAsyncErrorBoundary(operation, fn);
+  }
+
+  /**
+   * Get error statistics and monitoring information
+   */
+  getErrorStatistics(): {
+    totalErrors: number;
+    errorRate: number; // errors per minute
+    criticalErrors: string[];
+    recentErrorRate: number; // errors per minute in last 5 minutes
+    errorTrend: 'increasing' | 'decreasing' | 'stable';
+  } {
+    const now = Date.now();
+    const timeSinceLastCheck = (now - this.lastErrorCheck) / (1000 * 60); // minutes
+    const errorRate =
+      timeSinceLastCheck > 0 ? this.totalSearchErrors / timeSinceLastCheck : 0;
+
+    // Get recent error rate (last 5 minutes)
+    const recentErrorRate = this.errorAggregator.getRealTimeErrorRate(5);
+
+    // Get critical errors from aggregator
+    const aggregatorStats = this.errorAggregator.getErrorStatistics();
+    const criticalErrors = aggregatorStats.criticalErrors;
+
+    return {
+      totalErrors: this.totalSearchErrors,
+      errorRate,
+      criticalErrors,
+      recentErrorRate: recentErrorRate.errorsPerMinute,
+      errorTrend: recentErrorRate.trend,
+    };
+  }
+
+  /**
+   * Check for critical search failures and generate alerts
+   */
+  checkSearchFailureAlerts(): {
+    alerts: string[];
+    warnings: string[];
+  } {
+    const alerts: string[] = [];
+    const warnings: string[] = [];
+
+    const stats = this.getErrorStatistics();
+    const aggregatorStats = this.errorAggregator.getErrorStatistics();
+
+    // Check error rate thresholds
+    if (
+      stats.recentErrorRate >
+      PERFORMANCE_THRESHOLDS.CRITICAL_ERROR_RATE_THRESHOLD
+    ) {
+      alerts.push(
+        `Critical search error rate: ${stats.recentErrorRate.toFixed(2)} errors/minute (threshold: ${PERFORMANCE_THRESHOLDS.CRITICAL_ERROR_RATE_THRESHOLD})`,
+      );
+    } else if (
+      stats.recentErrorRate > PERFORMANCE_THRESHOLDS.ERROR_RATE_THRESHOLD
+    ) {
+      warnings.push(
+        `High search error rate: ${stats.recentErrorRate.toFixed(2)} errors/minute (threshold: ${PERFORMANCE_THRESHOLDS.ERROR_RATE_THRESHOLD})`,
+      );
+    }
+
+    // Check for critical errors
+    if (stats.criticalErrors.length > 0) {
+      alerts.push(
+        `Critical search errors detected: ${stats.criticalErrors.join(', ')}`,
+      );
+    }
+
+    // Check error trend
+    if (stats.errorTrend === 'increasing') {
+      warnings.push('Search error rate is increasing - monitor closely');
+    }
+
+    // Check for high frequency errors
+    if (
+      aggregatorStats.mostFrequentError &&
+      aggregatorStats.mostFrequentError.count >
+        ERROR_AGGREGATION.CRITICAL_THRESHOLD
+    ) {
+      alerts.push(
+        `Frequent search error: ${aggregatorStats.mostFrequentError.type} (${aggregatorStats.mostFrequentError.count} occurrences)`,
+      );
+    }
+
+    return { alerts, warnings };
+  }
+
+  /**
+   * Log aggregated error report for search operations
+   */
+  logErrorReport(): void {
+    this.errorAggregator.logAggregatedErrors(this.logger);
+  }
+
+  /**
+   * Reset error statistics (useful for testing or manual reset)
+   */
+  resetErrorStatistics(): void {
+    this.errorAggregator.reset();
+    this.totalSearchErrors = 0;
+    this.lastErrorCheck = Date.now();
   }
 }

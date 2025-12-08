@@ -1,5 +1,10 @@
 import type Database from 'better-sqlite3';
 
+import { DatabaseErrorType } from '../../../shared/errors/DatabaseError';
+import type { ServiceError } from '../../../shared/errors/ServiceError';
+import { ErrorFactory } from '../../../shared/errors/ErrorFactory';
+import { ErrorMigration } from '../../../shared/errors/ErrorMigration';
+import { LogManager } from '../../../shared/utils/LogManager';
 import type { DatabaseConfig } from '../types/StorageTypes';
 import type {
   ConnectionHealth,
@@ -25,6 +30,7 @@ export class EnhancedConnectionPool extends ConnectionPool {
   private cleanupInterval?: NodeJS.Timeout;
   private healthCheckInterval?: NodeJS.Timeout;
   private connectionIdCounter = 0;
+  private logger = LogManager.getLogger('EnhancedConnectionPool');
 
   constructor(
     config: DatabaseConfig,
@@ -32,15 +38,43 @@ export class EnhancedConnectionPool extends ConnectionPool {
   ) {
     // Validate database path - check if it's obviously invalid
     if (config.path === '/invalid/path' || config.path.includes('/invalid/')) {
-      throw new Error(`Invalid database path: ${config.path}`);
+      LogManager.getLogger('EnhancedConnectionPool').error(
+        'Invalid database path provided during initialization',
+        undefined,
+        {
+          path: config.path,
+          operation: 'initialization',
+        },
+      );
+      throw ErrorFactory.validation(
+        `Invalid database path: ${config.path}. Expected valid file system path`,
+        'path',
+        config.path,
+      );
     }
 
     // Validate database path exists or can be created
     try {
       super(config);
     } catch (error) {
-      throw new Error(
+      LogManager.getLogger('EnhancedConnectionPool').error(
+        'Failed to initialize connection pool',
+        error instanceof Error ? error : undefined,
+        {
+          path: config.path,
+          operation: 'initialization',
+        },
+      );
+      throw ErrorFactory.database(
+        DatabaseErrorType.CONNECTION_FAILED,
         `Failed to initialize connection pool: ${error instanceof Error ? error.message : String(error)}`,
+        {
+          original: error instanceof Error ? error : undefined,
+          context: {
+            path: config.path,
+            operation: 'pool_initialization',
+          },
+        },
       );
     }
 
@@ -74,8 +108,26 @@ export class EnhancedConnectionPool extends ConnectionPool {
 
         // Validate connection health
         if (!this.isConnectionHealthy(connection)) {
+          this.logger.warn(
+            'Connection failed health check, replacing connection',
+            {
+              attempt,
+              maxAttempts: maxAttempts,
+              operation: 'connection_acquisition',
+            },
+          );
           this.replaceConnection(connection);
-          throw new Error('Connection failed health check');
+          throw ErrorFactory.database(
+            DatabaseErrorType.CONNECTION_FAILED,
+            'Connection failed health check',
+            {
+              context: {
+                attempt,
+                maxAttempts,
+                operation: 'health_check',
+              },
+            },
+          );
         }
 
         // Update performance metrics
@@ -87,8 +139,26 @@ export class EnhancedConnectionPool extends ConnectionPool {
         attempt++;
 
         if (attempt > maxAttempts) {
-          throw new Error(
+          this.logger.error(
+            'Failed to acquire healthy connection after all retry attempts',
+            error instanceof Error ? error : undefined,
+            {
+              attempt,
+              maxAttempts,
+              operation: 'connection_acquisition',
+            },
+          );
+          throw ErrorFactory.database(
+            DatabaseErrorType.CONNECTION_FAILED,
             `Failed to acquire healthy connection after ${maxAttempts} attempts: ${error instanceof Error ? error.message : String(error)}`,
+            {
+              original: error instanceof Error ? error : undefined,
+              context: {
+                attempt,
+                maxAttempts,
+                operation: 'connection_acquisition_retry_exhausted',
+              },
+            },
           );
         }
 
@@ -104,12 +174,34 @@ export class EnhancedConnectionPool extends ConnectionPool {
           delay,
           CONNECTION_POOL_DEFAULTS.MIN_RETRY_DELAY_MS,
         );
+
+        this.logger.info('Retrying connection acquisition after failure', {
+          attempt,
+          maxAttempts,
+          delay: actualDelay,
+          operation: 'connection_retry',
+        });
         await this.sleep(actualDelay);
       }
     }
 
-    throw new Error(
+    this.logger.error(
+      'Failed to acquire connection after maximum retry attempts exceeded',
+      undefined,
+      {
+        maxAttempts,
+        operation: 'connection_acquisition',
+      },
+    );
+    throw ErrorFactory.database(
+      DatabaseErrorType.CONNECTION_FAILED,
       `Failed to acquire connection after ${maxAttempts} attempts: maximum retry attempts exceeded`,
+      {
+        context: {
+          maxAttempts,
+          operation: 'connection_acquisition_max_retries',
+        },
+      },
     );
   }
 
@@ -202,6 +294,14 @@ export class EnhancedConnectionPool extends ConnectionPool {
       details.push('All connections are operating normally');
     }
 
+    this.logger.debug('Performed health check on connection pool', {
+      healthy,
+      total,
+      healthRate: Math.round(healthRate * 100) / 100,
+      status,
+      operation: 'health_check',
+    });
+
     return { status, details };
   }
 
@@ -210,6 +310,11 @@ export class EnhancedConnectionPool extends ConnectionPool {
    */
   warmupConnectionPool(): void {
     const minConnections = this.performanceConfig.connectionPool.minConnections;
+    this.logger.info('Starting connection pool warmup', {
+      minConnections,
+      operation: 'pool_warmup',
+    });
+
     const connections: Database.Database[] = [];
 
     try {
@@ -221,8 +326,21 @@ export class EnhancedConnectionPool extends ConnectionPool {
 
       // Return connections to pool
       connections.forEach(conn => this.releaseConnection(conn));
-    } catch {
-      // Log warmup failures but don't fail initialization
+
+      this.logger.info('Connection pool warmup completed successfully', {
+        connectionsCreated: minConnections,
+        operation: 'pool_warmup',
+      });
+    } catch (error) {
+      const migratedError = this.migrateError(error as Error, 'pool_warmup');
+      this.logger.warn(
+        'Connection pool warmup failed, continuing with cold pool',
+        {
+          minConnections,
+          operation: 'pool_warmup',
+          error: migratedError.message,
+        },
+      );
     }
   }
 
@@ -295,11 +413,17 @@ export class EnhancedConnectionPool extends ConnectionPool {
 
       return true;
     } catch (error) {
+      const migratedError = this.migrateError(error as Error, 'health_check');
       health.failureCount++;
-      health.lastError = error instanceof Error ? error.message : String(error);
+      health.lastError = migratedError.message;
       health.isHealthy = false;
 
-      // Log validation failure for monitoring
+      this.logger.warn('Connection health check failed', {
+        connectionId: health.id,
+        failureCount: health.failureCount,
+        operation: 'health_check',
+        error: migratedError.message,
+      });
 
       return false;
     }
@@ -309,20 +433,52 @@ export class EnhancedConnectionPool extends ConnectionPool {
    * Replace unhealthy connection
    */
   private replaceConnection(unhealthyConnection: Database.Database): void {
+    const health = this.connectionHealth.get(unhealthyConnection);
+    this.logger.info('Replacing unhealthy connection', {
+      connectionId: health?.id,
+      operation: 'connection_replacement',
+    });
+
     this.connectionHealth.delete(unhealthyConnection);
 
     try {
       unhealthyConnection.close();
-    } catch {
-      // Log cleanup errors but don't fail the replacement
+    } catch (error) {
+      const migratedError = this.migrateError(
+        error as Error,
+        'connection_cleanup',
+      );
+      this.logger.warn(
+        'Failed to close unhealthy connection during replacement',
+        {
+          connectionId: health?.id,
+          operation: 'connection_cleanup',
+          error: migratedError.message,
+        },
+      );
     }
 
     // Create new connection to replace unhealthy one
     try {
       const newConnection = this.createNewConnection();
       this.trackConnection(newConnection);
-    } catch {
-      // Failed to create replacement connection
+      this.logger.debug('Successfully created replacement connection', {
+        connectionId: health?.id,
+        operation: 'connection_replacement',
+      });
+    } catch (error) {
+      const migratedError = this.migrateError(
+        error as Error,
+        'connection_replacement',
+      );
+      this.logger.error(
+        'Failed to create replacement connection',
+        migratedError,
+        {
+          connectionId: health?.id,
+          operation: 'connection_replacement',
+        },
+      );
     }
   }
 
@@ -367,11 +523,21 @@ export class EnhancedConnectionPool extends ConnectionPool {
   private cleanupIdleConnections(): void {
     const now = Date.now();
     const idleTimeout = this.performanceConfig.connectionPool.idleTimeoutMs;
+    let cleanedCount = 0;
 
     for (const [connection, health] of this.connectionHealth.entries()) {
       if (now - health.lastCheck > idleTimeout) {
         this.replaceConnection(connection);
+        cleanedCount++;
       }
+    }
+
+    if (cleanedCount > 0) {
+      this.logger.info('Cleaned up idle connections', {
+        cleanedCount,
+        idleTimeout,
+        operation: 'idle_cleanup',
+      });
     }
   }
 
@@ -519,5 +685,26 @@ export class EnhancedConnectionPool extends ConnectionPool {
    */
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Migrate legacy errors to ServiceError types for consistent error handling
+   */
+  private migrateError(error: Error, operation: string): ServiceError {
+    return ErrorMigration.migrateError(error, operation).migrated;
+  }
+
+  /**
+   * Create error boundary with automatic migration for legacy errors
+   */
+  private async createErrorBoundary<T>(
+    operation: string,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await fn();
+    } catch (error) {
+      throw this.migrateError(error as Error, operation);
+    }
   }
 }

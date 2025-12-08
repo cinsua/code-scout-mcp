@@ -3,13 +3,22 @@
  */
 
 import { PERFORMANCE_THRESHOLDS } from '../../../shared/utils/LoggingConstants';
+import { Logger } from '../../../shared/utils/Logger';
+import { ErrorFactory } from '../../../shared/errors/ErrorFactory';
+import { ErrorMigration } from '../../../shared/errors/ErrorMigration';
+
 export class PerformanceProfiler {
   private profiles: Map<string, ProfileSession> = new Map();
   private activeProfile?: ProfileSession;
   private metrics: ProfileMetrics;
+  private logger: Logger;
 
   constructor() {
     this.metrics = this.initializeMetrics();
+    this.logger = new Logger().child({
+      service: 'PerformanceProfiler',
+      component: 'storage',
+    });
   }
 
   /**
@@ -33,6 +42,18 @@ export class PerformanceProfiler {
     // Take initial memory snapshot
     this.takeMemorySnapshot(session);
 
+    this.logger.info(`Started performance profiling session`, {
+      operation: 'startProfile',
+      profileId,
+      profileName: name,
+      performance: {
+        duration: 0,
+        memoryUsage: 0, // Will be updated after memory snapshot
+        queryCount: 0,
+      },
+      metadata,
+    });
+
     return profileId;
   }
 
@@ -42,7 +63,12 @@ export class PerformanceProfiler {
   endProfile(profileId: string): ProfileResult {
     const session = this.profiles.get(profileId);
     if (!session) {
-      throw new Error(`Profile session not found: ${profileId}`);
+      throw ErrorFactory.resource(
+        'profile_session',
+        `Profile session not found: ${profileId}`,
+        undefined,
+        undefined,
+      );
     }
 
     session.endTime = Date.now();
@@ -57,6 +83,19 @@ export class PerformanceProfiler {
 
     // Update global metrics
     this.updateGlobalMetrics(result);
+
+    this.logger.info(`Ended performance profiling session`, {
+      operation: 'endProfile',
+      profileId,
+      profileName: session.name,
+      performance: {
+        duration: result.duration,
+        memoryUsage: result.memory.finalHeap,
+        queryCount: result.queries.total,
+      },
+      queries: result.queries.total,
+      memoryGrowth: result.memory.heapGrowth,
+    });
 
     this.activeProfile = undefined;
     return result;
@@ -84,6 +123,27 @@ export class PerformanceProfiler {
     };
 
     this.activeProfile.queries.push(queryRecord);
+
+    // Log slow or failed queries
+    if (!success) {
+      this.logger.warn(`Query failed in profiling session`, {
+        operation: 'recordQuery',
+        profileId: this.activeProfile.id,
+        query: query.substring(0, 100), // Truncate for logging
+        duration,
+        rowCount,
+      });
+    } else if (
+      duration > PERFORMANCE_THRESHOLDS.ANALYSIS_SLOW_QUERY_THRESHOLD_MS
+    ) {
+      this.logger.info(`Slow query recorded in profiling session`, {
+        operation: 'recordQuery',
+        profileId: this.activeProfile.id,
+        query: query.substring(0, 100), // Truncate for logging
+        duration,
+        rowCount,
+      });
+    }
   }
 
   /**
@@ -101,8 +161,20 @@ export class PerformanceProfiler {
       };
 
       session.memorySnapshots.push(snapshot);
-    } catch {
-      // Ignore memory snapshot errors
+    } catch (error) {
+      // Migrate legacy errors and log them appropriately
+      const migratedError = ErrorMigration.migrateError(
+        error as Error,
+        'takeMemorySnapshot',
+      );
+
+      this.logger.warn('Failed to take memory snapshot', {
+        operation: 'takeMemorySnapshot',
+        profileId: session.id,
+        error: migratedError.migrated.message,
+        wasLegacy: migratedError.wasLegacy,
+        originalType: migratedError.originalType,
+      });
     }
   }
 
@@ -232,7 +304,12 @@ export class PerformanceProfiler {
   generateProfileReport(profileId: string): ProfileReport {
     const session = this.profiles.get(profileId);
     if (!session) {
-      throw new Error(`Profile session not found: ${profileId}`);
+      throw ErrorFactory.resource(
+        'profile_session',
+        `Profile session not found: ${profileId}`,
+        undefined,
+        undefined,
+      );
     }
 
     const result = this.calculateProfileResult(session);
@@ -347,9 +424,15 @@ export class PerformanceProfiler {
    * Clear all profiles
    */
   clearProfiles(): void {
+    const profileCount = this.profiles.size;
     this.profiles.clear();
     this.activeProfile = undefined;
     this.metrics = this.initializeMetrics();
+
+    this.logger.info(`Cleared all performance profiling data`, {
+      operation: 'clearProfiles',
+      profilesCleared: profileCount,
+    });
   }
 
   /**

@@ -1,3 +1,95 @@
+import { ErrorMigration } from '../../../shared/errors/ErrorMigration';
+import { ValidationError } from '../../../shared/errors/ValidationError';
+import { LogManager } from '../../../shared/utils/LogManager';
+
+/**
+ * Error factory methods for consistent error creation in query builders
+ */
+const QueryBuilderErrorFactory = {
+  /**
+   * Create validation error for invalid format
+   */
+  invalidFormat(
+    field: string,
+    value: any,
+    expectedFormat: string,
+  ): ValidationError {
+    return ValidationError.invalidFormat(field, value, expectedFormat);
+  },
+
+  /**
+   * Create validation error for invalid input
+   */
+  invalidInput(
+    input: any,
+    expectedType?: string,
+    field?: string,
+  ): ValidationError {
+    return ValidationError.invalidInput(input, expectedType, field);
+  },
+
+  /**
+   * Create validation error for invalid type
+   */
+  invalidType(
+    field: string,
+    value: any,
+    expectedType: string,
+  ): ValidationError {
+    return ValidationError.invalidType(field, value, expectedType);
+  },
+
+  /**
+   * Create validation error for constraint violation
+   */
+  constraintViolation(
+    field: string,
+    constraint: string,
+    value?: any,
+  ): ValidationError {
+    return ValidationError.constraintViolation(field, constraint, value);
+  },
+
+  /**
+   * Create validation error for out of range values
+   */
+  outOfRange(
+    field: string,
+    value: number,
+    min?: number,
+    max?: number,
+  ): ValidationError {
+    return ValidationError.outOfRange(field, value, min, max);
+  },
+
+  /**
+   * Migrate legacy errors to ServiceError types
+   */
+  migrateError(
+    error: Error,
+    operation?: string,
+  ): ReturnType<typeof ErrorMigration.migrateError> {
+    return ErrorMigration.migrateError(error, operation);
+  },
+
+  /**
+   * Create error boundary with automatic migration
+   */
+  createErrorBoundary<T>(operation: string, fn: () => T): T {
+    return ErrorMigration.createErrorBoundary(operation, fn);
+  },
+
+  /**
+   * Create async error boundary with automatic migration
+   */
+  createAsyncErrorBoundary<T>(
+    operation: string,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    return ErrorMigration.createAsyncErrorBoundary(operation, fn);
+  },
+};
+
 /**
  * Query builder utilities for SQLite operations
  */
@@ -8,13 +100,23 @@
 export class QueryBuilder {
   private query = '';
   private params: unknown[] = [];
+  private logger = LogManager.getLogger('QueryBuilder');
 
   /**
    * Validate SQL identifier to prevent injection
    */
   private validateIdentifier(identifier: string): void {
     if (!/^[A-Z_a-z]\w*$/.test(identifier)) {
-      throw new Error(`Invalid identifier: ${identifier}`);
+      this.logger.warn('Invalid SQL identifier detected', {
+        operation: 'validateIdentifier',
+        identifier,
+        context: { queryBuilder: 'QueryBuilder' },
+      });
+      throw QueryBuilderErrorFactory.invalidFormat(
+        'identifier',
+        identifier,
+        'valid SQL identifier (letters, numbers, underscores, starting with letter or underscore)',
+      );
     }
   }
 
@@ -180,10 +282,19 @@ export class QueryBuilder {
    * Build and return the query and parameters
    */
   build(): { query: string; params: unknown[] } {
-    return {
+    const result = {
       query: this.query,
       params: [...this.params],
     };
+
+    this.logger.debug('Query built successfully', {
+      operation: 'build',
+      queryLength: this.query.length,
+      paramCount: this.params.length,
+      context: { queryBuilder: 'QueryBuilder' },
+    });
+
+    return result;
   }
 
   /**
@@ -202,13 +313,23 @@ export class QueryBuilder {
 export class InsertBuilder {
   private query = '';
   private params: unknown[] = [];
+  private logger = LogManager.getLogger('InsertBuilder');
 
   /**
    * Validate SQL identifier to prevent injection
    */
   private validateIdentifier(identifier: string): void {
     if (!/^[A-Z_a-z]\w*$/.test(identifier)) {
-      throw new Error(`Invalid identifier: ${identifier}`);
+      this.logger.warn('Invalid SQL identifier detected', {
+        operation: 'validateIdentifier',
+        identifier,
+        context: { queryBuilder: 'InsertBuilder' },
+      });
+      throw QueryBuilderErrorFactory.invalidFormat(
+        'identifier',
+        identifier,
+        'valid SQL identifier (letters, numbers, underscores, starting with letter or underscore)',
+      );
     }
   }
 
@@ -263,10 +384,19 @@ export class InsertBuilder {
    * Build and return the query and parameters
    */
   build(): { query: string; params: unknown[] } {
-    return {
+    const result = {
       query: this.query,
       params: [...this.params],
     };
+
+    this.logger.debug('Insert query built successfully', {
+      operation: 'build',
+      queryLength: this.query.length,
+      paramCount: this.params.length,
+      context: { queryBuilder: 'InsertBuilder' },
+    });
+
+    return result;
   }
 }
 
@@ -276,13 +406,23 @@ export class InsertBuilder {
 export class UpdateBuilder {
   private query = '';
   private params: unknown[] = [];
+  private logger = LogManager.getLogger('UpdateBuilder');
 
   /**
    * Validate SQL identifier to prevent injection
    */
   private validateIdentifier(identifier: string): void {
     if (!/^[A-Z_a-z]\w*$/.test(identifier)) {
-      throw new Error(`Invalid identifier: ${identifier}`);
+      this.logger.warn('Invalid SQL identifier detected', {
+        operation: 'validateIdentifier',
+        identifier,
+        context: { queryBuilder: 'UpdateBuilder' },
+      });
+      throw QueryBuilderErrorFactory.invalidFormat(
+        'identifier',
+        identifier,
+        'valid SQL identifier (letters, numbers, underscores, starting with letter or underscore)',
+      );
     }
   }
 
@@ -329,10 +469,19 @@ export class UpdateBuilder {
    * Build and return the query and parameters
    */
   build(): { query: string; params: unknown[] } {
-    return {
+    const result = {
       query: this.query,
       params: [...this.params],
     };
+
+    this.logger.debug('Update query built successfully', {
+      operation: 'build',
+      queryLength: this.query.length,
+      paramCount: this.params.length,
+      context: { queryBuilder: 'UpdateBuilder' },
+    });
+
+    return result;
   }
 }
 
@@ -342,13 +491,23 @@ export class UpdateBuilder {
 export class DeleteBuilder {
   private query = '';
   private params: unknown[] = [];
+  private logger = LogManager.getLogger('DeleteBuilder');
 
   /**
    * Validate SQL identifier to prevent injection
    */
   private validateIdentifier(identifier: string): void {
     if (!/^[A-Z_a-z]\w*$/.test(identifier)) {
-      throw new Error(`Invalid identifier: ${identifier}`);
+      this.logger.warn('Invalid SQL identifier detected', {
+        operation: 'validateIdentifier',
+        identifier,
+        context: { queryBuilder: 'DeleteBuilder' },
+      });
+      throw QueryBuilderErrorFactory.invalidFormat(
+        'identifier',
+        identifier,
+        'valid SQL identifier (letters, numbers, underscores, starting with letter or underscore)',
+      );
     }
   }
 
@@ -381,10 +540,19 @@ export class DeleteBuilder {
    * Build and return the query and parameters
    */
   build(): { query: string; params: unknown[] } {
-    return {
+    const result = {
       query: this.query,
       params: [...this.params],
     };
+
+    this.logger.debug('Delete query built successfully', {
+      operation: 'build',
+      queryLength: this.query.length,
+      paramCount: this.params.length,
+      context: { queryBuilder: 'DeleteBuilder' },
+    });
+
+    return result;
   }
 }
 
@@ -456,6 +624,7 @@ export class FTSQueryBuilder {
  * Search Query Builder for FTS5 operations
  */
 export class SearchQueryBuilder {
+  private static logger = LogManager.getLogger('SearchQueryBuilder');
   /**
    * Build tag search query with FTS5 MATCH
    */
@@ -477,7 +646,7 @@ export class SearchQueryBuilder {
     const tagQuery = tags.map(tag => `"${tag}"`).join(' OR ');
 
     let sql = `
-      SELECT 
+      SELECT
         f.id,
         f.path,
         f.filename,
@@ -554,7 +723,22 @@ export class SearchQueryBuilder {
     sql += ' ORDER BY fts.rank DESC LIMIT ? OFFSET ?';
     params.push(limit, offset);
 
-    return { sql, params };
+    const result = { sql, params };
+
+    SearchQueryBuilder.logger.debug('Tag search query built successfully', {
+      operation: 'buildTagSearchQuery',
+      tagCount: tags.length,
+      limit,
+      offset,
+      hasFilters: !!filters,
+      includeSnippets,
+      minScore,
+      queryLength: sql.length,
+      paramCount: params.length,
+      context: { queryBuilder: 'SearchQueryBuilder' },
+    });
+
+    return result;
   }
 
   /**
@@ -654,7 +838,22 @@ export class SearchQueryBuilder {
     sql += ' ORDER BY fts.rank DESC LIMIT ? OFFSET ?';
     params.push(limit, offset);
 
-    return { sql, params };
+    const result = { sql, params };
+
+    SearchQueryBuilder.logger.debug('Text search query built successfully', {
+      operation: 'buildTextSearchQuery',
+      queryLength: query.length,
+      limit,
+      offset,
+      hasFilters: !!filters,
+      includeSnippets,
+      minScore,
+      sqlLength: sql.length,
+      paramCount: params.length,
+      context: { queryBuilder: 'SearchQueryBuilder' },
+    });
+
+    return result;
   }
 
   /**
@@ -734,7 +933,16 @@ export class SearchQueryBuilder {
         };
 
       default:
-        throw new Error(`Unknown maintenance operation: ${operation}`);
+        SearchQueryBuilder.logger.warn('Unknown maintenance operation', {
+          operation: 'buildIndexMaintenanceQuery',
+          maintenanceOperation: operation,
+          context: { queryBuilder: 'SearchQueryBuilder' },
+        });
+        throw QueryBuilderErrorFactory.invalidInput(
+          operation,
+          'maintenance operation',
+          'rebuild|optimize|analyze|check',
+        );
     }
   }
 
@@ -763,55 +971,188 @@ export class SearchQueryBuilder {
   }): void {
     if (params.tags) {
       if (!Array.isArray(params.tags)) {
-        throw new Error('Tags must be an array');
+        SearchQueryBuilder.logger.warn(
+          'Invalid search params: tags must be array',
+          {
+            operation: 'validateSearchParams',
+            field: 'tags',
+            value: params.tags,
+            context: { queryBuilder: 'SearchQueryBuilder' },
+          },
+        );
+        throw QueryBuilderErrorFactory.invalidType(
+          'tags',
+          params.tags,
+          'array',
+        );
       }
 
       if (params.tags.length === 0) {
-        throw new Error('At least one tag is required');
+        SearchQueryBuilder.logger.warn(
+          'Invalid search params: empty tags array',
+          {
+            operation: 'validateSearchParams',
+            field: 'tags',
+            value: params.tags,
+            context: { queryBuilder: 'SearchQueryBuilder' },
+          },
+        );
+        throw QueryBuilderErrorFactory.constraintViolation(
+          'tags',
+          'must contain at least one tag',
+        );
       }
 
       if (params.tags.length > 5) {
-        throw new Error('Maximum 5 tags allowed');
+        SearchQueryBuilder.logger.warn('Invalid search params: too many tags', {
+          operation: 'validateSearchParams',
+          field: 'tags',
+          value: params.tags.length,
+          context: { queryBuilder: 'SearchQueryBuilder' },
+        });
+        throw QueryBuilderErrorFactory.outOfRange(
+          'tags',
+          params.tags.length,
+          undefined,
+          5,
+        );
       }
 
       for (const tag of params.tags) {
         if (typeof tag !== 'string' || tag.trim().length === 0) {
-          throw new Error('All tags must be non-empty strings');
+          SearchQueryBuilder.logger.warn('Invalid search params: invalid tag', {
+            operation: 'validateSearchParams',
+            field: 'tags',
+            value: tag,
+            context: { queryBuilder: 'SearchQueryBuilder' },
+          });
+          throw QueryBuilderErrorFactory.invalidType(
+            'tag',
+            tag,
+            'non-empty string',
+          );
         }
 
         if (tag.length > 100) {
-          throw new Error('Tag length cannot exceed 100 characters');
+          SearchQueryBuilder.logger.warn(
+            'Invalid search params: tag too long',
+            {
+              operation: 'validateSearchParams',
+              field: 'tags',
+              value: tag.length,
+              context: { queryBuilder: 'SearchQueryBuilder' },
+            },
+          );
+          throw QueryBuilderErrorFactory.outOfRange(
+            'tag',
+            tag.length,
+            undefined,
+            100,
+          );
         }
       }
     }
 
     if (params.query) {
       if (typeof params.query !== 'string') {
-        throw new Error('Query must be a string');
+        SearchQueryBuilder.logger.warn(
+          'Invalid search params: query must be string',
+          {
+            operation: 'validateSearchParams',
+            field: 'query',
+            value: params.query,
+            context: { queryBuilder: 'SearchQueryBuilder' },
+          },
+        );
+        throw QueryBuilderErrorFactory.invalidType(
+          'query',
+          params.query,
+          'string',
+        );
       }
 
       if (params.query.trim().length === 0) {
-        throw new Error('Query cannot be empty');
+        SearchQueryBuilder.logger.warn('Invalid search params: empty query', {
+          operation: 'validateSearchParams',
+          field: 'query',
+          value: params.query,
+          context: { queryBuilder: 'SearchQueryBuilder' },
+        });
+        throw QueryBuilderErrorFactory.constraintViolation(
+          'query',
+          'cannot be empty',
+        );
       }
 
       if (params.query.length > 1000) {
-        throw new Error('Query length cannot exceed 1000 characters');
+        SearchQueryBuilder.logger.warn(
+          'Invalid search params: query too long',
+          {
+            operation: 'validateSearchParams',
+            field: 'query',
+            value: params.query.length,
+            context: { queryBuilder: 'SearchQueryBuilder' },
+          },
+        );
+        throw QueryBuilderErrorFactory.outOfRange(
+          'query',
+          params.query.length,
+          undefined,
+          1000,
+        );
       }
     }
 
     if (params.limit !== undefined) {
       if (typeof params.limit !== 'number' || params.limit <= 0) {
-        throw new Error('Limit must be a positive number');
+        SearchQueryBuilder.logger.warn('Invalid search params: invalid limit', {
+          operation: 'validateSearchParams',
+          field: 'limit',
+          value: params.limit,
+          context: { queryBuilder: 'SearchQueryBuilder' },
+        });
+        throw QueryBuilderErrorFactory.invalidType(
+          'limit',
+          params.limit,
+          'positive number',
+        );
       }
 
       if (params.limit > 1000) {
-        throw new Error('Limit cannot exceed 1000');
+        SearchQueryBuilder.logger.warn(
+          'Invalid search params: limit too high',
+          {
+            operation: 'validateSearchParams',
+            field: 'limit',
+            value: params.limit,
+            context: { queryBuilder: 'SearchQueryBuilder' },
+          },
+        );
+        throw QueryBuilderErrorFactory.outOfRange(
+          'limit',
+          params.limit,
+          undefined,
+          1000,
+        );
       }
     }
 
     if (params.offset !== undefined) {
       if (typeof params.offset !== 'number' || params.offset < 0) {
-        throw new Error('Offset must be a non-negative number');
+        SearchQueryBuilder.logger.warn(
+          'Invalid search params: invalid offset',
+          {
+            operation: 'validateSearchParams',
+            field: 'offset',
+            value: params.offset,
+            context: { queryBuilder: 'SearchQueryBuilder' },
+          },
+        );
+        throw QueryBuilderErrorFactory.invalidType(
+          'offset',
+          params.offset,
+          'non-negative number',
+        );
       }
     }
   }
@@ -970,5 +1311,139 @@ export class QueryUtils {
    */
   static validateColumnName(name: string): boolean {
     return /^[A-Z_a-z]\w*$/.test(name);
+  }
+}
+
+/**
+ * Error migration utilities for query builder operations
+ */
+export class QueryBuilderErrorMigration {
+  private static logger = LogManager.getLogger('QueryBuilderErrorMigration');
+
+  /**
+   * Migrate legacy validation errors to ServiceError types
+   */
+  static migrateValidationError(
+    error: Error,
+    operation: string,
+  ): ValidationError {
+    const migration = QueryBuilderErrorFactory.migrateError(error, operation);
+
+    if (migration.wasLegacy) {
+      this.logger.debug('Migrated legacy validation error', {
+        operation,
+        originalType: migration.originalType,
+        migratedType: migration.migrated.constructor.name,
+      });
+    }
+
+    return migration.migrated as ValidationError;
+  }
+
+  /**
+   * Create error boundary for query builder operations with automatic migration
+   */
+  static createQueryErrorBoundary<T>(
+    operation: string,
+    queryBuilder: string,
+    fn: () => T,
+  ): T {
+    try {
+      return QueryBuilderErrorFactory.createErrorBoundary(operation, fn);
+    } catch (error) {
+      this.logger.warn('Query builder error caught and migrated', {
+        operation,
+        queryBuilder,
+        errorType: (error as Error).constructor.name,
+        errorMessage: (error as Error).message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Create async error boundary for query builder operations
+   */
+  static async createAsyncQueryErrorBoundary<T>(
+    operation: string,
+    queryBuilder: string,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await QueryBuilderErrorFactory.createAsyncErrorBoundary(
+        operation,
+        fn,
+      );
+    } catch (error) {
+      this.logger.warn('Async query builder error caught and migrated', {
+        operation,
+        queryBuilder,
+        errorType: (error as Error).constructor.name,
+        errorMessage: (error as Error).message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Wrap query builder methods with error migration
+   */
+  static wrapQueryBuilderMethod<T extends (...args: any[]) => any>(
+    method: T,
+    operation: string,
+    queryBuilder: string,
+  ): T {
+    return ((...args: Parameters<T>) => {
+      try {
+        const result = method.apply(this, args);
+
+        // Handle promises
+        if (result instanceof Promise) {
+          return result.catch((error: Error) => {
+            throw this.migrateValidationError(
+              error,
+              `${queryBuilder}.${operation}`,
+            );
+          });
+        }
+
+        return result;
+      } catch (error) {
+        throw this.migrateValidationError(
+          error as Error,
+          `${queryBuilder}.${operation}`,
+        );
+      }
+    }) as T;
+  }
+
+  /**
+   * Batch migrate multiple errors from query operations
+   */
+  static migrateQueryErrors(
+    errors: Error[],
+    operation: string,
+    queryBuilder: string,
+  ) {
+    const migrations = errors.map(error =>
+      QueryBuilderErrorFactory.migrateError(
+        error,
+        `${queryBuilder}.${operation}`,
+      ),
+    );
+
+    const legacyCount = migrations.filter(m => m.wasLegacy).length;
+
+    if (legacyCount > 0) {
+      this.logger.info('Batch migrated query errors', {
+        operation,
+        queryBuilder,
+        totalErrors: errors.length,
+        legacyErrors: legacyCount,
+        migrationRate: ((legacyCount / errors.length) * 100).toFixed(1) + '%',
+      });
+    }
+
+    return migrations;
   }
 }
